@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""End-to-end smoke test: runs the tuiforge binary inside a pseudo-terminal.
+"""End-to-end smoke test: runs the glyphforge binary inside a pseudo-terminal.
 
-Usage: scripts/pty_smoke_test.py target/release/tuiforge /tmp/some-empty-dir
+Usage: scripts/pty_smoke_test.py target/release/glyphforge /tmp/some-empty-dir
 
 The harness answers the terminal queries the editor sends (cursor position,
 device attributes) so the run matches a real terminal. Exact screen content
@@ -14,15 +14,15 @@ ESC_RE = re.compile(r"\x1b\[[0-9;?<>=]*[A-Za-z@`~]|\x1b[()][A-Za-z0-9]|\x1b[=>]"
 def plain(text):
     return ESC_RE.sub("", text)
 
-def run(binary, home, extra_env=None, keys=None, cols=100, rows=30, timeout=8):
+def run(binary, home, extra_env=None, keys=None, cols=100, rows=30, timeout=8, args=()):
     env = dict(os.environ)
     env.update({"TERM": "xterm-256color", "COLORTERM": "truecolor", "HOME": home,
-                "LANG": "en_US.UTF-8", "TUIFORGE_LOG": "debug"})
+                "LANG": "en_US.UTF-8", "GLYPHFORGE_LOG": "debug"})
     env.pop("XDG_CONFIG_HOME", None); env.pop("XDG_STATE_HOME", None)
     if extra_env: env.update(extra_env)
     pid, fd = pty.fork()
     if pid == 0:
-        os.execve(binary, [binary], env)
+        os.execve(binary, [binary, *args], env)
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
     out = b""
     def read_for(secs):
@@ -72,7 +72,7 @@ assert "\x1b[?1049h" in text, "alternate screen entered"
 assert "\x1b[?1049l" in text, "alternate screen left"
 assert "\x1b[?1000h" in text or "\x1b[?1002h" in text, "mouse enabled"
 assert "\x1b[?1000l" in text or "\x1b[?1002l" in text, "mouse disabled"
-assert "TUIForge" in text
+assert "Glyphforge" in text
 pt = plain(text)
 # Ratatui redraws only changed cells, so exact layout checks live in the
 # TestBackend unit tests; here we only check the glyph reached the terminal.
@@ -121,14 +121,14 @@ assert code == 0, f"exit {code}"
 assert "Tokyo Night (omarchy)" in plain(text), "omarchy theme name in header"
 assert "\x1b[38;2;" in text or "38;2;" in text, "truecolor escapes emitted"
 assert "Omarchy" in text
-log = open(ohome + "/.local/state/tuiforge/tuiforge.log").read()
+log = open(ohome + "/.local/state/glyphforge/glyphforge.log").read()
 assert "loaded Omarchy theme" in log, log[-500:]
 print("smoke 3 ok: omarchy theme detected, truecolor used, log written")
 
 # 4. Broken config is reported, not fatal.
 bhome = home + "/broken"
-os.makedirs(bhome + "/.config/tuiforge", exist_ok=True)
-open(bhome + "/.config/tuiforge/config.toml", "w").write("[canvas]\nnot_a_field = 1\n")
+os.makedirs(bhome + "/.config/glyphforge", exist_ok=True)
+open(bhome + "/.config/glyphforge/config.toml", "w").write("[canvas]\nnot_a_field = 1\n")
 code, out = run(binary, bhome, keys=[(b"\x11", 0.3)])
 text = out.decode("utf-8", "replace")
 assert code == 0, f"exit {code}"
@@ -141,4 +141,13 @@ code, out = run(binary, home, keys=env_keys + [(b"\x11", 0.2), (b"\x11", 0.3)], 
 text = out.decode("utf-8", "replace")
 assert code == 0
 print("smoke 5 ok: narrow terminal without panels")
+# 6. Open the shipped example: components render, undo reports, clean quit.
+example = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "examples", "dashboard.glyph")
+code, out = run(binary, home, keys=[(b"\x1a", 0.3), (b"\x11", 0.3)], args=(example,), cols=120, rows=36)
+text = plain(out.decode("utf-8", "replace"))
+assert code == 0, f"exit {code}"
+assert "Services" in text and "System Monitor" in text, "example components rendered"
+assert "Nothing" in text and "undo" in text, "undo reported in the status bar (diff-rendered)"
+assert "Minimal Dark" in text, "document theme shown in the header"
+print("smoke 6 ok: example project opens and renders")
 print("ALL SMOKE TESTS PASSED")

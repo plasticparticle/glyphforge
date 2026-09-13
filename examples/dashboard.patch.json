@@ -1,0 +1,626 @@
+{
+  "operations": [
+    {
+      "op": "set_theme",
+      "theme": {
+        "id": "minimal-dark",
+        "name": "Minimal Dark",
+        "border": "rounded",
+        "colors": {
+          "background": "#14161b",
+          "surface": "#1b1e25",
+          "surface-alt": "#22262f",
+          "border": "#3a3f4b",
+          "border-muted": "#2a2e37",
+          "foreground": "#d7dae0",
+          "foreground-muted": "#7c8291",
+          "primary": "#8ab4f8",
+          "secondary": "#c4a7e7",
+          "success": "#9ccc65",
+          "warning": "#ffca6b",
+          "error": "#ff7b72",
+          "info": "#79c0ff",
+          "selection": "#2f4f7f",
+          "selection-foreground": "#ffffff",
+          "focus": "#8ab4f8"
+        }
+      }
+    },
+    {
+      "op": "create_component",
+      "layer": "main-ui",
+      "component": {
+        "id": "window",
+        "kind": "group",
+        "layout": {
+          "container": {
+            "direction": "horizontal"
+          }
+        },
+        "children": [
+          {
+            "id": "sidebar",
+            "kind": "panel",
+            "props": {
+              "title": "glyphforge"
+            },
+            "layout": {
+              "width": "fixed(24)",
+              "padding": {
+                "left": 1,
+                "right": 1
+              },
+              "container": {
+                "direction": "vertical"
+              }
+            },
+            "responsive": [
+              {
+                "max_width": 90,
+                "hide": true
+              }
+            ],
+            "children": [
+              {
+                "id": "nav-heading",
+                "kind": "heading",
+                "props": {
+                  "text": "Navigation"
+                },
+                "layout": {
+                  "height": "content"
+                }
+              },
+              {
+                "id": "nav-dashboard",
+                "kind": "label",
+                "props": {
+                  "text": "\u25b8 Dashboard",
+                  "color": "primary",
+                  "bold": true
+                },
+                "layout": {
+                  "height": "content"
+                }
+              },
+              {
+                "id": "nav-services",
+                "kind": "label",
+                "props": {
+                  "text": "  Services"
+                },
+                "layout": {
+                  "height": "content"
+                }
+              },
+              {
+                "id": "nav-logs",
+                "kind": "label",
+                "props": {
+                  "text": "  Logs"
+                },
+                "layout": {
+                  "height": "content"
+                }
+              },
+              {
+                "id": "nav-settings",
+                "kind": "label",
+                "props": {
+                  "text": "  Settings"
+                },
+                "layout": {
+                  "height": "content"
+                }
+              },
+              {
+                "id": "nav-spacer",
+                "kind": "group"
+              },
+              {
+                "id": "logo",
+                "kind": "artwork",
+                "props": {
+                  "layer": "main-artwork",
+                  "width": 9,
+                  "height": 1
+                },
+                "layout": {
+                  "height": "content",
+                  "margin": {
+                    "left": 1,
+                    "bottom": 1
+                  }
+                }
+              },
+              {
+                "id": "nav-divider",
+                "kind": "divider",
+                "layout": {
+                  "height": "content"
+                }
+              },
+              {
+                "id": "nav-hint",
+                "kind": "label",
+                "props": {
+                  "text": "? help  q quit",
+                  "color": "foreground-muted"
+                },
+                "layout": {
+                  "height": "content"
+                }
+              }
+            ]
+          },
+          {
+            "id": "content",
+            "kind": "group",
+            "layout": {
+              "padding": {
+                "top": 0,
+                "right": 1,
+                "bottom": 0,
+                "left": 1
+              },
+              "container": {
+                "direction": "vertical",
+                "gap": 1
+              }
+            },
+            "children": [
+              {
+                "id": "header",
+                "kind": "group",
+                "layout": {
+                  "height": "fixed(1)",
+                  "container": {
+                    "direction": "horizontal"
+                  }
+                },
+                "children": [
+                  {
+                    "id": "title",
+                    "kind": "heading",
+                    "props": {
+                      "text": "System Monitor"
+                    }
+                  },
+                  {
+                    "id": "host",
+                    "kind": "label",
+                    "props": {
+                      "text": "omarchy-01 \u00b7 up 12d 4h",
+                      "color": "foreground-muted",
+                      "align": "right"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "metrics",
+                "kind": "group",
+                "layout": {
+                  "height": "fixed(5)",
+                  "container": {
+                    "direction": "grid",
+                    "columns": 4,
+                    "gap": 1
+                  }
+                },
+                "responsive": [
+                  {
+                    "max_width": 100,
+                    "layout": {
+                      "height": "fixed(11)",
+                      "container": {
+                        "direction": "grid",
+                        "columns": 2,
+                        "gap": 1
+                      }
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "id": "cpu",
+                    "kind": "panel",
+                    "props": {
+                      "title": "CPU"
+                    },
+                    "layout": {
+                      "container": {
+                        "direction": "vertical"
+                      }
+                    },
+                    "children": [
+                      {
+                        "id": "cpu-value",
+                        "kind": "heading",
+                        "props": {
+                          "text": "72%"
+                        },
+                        "layout": {
+                          "height": "content"
+                        }
+                      },
+                      {
+                        "id": "cpu-spark",
+                        "kind": "label",
+                        "props": {
+                          "text": "\u2581\u2582\u2583\u2585\u2586\u2588\u2587\u2585\u2583",
+                          "color": "primary"
+                        },
+                        "layout": {
+                          "height": "content"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "mem",
+                    "kind": "panel",
+                    "props": {
+                      "title": "Memory"
+                    },
+                    "layout": {
+                      "container": {
+                        "direction": "vertical"
+                      }
+                    },
+                    "children": [
+                      {
+                        "id": "mem-value",
+                        "kind": "heading",
+                        "props": {
+                          "text": "53%"
+                        },
+                        "layout": {
+                          "height": "content"
+                        }
+                      },
+                      {
+                        "id": "mem-spark",
+                        "kind": "label",
+                        "props": {
+                          "text": "\u2581\u2581\u2582\u2583\u2584\u2585\u2586\u2585\u2584",
+                          "color": "success"
+                        },
+                        "layout": {
+                          "height": "content"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "net",
+                    "kind": "panel",
+                    "props": {
+                      "title": "Network"
+                    },
+                    "layout": {
+                      "container": {
+                        "direction": "vertical"
+                      }
+                    },
+                    "children": [
+                      {
+                        "id": "net-value",
+                        "kind": "heading",
+                        "props": {
+                          "text": "1.2 MB/s"
+                        },
+                        "layout": {
+                          "height": "content"
+                        }
+                      },
+                      {
+                        "id": "net-spark",
+                        "kind": "label",
+                        "props": {
+                          "text": "\u2582\u2582\u2583\u2583\u2586\u2588\u2587\u2585\u2583",
+                          "color": "info"
+                        },
+                        "layout": {
+                          "height": "content"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "disk",
+                    "kind": "panel",
+                    "props": {
+                      "title": "Disk"
+                    },
+                    "layout": {
+                      "container": {
+                        "direction": "vertical"
+                      }
+                    },
+                    "children": [
+                      {
+                        "id": "disk-value",
+                        "kind": "heading",
+                        "props": {
+                          "text": "81%",
+                          "color": "warning"
+                        },
+                        "layout": {
+                          "height": "content"
+                        }
+                      },
+                      {
+                        "id": "disk-spark",
+                        "kind": "label",
+                        "props": {
+                          "text": "\u2585\u2585\u2586\u2586\u2586\u2587\u2587\u2587\u2588",
+                          "color": "warning"
+                        },
+                        "layout": {
+                          "height": "content"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "services",
+                "kind": "panel",
+                "props": {
+                  "title": "Services"
+                },
+                "layout": {
+                  "padding": {
+                    "left": 1,
+                    "right": 1
+                  },
+                  "container": {
+                    "direction": "vertical"
+                  }
+                },
+                "children": [
+                  {
+                    "id": "svc-header",
+                    "kind": "label",
+                    "props": {
+                      "text": "NAME          STATE      LATENCY   RESTARTS",
+                      "color": "foreground-muted"
+                    },
+                    "layout": {
+                      "height": "content"
+                    }
+                  },
+                  {
+                    "id": "svc-api",
+                    "kind": "label",
+                    "props": {
+                      "text": "api           healthy    42 ms     0"
+                    },
+                    "layout": {
+                      "height": "content"
+                    }
+                  },
+                  {
+                    "id": "svc-payments",
+                    "kind": "label",
+                    "props": {
+                      "text": "payments      degraded   320 ms    3",
+                      "color": "warning"
+                    },
+                    "layout": {
+                      "height": "content"
+                    }
+                  },
+                  {
+                    "id": "svc-search",
+                    "kind": "label",
+                    "props": {
+                      "text": "search        healthy    18 ms     0"
+                    },
+                    "layout": {
+                      "height": "content"
+                    }
+                  },
+                  {
+                    "id": "svc-worker",
+                    "kind": "label",
+                    "props": {
+                      "text": "worker        down       \u2014         12",
+                      "color": "error"
+                    },
+                    "layout": {
+                      "height": "content"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "actions",
+                "kind": "group",
+                "layout": {
+                  "height": "fixed(1)",
+                  "container": {
+                    "direction": "horizontal",
+                    "gap": 2
+                  }
+                },
+                "children": [
+                  {
+                    "id": "btn-restart",
+                    "kind": "button",
+                    "props": {
+                      "label": "Restart worker",
+                      "primary": true
+                    },
+                    "layout": {
+                      "width": "content"
+                    }
+                  },
+                  {
+                    "id": "btn-logs",
+                    "kind": "button",
+                    "props": {
+                      "label": "Open logs"
+                    },
+                    "layout": {
+                      "width": "content"
+                    }
+                  },
+                  {
+                    "id": "btn-ack",
+                    "kind": "button",
+                    "props": {
+                      "label": "Acknowledge",
+                      "disabled": true
+                    },
+                    "layout": {
+                      "width": "content"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "op": "set_cells",
+      "layer": "main-artwork",
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "cell": {
+            "content": {
+              "kind": "glyph",
+              "value": "\u2584"
+            },
+            "style": {
+              "fg": "#8ab4f8"
+            }
+          }
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "cell": {
+            "content": {
+              "kind": "glyph",
+              "value": "\u2580"
+            },
+            "style": {
+              "fg": "#8ab4f8"
+            }
+          }
+        },
+        {
+          "x": 2,
+          "y": 0,
+          "cell": {
+            "content": {
+              "kind": "glyph",
+              "value": "\u2584"
+            },
+            "style": {
+              "fg": "#8ab4f8"
+            }
+          }
+        },
+        {
+          "x": 4,
+          "y": 0,
+          "cell": {
+            "content": {
+              "kind": "glyph",
+              "value": "g"
+            },
+            "style": {
+              "fg": "#7c8291",
+              "attrs": {
+                "bold": true
+              }
+            }
+          }
+        },
+        {
+          "x": 5,
+          "y": 0,
+          "cell": {
+            "content": {
+              "kind": "glyph",
+              "value": "l"
+            },
+            "style": {
+              "fg": "#7c8291",
+              "attrs": {
+                "bold": true
+              }
+            }
+          }
+        },
+        {
+          "x": 6,
+          "y": 0,
+          "cell": {
+            "content": {
+              "kind": "glyph",
+              "value": "y"
+            },
+            "style": {
+              "fg": "#7c8291",
+              "attrs": {
+                "bold": true
+              }
+            }
+          }
+        },
+        {
+          "x": 7,
+          "y": 0,
+          "cell": {
+            "content": {
+              "kind": "glyph",
+              "value": "p"
+            },
+            "style": {
+              "fg": "#7c8291",
+              "attrs": {
+                "bold": true
+              }
+            }
+          }
+        },
+        {
+          "x": 8,
+          "y": 0,
+          "cell": {
+            "content": {
+              "kind": "glyph",
+              "value": "h"
+            },
+            "style": {
+              "fg": "#7c8291",
+              "attrs": {
+                "bold": true
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "op": "update_layer",
+      "target": "main-artwork",
+      "name": "Logo asset",
+      "visible": false
+    },
+    {
+      "op": "reorder_layer",
+      "target": "main-artwork",
+      "index": 0
+    }
+  ]
+}

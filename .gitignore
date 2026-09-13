@@ -1,4 +1,4 @@
 /target
-*.tuiforge.autosave
-*.tuiforge.recovery
+*.glyphforge.autosave
+*.glyphforge.recovery
 .direnv

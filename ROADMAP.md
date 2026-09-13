@@ -1,150 +1,181 @@
-# TUIForge Roadmap
+# Glyphforge Roadmap
 
 Development proceeds in small, independently testable milestones. Every
-milestone follows the same pipeline before it is considered done:
+milestone runs the same pipeline before it counts as done:
 
-1. implement
-2. write tests
-3. `cargo test --workspace`
-4. `cargo clippy --workspace --all-targets -- -D warnings`
-5. `cargo fmt --all --check`
-6. fix every warning and error
-7. update `ARCHITECTURE.md`, `README.md` and this file
+1. implement, 2. write tests, 3. `cargo test --workspace`,
+4. `cargo clippy --workspace --all-targets -- -D warnings`,
+5. `cargo fmt --all --check`, 6. fix everything, 7. update
+`ARCHITECTURE.md`, `README.md` and this file.
 
-The repository must never be left in a state where the pipeline fails.
+The repository must never be left with a failing pipeline.
 
-Status legend: `[x]` done, `[~]` partially done (details listed), `[ ]` open.
+Status legend: `[x]` done, `[~]` partial (details listed), `[ ]` open.
+
+The order follows the foundational priorities of the product brief:
+semantic object model, stable ids, layout, tokens, action system, patches,
+rendering, undo transactions, component abstraction, agent-readable
+serialisation. The component library, advanced tooling, MCP and framework
+exporters come only after those are stable.
 
 ---
 
-## Milestone 0 — Skeleton, terminal lifecycle, architecture  `[x]`
+## Foundation milestones
 
-- [x] Cargo workspace: `tuiforge-core` (no Ratatui) and `tuiforge` (app)
-- [x] `ARCHITECTURE.md`, `ROADMAP.md`, `README.md`, `LICENSE`
-- [x] Terminal guard: raw mode, alternate screen, mouse capture, bracketed
-      paste, focus events, kitty keyboard flags; restored on drop and panic
-- [x] Capability detection: colour depth, keyboard enhancement, Unicode, mouse
-- [x] `Action` enum, action descriptors, `App::dispatch` as single entry point
-- [x] Key model, key-chord parsing, default keymap, config overrides
-- [x] Event loop with tick, resize handling, focus events
-- [x] XDG path resolution and TOML config with defaults
-- [x] Logging to `$XDG_STATE_HOME/tuiforge/tuiforge.log` (`TUIFORGE_LOG`)
-- [x] UI theme roles, built-in ANSI theme
-- [x] Omarchy detection and `colors.toml` mapping (loaded at start, on
-      focus gain and via `reload-theme`); pulled forward from M14 because
-      the UI palette needs it from day one
-- [x] Layout: header, hideable left/right panels, canvas, status bar
-- [x] Errors surfaced in the status bar, never by tearing down the terminal
-- [x] pty smoke test (`scripts/pty_smoke_test.py`): lifecycle, typing,
-      help overlay, Omarchy fixture, malformed config, narrow terminal
+### F0 — Skeleton and terminal lifecycle  `[x]`
+Workspace, terminal guard with panic-safe restore, capability detection,
+XDG config, keymap with overrides, action dispatch, event loop, hideable
+panels, status bar, help overlay, pty smoke test.
 
-## Milestone 1 — Canvas, cells, Unicode, rendering  `[~]`
+### F1 — Cells and Unicode  `[x]`
+Grapheme validation and width, cell model with transparency and wide
+tails, canvas invariants and deltas, compositing with repair, viewport
+rendering.
 
-- [x] `Grapheme` with cluster validation and width (1 or 2)
-- [x] `Color`, `Attributes`, `CellStyle`, `Cell`, `CellContent`
-- [x] `Canvas` with wide-glyph invariants and delta-returning `put`
-- [x] `Layer`, `Document` (single default layer, active layer)
-- [x] Compositor with wide-glyph repair
-- [x] Canvas view: viewport scrolling, clipping, cursor follows viewport
-- [x] Cursor movement, typing places graphemes, Backspace/Delete erase
-- [x] Tests: width, wide-glyph insert/overwrite/edge, compositing,
-      repair, clipping, view rendering via `TestBackend`
-- [ ] Colour-depth degradation for document colours in the view
-- [ ] Optional `cjk_ambiguous_wide` width mode
-- [ ] Per-row dirty tracking for the composite cache
+### F2 — Semantic object model and ids  `[x]`
+`ObjectId`, `Value`/`Properties`, `Component` tree with responsive rules,
+tree helpers (find, locate, insert, remove), documents with screens and
+interface/artwork layers, document-wide id uniqueness.
 
-## Milestone 2 — Cursor, pencil, eraser, text  `[ ]`
+### F3 — Layout model  `[x]`
+`Dimension` (content/fill/fixed/percent/flex), placement, containers
+(horizontal, vertical, stack, grid), padding, margin, gap, alignment,
+min/max clamps, deterministic solver with `Measure` for intrinsic sizes.
+- [ ] `hug`-style content sizing for containers (size to children)
+- [ ] `fill` in cross axis for absolute children
 
-- `Tool` trait, `ToolRegistry`, `ToolContext`; tools panel shows real tools
-- Pencil (current glyph + style), Eraser, Text (typing with wrap-less flow)
-- Cursor modes: insert vs overwrite; Vim-style navigation option
-- Tests: tool routing, pencil over wide glyphs, eraser tail handling
+### F4 — Style tokens and themes  `[x]`
+Token set, `Theme` with fallback chain, built-in `terminal`,
+`minimal-dark`, `minimal-light`, Omarchy conversion, document theme vs
+chrome theme, "Use current Omarchy theme" as an undoable operation.
 
-## Milestone 3 — Layers  `[ ]`
+### F5 — Patches  `[x]`
+Operations for components, layers, cells and theme; validated,
+transactional, invertible, JSON shape as in the brief.
 
-- create / delete / rename / duplicate / reorder / show-hide / lock / merge down
-- Layers panel becomes interactive (keyboard first, mouse in M8)
-- Locked layers reject edits with a status message
-- Tests: every operation, merge-down compositing, z-order
+### F6 — Rendering pipeline  `[x]`
+`Registry`/`ComponentRenderer`, `RenderContext`, painter, screen
+rendering with responsive resolution and size override, `artwork`
+component bridging the modes, plain-text preview.
 
-## Milestone 4 — Selection and clipboard  `[ ]`
+### F7 — History  `[x]`
+Transactions with origin, stroke grouping, undo/redo, limit, saved
+marker; editor typing and agent patches both go through it.
+- [ ] Review UI for agent transactions (list, inspect diff, accept, reject)
 
-- Rectangular selection model; select/deselect/move/copy/cut/paste/duplicate/
-  delete/fill/replace glyph/replace fg/replace bg
-- Internal clipboard; OSC 52 and `wl-copy`/`xclip` best-effort backends
-- Tests: move/copy across layer boundaries, wide glyphs at selection edges,
-  clipping when pasting near the border
+### F8 — Component abstraction  `[~]`
+- [x] Renderer registry, placeholder for unknown kinds
+- [x] `group`, `panel`, `label`, `heading`, `button`, `divider`, `artwork`
+- [ ] Component descriptors (property schema, defaults, palette metadata)
+      so the inspector and the command palette can offer them
 
-## Milestone 5 — Undo/redo  `[ ]`
+### F9 — Agent-readable serialisation and API  `[x]`
+`.glyph` envelope with `schema_version`, migration chain, one-line diffs
+for layout changes, run-based artwork storage, atomic save, `Session`
+API, CLI `inspect`/`render`/`validate`/`apply`/`export`/`new`, validator
+with stable codes.
+- [ ] YAML-style outline export for hand-off (`inspect` prints a compact
+      outline today; a dedicated `handoff` format follows the exporter
+      interfaces)
 
-- `history::Command`, `Transaction`, `History` with depth limit
-- Every tool and layer/selection operation goes through transactions
-- Stroke grouping (press..release = one transaction), saved-marker dirty state
-- Tests: apply/revert symmetry, grouping, depth limit, dirty tracking
+---
 
-## Milestone 6 — Lines, rectangles, smart box drawing  `[ ]`
+## Editor milestones
 
-- `boxdraw` topology model: per-cell edge set with style (ascii, single,
-  double, heavy, rounded); glyph resolution table; smart merge toggle
-- Line, H-line, V-line, Rectangle, Filled rectangle, Box, Rounded box tools
-- Box-style palette
-- Tests: intersection table (`─`+`│` = `┼`, T-junctions, corners), mixed
-  styles, merge disabled
+### E1 — Interface Mode editing  `[ ]`
+Selection of components by click and by id, move/resize with keyboard and
+mouse (through `move`/`resize` operations), inspector panel with editable
+properties, create components from the palette, delete, reparent.
 
-## Milestone 7 — Colours and palettes  `[ ]`
+### E2 — Alignment and geometry  `[ ]`
+Snap to grid and neighbours, alignment guides while dragging, align and
+distribute operations on multi-selection, equal size.
 
-- Foreground/background selectors, recent colours, palette colours, colour
-  picker (16 / 256 / RGB), swap, reset to default
-- Preview modes ANSI 16 / 256 / TrueColor via quantisers
-- Tests: quantisation, preview does not mutate document
+### E3 — Subcell Mode tools  `[ ]`
+Tool trait and registry; pencil, eraser, text, rectangle selection with
+move/copy/cut/paste/fill; line/box tools with topology-aware junctions
+(`boxdraw` gains the merge tables); sub-cell raster (half, quarter,
+Braille, shading) encoded to glyphs.
 
-## Milestone 8 — Mouse interaction  `[ ]`
+### E4 — Colours and palettes  `[ ]`
+Foreground/background pickers (16/256/RGB), recent and palette colours,
+token picker for components, colour-depth preview modes.
 
-- Click, double click, drag, selection handles, scrollbars, wheel scrolling,
-  panel and palette selection
-- Hit-testing derived from the layout, not duplicated
-- Tests: hit-test math, drag-to-selection
+### E5 — Command palette and context actions  `[ ]`
+Ctrl+Space (and the Ctrl+P fallback), fuzzy matching over titles,
+keywords and aliases with recency weighting, contextual actions from the
+selection (table selected -> column actions, artwork selected -> mirror/
+invert/convert).
 
-## Milestone 9 — Command palette and fuzzy actions  `[ ]`
+### E6 — Layers and screens UI  `[ ]`
+Interactive layer list (create, rename, duplicate, reorder, lock, hide,
+isolate, merge), screen switcher, responsive size presets with instant
+preview, minimap for large canvases, find component/screen/text.
 
-- Ctrl+Space (kitty protocol / NUL) plus configurable fallback (Ctrl+P)
-- `nucleo-matcher` based fuzzy matching over titles, keywords, aliases;
-  recency weighting; shortcut display; mouse selection
-- Tests: "border" matches Draw Box, "layer up" ranks Move Layer Up first
+### E7 — Mouse workflow  `[ ]`
+Drag, resize handles, multi-select, double click, context menus where the
+terminal permits, wheel, palette and layer interaction.
 
-## Milestone 10 — Project persistence  `[ ]`
+---
 
-- `.tuiforge` JSON envelope with `schema_version`, migrations chain
-- New/Open/Save/Save As, recent files, `tuiforge file.tuiforge`
-- Autosave to `*.autosave`, recovery prompt, never overwriting the original
-- Tests: round trip, migration from a fixture v1 file, corrupted file error
+## Product milestones
 
-## Milestone 11 — ANSI import/export  `[ ]`
+### P1 — Component library  `[ ]`
+The brief's list, in slices ordered by usefulness: inputs and controls
+(input, password, search, textarea, checkbox, radio, toggle, select),
+navigation (tabs, breadcrumbs, menu, toolbar, status bar), data (list,
+tree, table, data grid, property grid, key-value list), viewers (log,
+code, markdown, diff), feedback (modal, dialog, notification, toast,
+tooltip, empty state, badge, tag, key hint, spinner), charts (sparkline,
+bar, histogram, line, gauge, heatmap, progress) with block, half-block,
+Braille and ASCII strategies. Each component gets a descriptor, renderer,
+intrinsic size and tests.
 
-- Exporters: plain UTF-8, ASCII-safe, ANSI 16 / 256 / TrueColor, clipboard
-- SGR delta minimisation, final reset
-- Importers: plain text, ANSI (SGR + basic cursor movement)
-- Tests: minimal escape output, `cat`-safe termination, import round trip
+### P2 — Preview states and data fixtures  `[ ]`
+Component state props (focused, hovered, selected, disabled, loading,
+error, empty), document-level `data` fixtures and `data` bindings on
+components, sample rows and mock series.
 
-## Milestone 12 — Art mode / sub-cell drawing  `[ ]`
+### P3 — Symbols and libraries  `[ ]`
+Symbol definitions with instances and property overrides, propagation of
+source changes, project libraries (themes, tokens, symbols, templates,
+character palettes) as separate `.glyph`-compatible files that can be
+shared.
 
-- `art` raster (2x2 quadrant, 2x4 Braille, half blocks, shading)
-- Raster -> glyph conversion, separate from the cell model
-- Tests: every quadrant pattern, Braille bit mapping
+### P4 — Templates and showcase examples  `[ ]`
+Starter templates and at least six polished examples (system monitor,
+developer dashboard, Git client, AI coding assistant, database explorer,
+settings application), each with a distinct aesthetic; the shipped
+`examples/dashboard.glyph` is the first.
 
-## Milestone 13 — Semantic TUI components  `[ ]`
+### P5 — Multi-screen prototypes and overview  `[ ]`
+Navigation actions (open dialog, switch tab, go to screen, close modal),
+prototype mode, screen graph overview.
 
-- Component descriptors rendering to cells: Panel, Border, Label, Button,
-  Input, Checkbox, Radio, Tabs, Table, List, Scrollbar, Progress, Modal,
-  Status bar, Menu
-- Stored as metadata in the project so they can become editable later
-- Tests: rendering snapshots per component
+### P6 — Import and export  `[ ]`
+Plain text and ANSI import; ANSI 16/256/TrueColor export with minimal SGR
+deltas and clean reset; clipboard (internal, OSC 52, wl-copy/xclip);
+hand-off representation for code generation; exporter interfaces for
+Ratatui, Textual, Bubble Tea and Ink (implementations only after the
+semantic model has stabilised).
 
-## Milestone 14 — Omarchy integration and packaging  `[ ]`
+### P7 — Validation and design analysis  `[ ]`
+More deterministic checks (invisible fg/bg combinations, wide-character
+collisions, minimum sizes, unreachable controls); a separate heuristic
+module for spacing, alignment and hierarchy suggestions, clearly labelled
+as opinions.
 
-- Theme mtime polling on tick; documented `theme-set.d` hook
-- Terminal-specific checks for the four Omarchy terminals
-- `.desktop` entry, AppStream metadata, PKGBUILD, install script, README
-  installation section, example projects
-- Tests: desktop file validation in CI, colors.toml fixtures for several
-  Omarchy themes
+### P8 — MCP server  `[ ]`
+Only after the `Session` API is stable: a `glyphforge-mcp` crate exposing
+`get_document`, `query_components`, `create_component`, `apply_patch`,
+`render_preview`, `validate_layout`, `export_document`. No `set_cell`-sized
+tools.
+
+### P9 — Omarchy integration and packaging  `[ ]`
+Theme change polling and `theme-set.d` hook, checks in the four Omarchy
+terminals, `.desktop` entry, AppStream metadata, PKGBUILD, install script,
+installation guide.
+
+### P10 — Autosave and recovery  `[ ]`
+Autosave to a sibling file on a timer, recovery prompt on start, never
+overwriting the original silently.

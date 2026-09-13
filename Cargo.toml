@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
-members = ["crates/tuiforge-core", "crates/tuiforge"]
-default-members = ["crates/tuiforge"]
+members = ["crates/glyphforge-core", "crates/glyphforge"]
+default-members = ["crates/glyphforge"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,10 +9,10 @@ edition = "2024"
 rust-version = "1.85"
 license = "MIT"
 repository = "https://github.com/plasticparticle/glyphforge"
-authors = ["TUIForge contributors"]
+authors = ["Glyphforge contributors"]
 
 [workspace.dependencies]
-tuiforge-core = { path = "crates/tuiforge-core", version = "0.1.0" }
+glyphforge-core = { path = "crates/glyphforge-core", version = "0.1.0" }
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

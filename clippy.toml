@@ -1,3 +1,4 @@
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
-doc-valid-idents = ["TUIForge", "Omarchy", "Ratatui", "Crossterm", "TrueColor", "OSC", "SGR", "..", "TOML", "JSON", "XDG"]
+doc-valid-idents = ["Glyphforge", "Omarchy", "Ratatui", "Crossterm", "TrueColor", "OSC", "SGR", "..", "TOML", "JSON", "XDG"]
+too-many-lines-threshold = 160

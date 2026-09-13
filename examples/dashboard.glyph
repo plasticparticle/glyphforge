@@ -1,0 +1,1529 @@
+{
+  "format": "glyphforge",
+  "schema_version": 1,
+  "meta": {
+    "title": "",
+    "author": "",
+    "description": ""
+  },
+  "theme": {
+    "id": "minimal-dark",
+    "name": "Minimal Dark",
+    "colors": {
+      "background": "#14161b",
+      "border": "#3a3f4b",
+      "border-muted": "#2a2e37",
+      "error": "#ff7b72",
+      "focus": "#8ab4f8",
+      "foreground": "#d7dae0",
+      "foreground-muted": "#7c8291",
+      "info": "#79c0ff",
+      "primary": "#8ab4f8",
+      "secondary": "#c4a7e7",
+      "selection": "#2f4f7f",
+      "selection-foreground": "#ffffff",
+      "success": "#9ccc65",
+      "surface": "#1b1e25",
+      "surface-alt": "#22262f",
+      "warning": "#ffca6b"
+    },
+    "border": "rounded",
+    "spacing": {
+      "padding": 1,
+      "gap": 1
+    }
+  },
+  "screens": [
+    {
+      "id": "main",
+      "name": "Main",
+      "size": {
+        "width": 100,
+        "height": 28
+      },
+      "layers": [
+        {
+          "id": "main-artwork",
+          "name": "Logo asset",
+          "visible": false,
+          "locked": false,
+          "kind": "artwork",
+          "cells": {
+            "width": 100,
+            "height": 28,
+            "text": [
+              {
+                "y": 0,
+                "x": 0,
+                "text": "▄▀▄"
+              },
+              {
+                "y": 0,
+                "x": 4,
+                "text": "glyph"
+              }
+            ],
+            "styles": [
+              {
+                "y": 0,
+                "x": 0,
+                "len": 3,
+                "fg": "#8ab4f8"
+              },
+              {
+                "y": 0,
+                "x": 4,
+                "len": 5,
+                "fg": "#7c8291",
+                "attrs": [
+                  "bold"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "main-ui",
+          "name": "UI",
+          "visible": true,
+          "locked": false,
+          "kind": "interface",
+          "components": [
+            {
+              "id": "window",
+              "kind": "group",
+              "layout": {
+                "placement": {
+                  "mode": "flow"
+                },
+                "width": "fill",
+                "height": "fill",
+                "min_width": null,
+                "max_width": null,
+                "min_height": null,
+                "max_height": null,
+                "padding": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "margin": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "container": {
+                  "direction": "horizontal",
+                  "gap": 0,
+                  "columns": 0,
+                  "align": "stretch"
+                }
+              },
+              "children": [
+                {
+                  "id": "sidebar",
+                  "kind": "panel",
+                  "props": {
+                    "title": "glyphforge"
+                  },
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fixed(24)",
+                    "height": "fill",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 1,
+                      "bottom": 0,
+                      "left": 1
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "vertical",
+                      "gap": 0,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  },
+                  "responsive": [
+                    {
+                      "max_width": 90,
+                      "min_width": null,
+                      "hide": true,
+                      "set": {},
+                      "layout": null
+                    }
+                  ],
+                  "children": [
+                    {
+                      "id": "nav-heading",
+                      "kind": "heading",
+                      "props": {
+                        "text": "Navigation"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "content",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "nav-dashboard",
+                      "kind": "label",
+                      "props": {
+                        "bold": true,
+                        "color": "primary",
+                        "text": "▸ Dashboard"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "content",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "nav-services",
+                      "kind": "label",
+                      "props": {
+                        "text": "  Services"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "content",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "nav-logs",
+                      "kind": "label",
+                      "props": {
+                        "text": "  Logs"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "content",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "nav-settings",
+                      "kind": "label",
+                      "props": {
+                        "text": "  Settings"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "content",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "nav-spacer",
+                      "kind": "group",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "logo",
+                      "kind": "artwork",
+                      "props": {
+                        "height": 1,
+                        "layer": "main-artwork",
+                        "width": 9
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "content",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 1,
+                          "left": 1
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "nav-divider",
+                      "kind": "divider",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "content",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "nav-hint",
+                      "kind": "label",
+                      "props": {
+                        "color": "foreground-muted",
+                        "text": "? help  q quit"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "content",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "content",
+                  "kind": "group",
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fill",
+                    "height": "fill",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 1,
+                      "bottom": 0,
+                      "left": 1
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "vertical",
+                      "gap": 1,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  },
+                  "children": [
+                    {
+                      "id": "header",
+                      "kind": "group",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fixed(1)",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "horizontal",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "title",
+                          "kind": "heading",
+                          "props": {
+                            "text": "System Monitor"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        },
+                        {
+                          "id": "host",
+                          "kind": "label",
+                          "props": {
+                            "align": "right",
+                            "color": "foreground-muted",
+                            "text": "omarchy-01 · up 12d 4h"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "metrics",
+                      "kind": "group",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fixed(5)",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "grid",
+                          "gap": 1,
+                          "columns": 4,
+                          "align": "stretch"
+                        }
+                      },
+                      "responsive": [
+                        {
+                          "max_width": 100,
+                          "min_width": null,
+                          "hide": false,
+                          "set": {},
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fixed(11)",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "grid",
+                              "gap": 1,
+                              "columns": 2,
+                              "align": "stretch"
+                            }
+                          }
+                        }
+                      ],
+                      "children": [
+                        {
+                          "id": "cpu",
+                          "kind": "panel",
+                          "props": {
+                            "title": "CPU"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "cpu-value",
+                              "kind": "heading",
+                              "props": {
+                                "text": "72%"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "content",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            },
+                            {
+                              "id": "cpu-spark",
+                              "kind": "label",
+                              "props": {
+                                "color": "primary",
+                                "text": "▁▂▃▅▆█▇▅▃"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "content",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "mem",
+                          "kind": "panel",
+                          "props": {
+                            "title": "Memory"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "mem-value",
+                              "kind": "heading",
+                              "props": {
+                                "text": "53%"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "content",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            },
+                            {
+                              "id": "mem-spark",
+                              "kind": "label",
+                              "props": {
+                                "color": "success",
+                                "text": "▁▁▂▃▄▅▆▅▄"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "content",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "net",
+                          "kind": "panel",
+                          "props": {
+                            "title": "Network"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "net-value",
+                              "kind": "heading",
+                              "props": {
+                                "text": "1.2 MB/s"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "content",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            },
+                            {
+                              "id": "net-spark",
+                              "kind": "label",
+                              "props": {
+                                "color": "info",
+                                "text": "▂▂▃▃▆█▇▅▃"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "content",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "disk",
+                          "kind": "panel",
+                          "props": {
+                            "title": "Disk"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "disk-value",
+                              "kind": "heading",
+                              "props": {
+                                "color": "warning",
+                                "text": "81%"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "content",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            },
+                            {
+                              "id": "disk-spark",
+                              "kind": "label",
+                              "props": {
+                                "color": "warning",
+                                "text": "▅▅▆▆▆▇▇▇█"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "content",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "services",
+                      "kind": "panel",
+                      "props": {
+                        "title": "Services"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 1,
+                          "bottom": 0,
+                          "left": 1
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "svc-header",
+                          "kind": "label",
+                          "props": {
+                            "color": "foreground-muted",
+                            "text": "NAME          STATE      LATENCY   RESTARTS"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "content",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        },
+                        {
+                          "id": "svc-api",
+                          "kind": "label",
+                          "props": {
+                            "text": "api           healthy    42 ms     0"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "content",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        },
+                        {
+                          "id": "svc-payments",
+                          "kind": "label",
+                          "props": {
+                            "color": "warning",
+                            "text": "payments      degraded   320 ms    3"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "content",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        },
+                        {
+                          "id": "svc-search",
+                          "kind": "label",
+                          "props": {
+                            "text": "search        healthy    18 ms     0"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "content",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        },
+                        {
+                          "id": "svc-worker",
+                          "kind": "label",
+                          "props": {
+                            "color": "error",
+                            "text": "worker        down       —         12"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "content",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "actions",
+                      "kind": "group",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fixed(1)",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "horizontal",
+                          "gap": 2,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "btn-restart",
+                          "kind": "button",
+                          "props": {
+                            "label": "Restart worker",
+                            "primary": true
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "content",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        },
+                        {
+                          "id": "btn-logs",
+                          "kind": "button",
+                          "props": {
+                            "label": "Open logs"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "content",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        },
+                        {
+                          "id": "btn-ack",
+                          "kind": "button",
+                          "props": {
+                            "disabled": true,
+                            "label": "Acknowledge"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "content",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

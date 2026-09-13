@@ -1,415 +1,401 @@
-# TUIForge Architecture
+# Glyphforge Architecture
 
-TUIForge is a full-screen terminal application (TUI) for visually designing
-terminal user interfaces and ANSI/Unicode artwork. This document describes the
-architecture that every milestone builds on. It is a living document: when a
-milestone changes a boundary, the corresponding section is updated in the same
-change.
+Glyphforge is a terminal-native visual design environment for terminal user
+interfaces. It runs as a full-screen TUI and, through the same core, as a
+headless CLI for scripts and coding agents. This document describes the
+architecture every milestone builds on; when a milestone changes a boundary,
+this file changes in the same commit.
 
-Target: Linux, primarily Omarchy (Arch + Hyprland), usable on any modern
-terminal. Implementation language: Rust (edition 2024).
+The governing principle:
 
----
-
-## 1. Crate layout and the core/presentation boundary
-
-The repository is a Cargo workspace with two crates:
-
-| Crate | Role | Allowed dependencies |
-|-------|------|----------------------|
-| `crates/tuiforge-core` | Domain model: cells, canvas, layers, selection, compositing, history commands, import/export codecs, project format. | `serde`, `uuid`, `unicode-*`, `thiserror`. **Never** `ratatui` or `crossterm`. |
-| `crates/tuiforge` | The application: terminal lifecycle, input, actions, tools, UI widgets, rendering, config, theme, Omarchy integration, storage. | Everything in core plus `ratatui`, `crossterm`, `clap`, `toml`, `tracing`. |
-
-The split is enforced by the manifests, not by convention: `tuiforge-core`
-cannot compile against Ratatui, so the document model cannot leak
-presentation types. Ratatui is the presentation layer; the domain model owns
-its own `Color`, `Cell`, `Grapheme` and buffer types, and the `render` module
-in the application crate converts them.
-
-Module map of the application crate (`crates/tuiforge/src`):
-
-```
-main.rs        CLI parsing, logging setup, error reporting, process exit code
-cli.rs         clap definition
-app/           App state, the run loop, action dispatch, error surfacing
-actions/       Action enum, action descriptors (names, keywords, aliases)
-input/         Key model, key-chord parsing, keymap (config -> Action), crossterm conversion
-terminal/      RAII terminal guard, panic hook, capability detection
-render/        core Color/Cell -> ratatui Style/Cell, CellBuffer -> ratatui Buffer
-ui/            Layout and widgets: canvas view, side panels, status bar, later menus/modals
-theme/         UI theme roles (background, accent, ...) and the built-in theme
-omarchy/       Omarchy detection and colors.toml -> UiTheme mapping
-config/        TOML config model with defaults, XDG path resolution
-tools/         (M2+) Tool trait and implementations
-commands/      (M9) command palette and fuzzy matching
-storage/       (M10) load/save/autosave/recovery
-```
-
-Module map of the core crate (`crates/tuiforge-core/src`):
-
-```
-document/grapheme.rs   Grapheme: validated single grapheme cluster with terminal width
-document/color.rs      Color: Default | Indexed(u8) | Rgb; quantisation helpers
-document/cell.rs       Cell, CellContent, CellStyle, Attributes
-document/canvas.rs     Canvas: dense cell grid with wide-glyph invariants
-document/layer.rs      Layer: id, name, visibility, lock, opacity metadata, canvas
-document/document.rs   Document: size, layers (bottom to top), active layer, metadata
-document/position.rs   Position, Size, Rect
-compose.rs             Compositor: visible layers -> CellBuffer, wide-glyph repair
-history/               (M5) reversible commands and transactions
-selection/             (M4) rectangular selections
-boxdraw/               (M6) box-drawing topology and glyph selection
-export/, import/       (M11) codecs independent of the document model
-project/               (M10) versioned file envelope and migrations
-art/                   (M12) sub-cell raster -> block/Braille conversion
-```
-
-Guidance, not law: modules are split by domain responsibility, never by file
-size.
+> **Semantic design first. Terminal cells are a rendering target, not the
+> document model.** Interface Mode keeps panels, tables and buttons as
+> objects with identity, properties, layout and relationships. Subcell Mode
+> works on raw cells (and sub-cell pixels) for artwork. Both live in one
+> document and reference each other.
 
 ---
 
-## 2. Domain model
-
-### 2.1 Grapheme
-
-A `Grapheme` is an immutable, validated string that holds **exactly one
-extended grapheme cluster** (per Unicode UAX #29, via `unicode-segmentation`)
-whose display width is 1 or 2 terminal columns (per `unicode-width`).
-
-Rejected at construction: empty strings, more than one cluster, control
-characters, clusters with width 0 (a lone combining mark cannot occupy a
-cell by itself; a base character with combining marks attached is a single
-width-1 cluster and is accepted), and clusters wider than 2.
-
-Width uses the non-CJK ("narrow") interpretation of East Asian Ambiguous
-characters. Box-drawing glyphs are Ambiguous; in CJK-locale terminals that
-render them double width the editor will be off. This is a documented
-limitation; a `cjk_ambiguous_wide` setting is planned (see ROADMAP).
-
-### 2.2 Color and style
-
-```rust
-enum Color { Default, Indexed(u8), Rgb(u8, u8, u8) }
-```
-
-`Indexed(0..=15)` are the ANSI 16 colours, `Indexed(16..=255)` the 256-colour
-extension. `Default` means "the terminal's default", which is distinct from
-any concrete colour and survives export (it becomes `SGR 39`/`49`).
-
-`Attributes` is a set of booleans: bold, dim, italic, underline, blink,
-reverse, strikethrough. `CellStyle` bundles foreground, background and
-attributes.
-
-Colours serialise as short strings (`"default"`, `"ansi:12"`, `"#7aa2f7"`) so
-project files stay readable.
-
-### 2.3 Cell and canvas
-
-```rust
-enum CellContent { Empty, Glyph(Grapheme), WideTail }
-struct Cell { content: CellContent, style: CellStyle }
-```
-
-- `Empty` is **transparent**: the compositor looks through it to lower
-  layers. A painted background with no character is `Glyph(" ")` with a
-  background colour, which is opaque.
-- `WideTail` is the right half of a double-width glyph. It is never written
-  by callers; the canvas maintains it.
-
-`Canvas` is a dense `Vec<Cell>` in row-major order with a fixed width and
-height. Every mutation goes through `Canvas::put`, which maintains the wide
-glyph invariant:
-
-1. A width-2 glyph at `(x, y)` implies `WideTail` at `(x+1, y)`.
-2. A `WideTail` at `(x, y)` implies a width-2 glyph at `(x-1, y)`.
-3. A width-2 glyph is never placed in the last column; the write is rejected
-   with `CanvasError::WideGlyphAtEdge`.
-
-Overwriting either half of a wide glyph blanks the other half. `put` returns
-the list of cells it changed (position and previous value), which is exactly
-the delta the history system stores.
-
-`Vec<String>` is not used anywhere for canvas data.
-
-### 2.4 Layers and document
-
-A `Layer` has a UUID, name, `visible`, `locked`, `opacity` (metadata only for
-now, 1.0 by default, kept for future formats) and its own `Canvas`. All
-layers of a document share the document's size.
-
-`Document` holds `layers` ordered bottom to top, the index of the active
-layer, the size, a palette, and metadata (title, timestamps). Layer
-operations (M3) are methods on `Document`, each returning the information
-needed to reverse it.
-
-### 2.5 Compositing
-
-`compose::composite(&Document) -> CellBuffer` walks layers top-down per cell
-and takes the first non-`Empty` content. Afterwards a repair pass fixes
-half-covered wide glyphs: a `WideTail` whose head was covered by a higher
-layer, or a head whose tail was covered, is replaced by a blank glyph that
-keeps its style. The output buffer therefore always satisfies the same
-invariants as a canvas and can be rendered or exported without further
-checks. The pass is a pure function and is unit tested.
-
-Colour-mode preview (ANSI 16/256/TrueColor) is applied after compositing by
-mapping each `Color` through a quantiser; the document is never mutated for
-previews.
-
----
-
-## 3. Application state and event loop
-
-The application is a single-threaded, explicit state machine:
+## 1. Crates and layering
 
 ```
-loop {
-    if needs_redraw { terminal.draw(|frame| ui::render(&app, frame)) }
-    match poll(tick) {
-        Event -> input::translate(event) -> Vec<Action> -> app.dispatch(action)
-        Tick  -> app.tick()   // autosave timer, theme mtime poll, blink
-    }
-    if app.should_quit { break }
-}
+glyphforge-core          domain: ids, components, layout, themes, cells,
+                         patches, history, rendering, validation, project
+                         format, application API          (no Ratatui)
+        │
+        │  api::Session  (the application API)
+        │
+   ┌────┼───────────────┐
+  CLI  TUI            MCP (later)
+   glyphforge          glyphforge          glyphforge-mcp
+   headless.rs         app/, ui/, ...      not before the API is stable
 ```
 
-`App` owns the `Document`, the editor state (cursor, viewport, active tool,
-selection, clipboard), the UI state (panel visibility, focus, open modal), the
-`UiTheme`, the `Config`, the detected `TerminalCapabilities`, and a status
-line with an optional error.
+| Crate | Responsibility | Allowed dependencies |
+|-------|----------------|----------------------|
+| `crates/glyphforge-core` | Everything about designs. | `serde`, `serde_json`, `unicode-*`, `thiserror`. **Never** `ratatui`/`crossterm`. |
+| `crates/glyphforge` | The binary: terminal lifecycle, input, actions, editor UI, config, Omarchy detection, CLI subcommands. | core + `ratatui`, `crossterm`, `clap`, `toml`, `tracing`. |
 
-Rendering is pull-based: `ui::render` reads `&App` and never mutates it.
-Redraws happen only after an event or tick that changed state; the composite
-buffer is cached and invalidated by document edits.
+The manifest enforces the boundary: the core cannot name a Ratatui type.
+The interactive editor, the CLI and a future MCP server call the same
+`Session` methods; none of them has private access to the document.
 
-### 3.1 Errors
+Core module map (`crates/glyphforge-core/src`):
 
-Domain errors are `thiserror` enums (`CanvasError`, `GraphemeError`, later
-`ProjectError`, `CodecError`). The application converts recoverable errors
-into `StatusMessage::Error` shown in the status bar and logged via `tracing`;
-the terminal session is never torn down for a recoverable error. Unrecoverable
-errors (e.g. the terminal cannot enter raw mode) propagate to `main`, which
-restores the terminal, prints the error chain to stderr and exits non-zero.
-
-`unwrap`/`expect` are clippy-denied in production code (allowed in tests).
-
-### 3.2 Terminal lifecycle
-
-`terminal::TerminalGuard` enables raw mode, enters the alternate screen,
-enables mouse capture, bracketed paste and focus-change events, and pushes
-kitty keyboard enhancement flags when the terminal reports support. `Drop`
-undoes all of it in reverse order. A panic hook restores the terminal before
-the default hook prints the panic, so a bug never leaves the user's shell in
-raw mode.
-
-### 3.3 Capability detection
-
-`terminal::caps` determines at startup:
-
-- colour depth (`COLORTERM=truecolor|24bit` -> TrueColor; `TERM` containing
-  `256color` -> 256; else 16; `NO_COLOR` respected),
-- keyboard enhancement support (crossterm's kitty-protocol query),
-- Unicode support (`LANG`/`LC_ALL`/`LC_CTYPE` mention UTF-8),
-- mouse support (assumed unless `TERM=linux`/`dumb`).
-
-The result is data, not behaviour: renderers and exporters read it and
-degrade (e.g. quantise theme colours to 256).
-
----
-
-## 4. Actions
-
-Every user-visible behaviour is an `Action` variant. Keyboard shortcuts,
-mouse gestures, menus and the command palette all produce `Action`s and feed
-the single `App::dispatch`. UI handlers never implement behaviour.
-
-`actions::ActionDescriptor` attaches metadata to bindable actions: stable
-kebab-case `name` (used in config), human `title`, `keywords` and `aliases`
-(used by the command palette's fuzzy matcher), and a `category`. Actions with
-payloads that come from UI geometry (e.g. `CursorTo(Position)`) are not
-bindable and have no descriptor.
-
-Keymaps map `KeyChord` (key + modifiers, parsed from strings like
-`"ctrl+shift+s"`) to action names. The built-in defaults are a keymap like
-any other; the user's `[keys]` config table overrides entries by name.
-
-Ctrl+Space: with the kitty keyboard protocol it arrives unambiguously; on
-legacy terminals it arrives as NUL, which crossterm reports as
-`Ctrl+Space` too. Where a terminal swallows it, the configurable fallback
-(default `Ctrl+P`) opens the palette. The action itself is the same.
-
----
-
-## 5. Input
-
-`input::Key` is TUIForge's own key model (code + modifiers), converted from
-crossterm events in one place. Key *release* and *repeat* events are ignored
-unless a tool opts in. Paste events become `Action::PasteText`. Mouse events
-are converted to `input::MouseEvent` with canvas-relative coordinates by the
-UI layer, which knows the layout; the canvas view then asks the active tool
-what to do.
-
-Focus is explicit: `UiState::focus` names the focused region (canvas, left
-panel, right panel, modal). Tab/Shift+Tab cycle it; keys are routed to the
-focused region first, then to the global keymap.
-
----
-
-## 6. Tools (M2+)
-
-```rust
-trait Tool {
-    fn id(&self) -> ToolId;
-    fn on_key(&mut self, ctx: &mut ToolContext, key: Key) -> ToolResponse;
-    fn on_mouse(&mut self, ctx: &mut ToolContext, ev: MouseEvent) -> ToolResponse;
-    fn overlay(&self, ctx: &ToolContext) -> Vec<OverlayCell>;  // preview, not committed
-}
+```
+id.rs            ObjectId: validated slug, unique per document
+value.rs         Value/Properties: JSON-like, totally ordered (no floats)
+component.rs     Component tree, responsive rules, tree helpers
+layout.rs        Dimension/Placement/Container + deterministic solver
+theme.rs         Theme, style tokens, fallback chain, built-in themes
+boxdraw.rs       Border families and glyph tables (topology later)
+document/        Grapheme, Color, Cell, Canvas (+ diff-friendly repr),
+                 Layer (artwork | interface), Screen, Document
+patch.rs         Operation, Patch: validated, transactional, invertible
+history.rs       Transaction, Origin, History (undo/redo, open strokes)
+render/          RenderContext, Registry, ComponentRenderer, painter,
+                 render_components, render_screen, to_text_lines
+validate.rs      deterministic diagnostics with stable codes
+project.rs       .glyph envelope, schema_version, migration chain, atomic save
+api.rs           Session: the application API
 ```
 
-Tools are registered in a `ToolRegistry` (id -> boxed tool + descriptor);
-adding a tool means adding a file and one registration line, not editing a
-central match. Tools mutate the document only through `ToolContext`, which
-records changes into the open history transaction, so every tool gets
-undo/redo for free. A drag from press to release is one transaction.
+Application module map (`crates/glyphforge/src`):
 
-Line and box tools do not write glyphs directly; they write *topology*
-(which edges of a cell are connected, and in which style) and the
-`boxdraw` module resolves topology to glyphs, merging with existing
-box-drawing cells when smart connectivity is on.
-
----
-
-## 7. History (M5)
-
-`history::Command` is a reversible unit: `apply(&mut Document)` and
-`revert(&mut Document)`. Commands are compact deltas (`CellsChanged { layer,
-cells: Vec<(Position, before, after)> }`, `LayerAdded`, `LayerRemoved`,
-`LayersReordered`, ...). A `Transaction` groups commands under one label and
-is what undo/redo operates on. The document is never cloned or serialised
-per edit. The stack has a configurable depth (default 1000 transactions) and
-tracks the saved position for dirty state.
+```
+main.rs, cli.rs  argument parsing; TUI by default, subcommands headless
+headless.rs      inspect / render / validate / apply / export / new
+app/             App state, dispatch (behaviour), run loop, viewport
+actions/         Action enum + descriptors (names, keywords, default keys)
+input/           key model, key-chord parsing, keymap with config overrides
+terminal/        RAII guard, panic hook, capability detection
+render/          core Canvas -> Ratatui buffer, colour degradation
+ui/              layout, header, canvas view, panels, status bar, help
+omarchy/         detection, colors.toml -> Theme
+config/          TOML config, XDG paths
+```
 
 ---
 
-## 8. Rendering
+## 2. Identity: `ObjectId`
 
-`render` converts `tuiforge_core::CellBuffer` into the Ratatui frame buffer
-for a rectangular viewport:
-
-- visible region = viewport offset + area size, clipped to the document;
-- each core cell maps to one Ratatui cell; a width-2 glyph writes its symbol
-  into the head cell and resets the tail cell, matching Ratatui's own
-  wide-character convention so its diff algorithm skips the tail;
-- `Color` -> `ratatui::style::Color` is one function, degraded by the
-  detected colour depth;
-- overlays (cursor, selection, tool previews, guides) are drawn after the
-  composite, in the UI layer.
-
-The canvas view owns scrolling: the cursor is always kept inside the visible
-region; the viewport moves in whole cells.
+Every screen, layer, component, theme and (later) symbol has an
+`ObjectId`: a slug `[a-z0-9][a-z0-9._-]*`, at most 64 characters, unique
+across the whole document. Ids are how humans and agents refer to things
+(`sidebar`, `server-table`), so they are readable and stable, never UUIDs.
+`ObjectId::slugify` derives ids from names; `unique_among` disambiguates.
+Duplicate ids are rejected on load and by every create operation.
 
 ---
 
-## 9. Serialization (M10)
+## 3. Document model
 
-Project files (`.tuiforge`) are JSON with a top-level envelope:
+```
+Document
+ ├─ meta            title, author, description
+ ├─ theme           Theme (tokens -> colours, border family, spacing)
+ └─ screens[]       Screen { id, name, size, layers[] }
+      └─ layers[]   Layer { id, name, visible, locked, content }
+            ├─ Interface { components[] }   semantic tree (Interface Mode)
+            └─ Artwork   { cells: Canvas }   raw cells      (Subcell Mode)
+```
+
+- A **screen** is one terminal-sized design surface; a project holds many
+  (Dashboard, Settings, ...). Navigation relationships come with the
+  prototype milestone.
+- A **layer** holds either components or cells, never both. Layers are
+  ordered bottom to top and composited in that order, so artwork can sit
+  under or over interface layers.
+- A **component** is `{ id, kind, props, layout, responsive[], children[] }`.
+  `kind` is a registry key (`panel`, `label`, `table`); unknown kinds are
+  preserved and rendered as a labelled placeholder rather than dropped.
+  `props` is an ordered map of `Value`s. Components never store cells.
+- **Artwork inside interfaces:** the `artwork` component kind references a
+  region of an artwork layer (`layer`, `x`, `y`, `width`, `height`) and is
+  placed by layout like any other component. The source layer is usually
+  hidden so it acts as an asset. This is the bridge between the two modes;
+  the reverse direction (render a component into cells) is a planned
+  operation.
+
+### 3.1 Cells (Subcell Mode)
+
+`Grapheme` is one extended grapheme cluster of width 1 or 2. `Cell` is
+`Empty` (transparent), `Glyph(Grapheme)` or `WideTail`. `Canvas` is a dense
+grid that maintains the wide-glyph invariant in `put` and returns the cells
+it changed, and `composite_over` merges another canvas on top with a repair
+pass for half-covered wide glyphs. Sub-cell raster drawing (Braille,
+quarter blocks) is a separate module that *produces* cells; it is not part
+of the cell model.
+
+### 3.2 Values and properties
+
+`Value` is `Null | Bool | Int | Str | List | Map` with a total order, so
+patches and diffs are deterministic. Colour properties hold either a token
+name (`primary`) or a literal (`#7aa2f7`, `ansi:4`); the theme resolves
+both. Floats are deliberately absent.
+
+---
+
+## 4. Layout model
+
+`Layout` per component:
+
+| Field | Meaning |
+|-------|---------|
+| `placement` | `flow` (laid out by the parent) or `absolute {x, y}` inside the parent's inner rect |
+| `width`, `height` | `content`, `fill`, `fixed(N)`, `percent(N)`, `flex(N)` |
+| `min_*`, `max_*` | clamps |
+| `padding`, `margin` | `Edges` |
+| `container` | `direction` (`horizontal`, `vertical`, `stack`, `grid`), `gap`, `columns`, `align` |
+
+`layout::solve(roots, area, measure)` returns integer rectangles for every
+component (outer and inner). Rules, in order: absolute children are placed
+first and never affect flow; fixed, percent and content sizes are resolved;
+`fill`/`flex` share the remainder by weight with largest-remainder rounding
+in document order; clamps apply; cross-axis alignment stretches by default.
+Grid uses equal columns and per-row heights. The solver is a pure function
+and has no notion of glyphs: renderers implement `Measure` to provide
+intrinsic sizes (a label's text width) and chrome insets (a panel's
+border). Same input, same output, always.
+
+Responsive rules live on the component: `{ max_width, min_width, hide,
+set, layout }`. `Component::resolve_responsive(width)` produces the
+effective tree for a screen width before layout and rendering; previews at
+other sizes only change the width passed in.
+
+---
+
+## 5. Style tokens and themes
+
+Components reference tokens, never literal colours (literals are allowed
+but discouraged). The token set:
+
+```
+background surface surface-alt border border-muted foreground
+foreground-muted primary secondary success warning error info
+selection selection-foreground focus
+```
+
+`Theme { id, name, colors, border, spacing }` maps tokens to `Color` and
+provides a fallback chain (`surface` -> `background`, status colours ->
+`primary` -> `foreground` -> terminal default) so partial themes still
+render. Built-in themes: `terminal` (ANSI only, adapts to any terminal),
+`minimal-dark`, `minimal-light`. Omarchy themes are converted at runtime
+from `colors.toml` (section 12). More preview themes are original designs,
+not copies of vendor palettes.
+
+The **document theme** (in the file) and the **editor chrome theme** (what
+the Glyphforge UI itself uses) are separate `Theme` values; "Use current
+Omarchy theme" copies the chrome theme into the document as an undoable
+operation.
+
+---
+
+## 6. Rendering pipeline
+
+```
+Screen ──► for each visible layer, bottom to top:
+             Artwork   → composite cells
+             Interface → resolve_responsive(width)
+                         layout::solve(..., RegistryMeasure)
+                         for each component (parents first):
+                             registry.renderer(kind).render(c, rect, inner, ctx, canvas)
+                         composite result
+        ──► Canvas (invariant-safe) ──► TUI viewport / text / exporters
+```
+
+`RenderContext` carries the theme and the screen (for artwork references).
+`Registry` maps kinds to `ComponentRenderer`s; adding a kind is one struct
+and one registration line. Renderers only paint through `painter`
+(`draw_text` with clipping and wide-glyph safety, `fill`, `draw_border`,
+`truncate` with ellipsis). Current kinds: `group`, `panel`, `label`,
+`heading`, `button`, `divider`, `artwork`, plus the placeholder.
+
+The editor shows the rendered canvas through a scrolling viewport and
+degrades colours to the detected depth. Previews at other terminal sizes
+render the same screen with a different `size` argument; nothing in the
+document changes.
+
+---
+
+## 7. Patches: the mutation mechanism
+
+Every change to a document is a `Patch { operations[] }`. Operations
+address objects by id:
+
+```
+move, resize, set_property, set_layout,
+create_component, delete_component,
+set_cells,
+create_layer, delete_layer, update_layer, reorder_layer,
+set_theme
+```
+
+`Patch::apply(&mut Document) -> Result<Patch>`:
+
+- **validated**: unknown targets, duplicate ids, locked layers, wrong layer
+  kinds and out-of-range cells are errors;
+- **transactional**: on the first failing operation, the already applied
+  ones are rolled back through their inverses and the document is
+  unchanged;
+- **invertible**: the return value is the inverse patch (`move` ->
+  `set_layout` with the previous layout, `create` -> `delete`, `set_cells`
+  -> `set_cells` with the previous cells, ...);
+- **deterministic and diffable**: operations are plain JSON with an `op`
+  tag, exactly the shape agents send.
+
+Humans and agents use the same operations. The editor's typing produces
+`set_cells`; an agent's "make it more compact" produces `resize` and
+`set_layout`. There is no second mutation path.
+
+---
+
+## 8. History
+
+`History` is a stack of `Transaction { label, origin, forward, inverse }`.
+`apply` runs a whole patch as one transaction; `begin`/`record`/`end`
+collect continuous edits (a stroke, a typed word) into one. Undo replays
+the inverse, redo the forward patch. The saved position is tracked for
+dirty state; trimming the stack past the limit makes the saved state
+unreachable and therefore dirty. `Origin::Agent { name, description }`
+marks agent transactions so the UI can list, inspect, accept or reject
+them (review UI is a later milestone; the data is already there).
+
+---
+
+## 9. Application API
+
+`api::Session` owns a document, its history, the renderer registry and the
+file path, and exposes: `document`, `component`, `query_components`,
+`create_component`, `update_component`, `move_component`,
+`resize_component`, `delete_component`, `apply_patch`, `begin`/`record`/
+`end`, `undo`/`redo`, `render` (canvas), `render_text`, `validate`,
+`validate_at(screen, size)`, `save`/`save_as`/`open`, `to_json`.
+
+The TUI's `App` holds a `Session` and dispatches actions into it; the CLI
+subcommands call the same methods; an MCP server will wrap them once the
+surface has settled. Nothing is added for agents that humans do not use.
+
+### 9.1 CLI
+
+```
+glyphforge inspect  FILE [--json]
+glyphforge render   FILE [--screen ID] [--width W --height H]
+glyphforge validate FILE [--width W --height H] [--strict]
+glyphforge apply    FILE PATCH.json [--out FILE] [--dry-run]
+glyphforge export   FILE --format text [--out FILE]
+glyphforge new      FILE [--width W --height H]
+```
+
+The intended agent loop is `inspect -> apply -> render -> validate`, each a
+cheap process.
+
+---
+
+## 10. Project format
+
+`.glyph` files are JSON with a versioned envelope:
 
 ```json
-{ "format": "tuiforge", "schema_version": 1, "document": { ... } }
+{ "format": "glyphforge", "schema_version": 1, "meta": {...}, "theme": {...}, "screens": [...] }
 ```
 
-Loading reads `schema_version` first and runs a chain of migrations
-(`v1 -> v2 -> ...`) before deserialising into the current model. Writing
-always emits the current version. An unversioned file is rejected. Autosave
-writes to a sibling `*.autosave` and recovery never overwrites the original
-without the user's confirmation.
+Design rules for diffability:
+
+- pretty-printed, one key per line, keys sorted (all maps are `BTreeMap`);
+- defaults are omitted (`serde(default, skip_serializing_if)`), so a
+  component with no children has no `children` key;
+- layout dimensions are short strings (`"fixed(24)"`), so a width change
+  is a one-line diff (asserted by a test);
+- artwork is stored as text runs and style runs per row, not one object
+  per cell; wide-glyph tails are not stored and are rebuilt on load;
+- there is no binary blob; heavy assets would be separate files.
+
+Loading reads `schema_version`, runs the migration chain up to the current
+version (each future bump adds one step and a fixture test), rejects
+unversioned or newer files, then validates ids. Saving writes to a
+temporary sibling and renames, so a crash never leaves a half-written file.
 
 ---
 
-## 10. Import and export (M11)
+## 11. Validation
 
-Codecs live in `tuiforge_core::export` / `import` and operate on
-`CellBuffer` (export) or produce a `Canvas` (import). They never touch the
-application. ANSI export tracks the current SGR state and emits only the
-deltas, ending with `ESC[0m` and a newline so `cat` leaves the terminal
-clean. ANSI import is an SGR interpreter plus a cursor that handles `\n`,
-`\r` and the common cursor-forward sequence; it is not a terminal emulator.
-
----
-
-## 11. Theme and Omarchy integration
-
-`theme::UiTheme` is a set of semantic roles: `background`, `panel_background`,
-`foreground`, `muted`, `accent`, `selection`, `error`, `warning`, `success`,
-`info`, `border`, `cursor`. All UI widgets use roles, never literal colours.
-
-The built-in theme uses only `Color::Default` and ANSI 16 indices, so it
-adapts to any terminal palette without configuration.
-
-`omarchy` uses only public, stable Omarchy interfaces observed in the Omarchy
-repository (`bin/omarchy-theme-set`, `bin/omarchy-theme-current`,
-`bin/omarchy-hook`):
-
-- detection: `$OMARCHY_PATH` is set, or `$XDG_DATA_HOME/omarchy` (default
-  `~/.local/share/omarchy`) exists, or `~/.config/omarchy/current/theme.name`
-  exists;
-- current theme name: `~/.config/omarchy/current/theme.name`;
-- colours: `~/.config/omarchy/current/theme/colors.toml` with keys `accent`,
-  `cursor`, `foreground`, `background`, `selection_foreground`,
-  `selection_background`, `color0..color15` (Omarchy generates this file
-  from `alacritty.toml` for themes that do not ship one);
-- role mapping: background/foreground/accent/cursor/selection direct;
-  error = color1, success = color2, warning = color3, info = color4,
-  muted = color8, panel background = background mixed 10 % toward
-  foreground, border = muted. No theme is hard-coded.
-- change notification: the theme is reloaded on terminal focus gain and via
-  the `reload-theme` action; M14 adds an mtime poll of `theme.name` on the
-  tick and documents an optional `~/.config/omarchy/hooks/theme-set.d/`
-  hook that signals running instances. Omarchy system files are never
-  modified.
-
-Outside Omarchy, or when the config sets `theme.source = "builtin"`, the
-built-in theme is used. Nothing else depends on Omarchy.
+`validate::validate(doc)` returns `Diagnostic { severity, code, screen,
+target, message }` with stable codes (`duplicate-id`, `no-space`,
+`clipped`, `truncated`, `overlap`, `unknown-kind`, `theme-tokens`).
+Messages name components, not coordinates ("`metrics-table`: "Request
+latency percentile" will be truncated at 80×24"). `validate_at(screen,
+size)` checks responsiveness. Deterministic layout validation is kept
+separate from heuristic design suggestions (a later, clearly labelled
+module) because the latter are opinions.
 
 ---
 
-## 12. Configuration and XDG
+## 12. Omarchy integration
 
-`config::paths` resolves `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`
-and `XDG_CACHE_HOME` with the specification's defaults relative to `$HOME`.
-TUIForge uses:
-
-- `$XDG_CONFIG_HOME/tuiforge/config.toml` — configuration,
-- `$XDG_DATA_HOME/tuiforge/` — user palettes, favourites, examples,
-- `$XDG_STATE_HOME/tuiforge/` — log file, recovery files, recent documents,
-- `$XDG_CACHE_HOME/tuiforge/` — glyph availability caches.
-
-The config file is TOML; every field has a default and a missing file is
-not an error. A malformed file is reported in the status bar and the
-defaults are used, so a typo never locks the user out of the editor.
+Detection and theme loading use only public Omarchy files: the active
+theme name in `~/.config/omarchy/current/theme.name` and its colours in
+`~/.config/omarchy/current/theme/colors.toml` (Omarchy generates that file
+from `alacritty.toml` when a theme lacks it). `OmarchyColors::to_theme`
+derives every token from the theme's own colours (`primary` = accent,
+status colours = ANSI 1..4, muted = colour 8, surfaces mixed from
+background toward foreground). No Omarchy theme is hard-coded; no Omarchy
+file is written. The chrome theme reloads on focus gain and on demand;
+Milestone 14 adds a modification-time poll and documents the
+`~/.config/omarchy/hooks/theme-set.d/` hook for instant refresh.
 
 ---
 
-## 13. Testing strategy
+## 13. The editor application
 
-- Core: unit tests next to each module (grapheme width, wide-glyph
-  invariants, compositing and repair, clipping, later box topology, flood
-  fill, history, codecs, migrations).
-- Application: pure functions (key-chord parsing, keymap resolution,
-  capability inference, colors.toml mapping, viewport math) are unit
-  tested; UI widgets are rendered into Ratatui's `TestBackend` and compared
-  as text.
-- A pty smoke test (scripted outside cargo) starts the binary, sends keys
-  and checks that it exits and restores the terminal.
+- **State machine, single dispatch.** `App::dispatch(Action)` is the only
+  place with behaviour; keys, mouse, palette and menus produce `Action`s.
+  Document mutations go through `Session` as patches, so the editor gets
+  undo/redo, dirty tracking and agent transactions from the core.
+- **Event loop.** Draw when something changed, poll events with a tick,
+  route keys through the help overlay, the keymap, Vim navigation, then
+  text insertion. Typing on an artwork layer records `set_cells` into an
+  open transaction that closes on the next non-edit action.
+- **Terminal lifecycle.** An RAII guard enables raw mode, the alternate
+  screen, mouse, bracketed paste, focus events and kitty keyboard flags
+  when supported; a panic hook restores everything first.
+- **Capabilities.** Colour depth, Unicode locale, mouse and keyboard
+  protocol are detected once and only consulted, never assumed.
 
 ---
 
-## 14. Performance notes
+## 14. Assumptions from the first pass that were replaced
 
-The composite `CellBuffer` is cached in `App` and recomputed only when a
-document edit invalidates it (later: per-row dirty flags). Rendering touches
-only the viewport. Canvases are dense vectors because terminal documents are
-small (a 400x200 canvas is 80k cells, ~4 MB) and dense storage gives
-predictable O(1) access; sparse structures are not worth their complexity
-here. Measure before optimising further.
+The first skeleton modelled a document as layers of cells only. The
+following assumptions would have blocked the semantic direction and were
+removed before building on them:
+
+| Old assumption | Why it blocked the goals | Replacement |
+|----------------|--------------------------|-------------|
+| `Document = Vec<Layer>` of cells | No identity, hierarchy or properties to patch, query, validate or export | Screens with interface (component tree) and artwork (cells) layers |
+| Layer ids were UUIDs | Agents and diffs need readable, stable names | `ObjectId` slugs, unique per document |
+| Edits mutated `Canvas` directly from the app | Undo, agent patches and the CLI would each need their own mutation path | Every change is an `Operation` in a `Patch`; history stores inverse patches |
+| `Canvas` serialised as one object per cell | Thousands of unrelated diff lines per edit | Text runs and style runs per row |
+| UI theme was a fixed struct of roles | Documents need portable, user-definable tokens | `Theme` with token map and fallback chain, shared by chrome and documents |
+| Rendering knew only cells | No place to lay out or draw components | `Registry` of renderers, `RenderContext`, layout solver |
+| Active layer lived in the document | Editor state leaked into the file | Active screen/layer are editor state |
+| Colours as an ad-hoc `UiTheme` per app | Omarchy mapping could not be reused by documents | Omarchy colours become a `Theme` like any other |
+
+Unchanged and still correct: grapheme-based cells with wide-glyph
+invariants, the terminal guard, capability detection, XDG configuration,
+the action/keymap design.
+
+---
+
+## 15. Testing strategy
+
+- Core: unit tests beside each module (ids, values, layout solver
+  including rounding and clamps, theme fallbacks, patch inverses and
+  rollback, history grouping and limits, renderers, painter clipping,
+  validation codes, project round trip and one-line-diff property) plus an
+  integration test that loads, validates and renders the shipped example
+  at two sizes and checks it is stored canonically.
+- Application: pure functions (key chords, keymaps, capabilities, Omarchy
+  parsing, viewport math) are unit tested; the editor UI renders into
+  Ratatui's `TestBackend`; CLI subcommands run against temporary files.
+- `scripts/pty_smoke_test.py` runs the real binary in a pseudo-terminal.
