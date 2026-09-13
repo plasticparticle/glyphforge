@@ -14,10 +14,35 @@ pub enum Direction {
     Right,
 }
 
+/// Where a key binding applies. Interface bindings win over global ones
+/// while the active layer holds components.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Context {
+    Global,
+    Interface,
+}
+
 /// Application actions. Variants without UI-geometry payloads are
 /// "bindable" and have an [`ActionDescriptor`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Action {
+    // Interface Mode
+    SelectNext,
+    SelectPrev,
+    SelectById,
+    SelectAt(Position),
+    MoveSelection(Direction),
+    ResizeSelection(Direction),
+    AddComponent,
+    EditProperty,
+    // Prompt (internal, not bindable)
+    PromptInput(char),
+    PromptBackspace,
+    PromptNext,
+    PromptPrev,
+    PromptComplete,
+    PromptSubmit,
+    PromptCancel,
     // Application
     Quit,
     ToggleHelp,
@@ -68,6 +93,7 @@ pub enum Category {
     Edit,
     View,
     Cursor,
+    Interface,
 }
 
 impl Category {
@@ -78,6 +104,7 @@ impl Category {
             Self::Edit => "Edit",
             Self::View => "View",
             Self::Cursor => "Cursor",
+            Self::Interface => "Interface Mode",
         }
     }
 }
@@ -89,6 +116,7 @@ pub struct ActionDescriptor {
     pub name: &'static str,
     pub title: &'static str,
     pub category: Category,
+    pub context: Context,
     #[allow(
         dead_code,
         reason = "consumed by the command palette fuzzy matcher (Milestone 9)"
@@ -107,10 +135,14 @@ pub struct ActionDescriptor {
 
 macro_rules! desc {
     ($name:literal, $title:literal, $cat:ident, $action:expr, keys: [$($k:literal),*], kw: [$($kw:literal),*], aliases: [$($al:literal),*], implemented: $impl:literal) => {
+        desc!($name, $title, $cat, Global, $action, keys: [$($k),*], kw: [$($kw),*], aliases: [$($al),*], implemented: $impl)
+    };
+    ($name:literal, $title:literal, $cat:ident, $ctx:ident, $action:expr, keys: [$($k:literal),*], kw: [$($kw:literal),*], aliases: [$($al:literal),*], implemented: $impl:literal) => {
         ActionDescriptor {
             name: $name,
             title: $title,
             category: Category::$cat,
+            context: Context::$ctx,
             keywords: &[$($kw),*],
             aliases: &[$($al),*],
             default_keys: &[$($k),*],
@@ -134,13 +166,27 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("new-document", "New Document", File, Action::NewDocument, keys: ["ctrl+n"], kw: ["create", "canvas"], aliases: ["new"], implemented: true),
             desc!("open-document", "Open Document", File, Action::OpenDocument, keys: ["ctrl+o"], kw: ["load", "file"], aliases: ["open"], implemented: false),
             desc!("save-document", "Save Document", File, Action::SaveDocument, keys: ["ctrl+s"], kw: ["write", "file"], aliases: ["save"], implemented: true),
-            desc!("save-document-as", "Save Document As", File, Action::SaveDocumentAs, keys: ["ctrl+shift+s"], kw: ["write", "file", "rename"], aliases: ["save as"], implemented: false),
+            desc!("save-document-as", "Save Document As", File, Action::SaveDocumentAs, keys: ["ctrl+shift+s"], kw: ["write", "file", "rename"], aliases: ["save as"], implemented: true),
             desc!("undo", "Undo", Edit, Action::Undo, keys: ["ctrl+z"], kw: ["history", "revert"], aliases: [], implemented: true),
             desc!("redo", "Redo", Edit, Action::Redo, keys: ["ctrl+y", "ctrl+shift+z"], kw: ["history", "repeat"], aliases: [], implemented: true),
             desc!("copy", "Copy", Edit, Action::Copy, keys: ["ctrl+c"], kw: ["clipboard", "selection"], aliases: [], implemented: false),
             desc!("cut", "Cut", Edit, Action::Cut, keys: ["ctrl+x"], kw: ["clipboard", "selection"], aliases: [], implemented: false),
             desc!("paste", "Paste", Edit, Action::Paste, keys: ["ctrl+v"], kw: ["clipboard", "insert"], aliases: [], implemented: false),
-            desc!("delete-selection", "Delete Selection", Edit, Action::DeleteSelection, keys: ["ctrl+delete"], kw: ["clear", "remove"], aliases: [], implemented: false),
+            desc!("delete-selection", "Delete Selection", Edit, Action::DeleteSelection, keys: ["ctrl+delete"], kw: ["clear", "remove"], aliases: [], implemented: true),
+            desc!("select-next", "Select Next Component", Interface, Interface, Action::SelectNext, keys: ["]"], kw: ["component", "cycle"], aliases: [], implemented: true),
+            desc!("select-prev", "Select Previous Component", Interface, Interface, Action::SelectPrev, keys: ["["], kw: ["component", "cycle"], aliases: [], implemented: true),
+            desc!("select-by-id", "Select Component By Id", Interface, Global, Action::SelectById, keys: ["ctrl+f"], kw: ["find", "jump", "goto"], aliases: ["find"], implemented: true),
+            desc!("add-component", "Add Component", Interface, Interface, Action::AddComponent, keys: ["a"], kw: ["create", "insert", "panel", "label", "button"], aliases: ["new component"], implemented: true),
+            desc!("edit-property", "Edit Property", Interface, Interface, Action::EditProperty, keys: ["enter"], kw: ["set", "title", "text", "inspector"], aliases: [], implemented: true),
+            desc!("delete-component", "Delete Component", Interface, Interface, Action::DeleteSelection, keys: ["delete", "backspace"], kw: ["remove"], aliases: [], implemented: true),
+            desc!("move-selection-up", "Move Selection Up", Interface, Interface, Action::MoveSelection(Direction::Up), keys: ["up"], kw: ["nudge"], aliases: [], implemented: true),
+            desc!("move-selection-down", "Move Selection Down", Interface, Interface, Action::MoveSelection(Direction::Down), keys: ["down"], kw: ["nudge"], aliases: [], implemented: true),
+            desc!("move-selection-left", "Move Selection Left", Interface, Interface, Action::MoveSelection(Direction::Left), keys: ["left"], kw: ["nudge"], aliases: [], implemented: true),
+            desc!("move-selection-right", "Move Selection Right", Interface, Interface, Action::MoveSelection(Direction::Right), keys: ["right"], kw: ["nudge"], aliases: [], implemented: true),
+            desc!("grow-right", "Resize Selection Wider", Interface, Interface, Action::ResizeSelection(Direction::Right), keys: ["shift+right"], kw: ["width", "resize"], aliases: [], implemented: true),
+            desc!("shrink-left", "Resize Selection Narrower", Interface, Interface, Action::ResizeSelection(Direction::Left), keys: ["shift+left"], kw: ["width", "resize"], aliases: [], implemented: true),
+            desc!("grow-down", "Resize Selection Taller", Interface, Interface, Action::ResizeSelection(Direction::Down), keys: ["shift+down"], kw: ["height", "resize"], aliases: [], implemented: true),
+            desc!("shrink-up", "Resize Selection Shorter", Interface, Interface, Action::ResizeSelection(Direction::Up), keys: ["shift+up"], kw: ["height", "resize"], aliases: [], implemented: true),
             desc!("backspace", "Erase Left", Edit, Action::Backspace, keys: ["backspace"], kw: ["delete", "erase"], aliases: [], implemented: true),
             desc!("delete-forward", "Erase At Cursor", Edit, Action::DeleteForward, keys: ["delete"], kw: ["delete", "erase", "clear"], aliases: [], implemented: true),
             desc!("new-line", "New Line", Edit, Action::NewLine, keys: ["enter"], kw: ["return", "next row"], aliases: [], implemented: true),
@@ -213,11 +259,11 @@ mod tests {
     }
 
     #[test]
-    fn actions_are_unique() {
+    fn actions_are_unique_per_context() {
         let mut seen = HashSet::new();
         for d in descriptors() {
             assert!(
-                seen.insert(d.action.clone()),
+                seen.insert((d.action.clone(), d.context)),
                 "duplicate action {:?}",
                 d.action
             );

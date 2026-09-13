@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use super::key::{KeyChord, KeyParseError};
-use crate::actions::{Action, descriptors, find_descriptor};
+use crate::actions::{Action, Context, descriptors, find_descriptor};
 
 /// Errors from applying user key bindings.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -19,7 +19,7 @@ pub enum KeymapError {
 
 #[derive(Debug, Clone, Default)]
 pub struct Keymap {
-    bindings: HashMap<KeyChord, Action>,
+    bindings: HashMap<(Context, KeyChord), Action>,
 }
 
 impl Keymap {
@@ -29,7 +29,7 @@ impl Keymap {
         for d in descriptors() {
             for chord in d.default_keys {
                 if let Ok(chord) = chord.parse::<KeyChord>() {
-                    bindings.insert(chord, d.action.clone());
+                    bindings.insert((d.context, chord), d.action.clone());
                 }
             }
         }
@@ -53,12 +53,13 @@ impl Keymap {
                 }
             };
             if action_name == "none" {
-                self.bindings.remove(&chord);
+                self.bindings.remove(&(Context::Global, chord));
+                self.bindings.remove(&(Context::Interface, chord));
                 continue;
             }
             match find_descriptor(action_name) {
                 Some(d) => {
-                    self.bindings.insert(chord, d.action.clone());
+                    self.bindings.insert((d.context, chord), d.action.clone());
                 }
                 None => errors.push(KeymapError::UnknownAction {
                     chord: chord_text.clone(),
@@ -69,20 +70,24 @@ impl Keymap {
         errors
     }
 
-    pub fn lookup(&self, chord: KeyChord) -> Option<&Action> {
-        self.bindings.get(&chord)
+    /// Looks a chord up in `context` first, then in the global context.
+    pub fn lookup(&self, chord: KeyChord, context: Context) -> Option<&Action> {
+        self.bindings
+            .get(&(context, chord))
+            .or_else(|| self.bindings.get(&(Context::Global, chord)))
     }
 
-    /// All chords bound to `action`, sorted by their textual form so the
-    /// output is stable.
+    /// All chords bound to `action` in any context, sorted by their
+    /// textual form so the output is stable.
     pub fn chords_for(&self, action: &Action) -> Vec<KeyChord> {
         let mut v: Vec<_> = self
             .bindings
             .iter()
             .filter(|(_, a)| *a == action)
-            .map(|(c, _)| *c)
+            .map(|((_, c), _)| *c)
             .collect();
         v.sort_by_key(ToString::to_string);
+        v.dedup();
         v
     }
 }
@@ -95,9 +100,12 @@ mod tests {
     #[test]
     fn defaults_contain_quit() {
         let km = Keymap::defaults();
-        assert_eq!(km.lookup(KeyChord::ctrl('q')), Some(&Action::Quit));
         assert_eq!(
-            km.lookup(KeyChord::plain(KeyCode::F(1))),
+            km.lookup(KeyChord::ctrl('q'), Context::Global),
+            Some(&Action::Quit)
+        );
+        assert_eq!(
+            km.lookup(KeyChord::plain(KeyCode::F(1)), Context::Interface),
             Some(&Action::ToggleHelp)
         );
     }
@@ -110,8 +118,11 @@ mod tests {
         o.insert("ctrl+q".to_owned(), "none".to_owned());
         let errors = km.apply_overrides(&o);
         assert!(errors.is_empty());
-        assert_eq!(km.lookup(KeyChord::ctrl('x')), Some(&Action::Quit));
-        assert_eq!(km.lookup(KeyChord::ctrl('q')), None);
+        assert_eq!(
+            km.lookup(KeyChord::ctrl('x'), Context::Global),
+            Some(&Action::Quit)
+        );
+        assert_eq!(km.lookup(KeyChord::ctrl('q'), Context::Global), None);
     }
 
     #[test]
@@ -123,7 +134,26 @@ mod tests {
         o.insert("ctrl+x".to_owned(), "quit".to_owned());
         let errors = km.apply_overrides(&o);
         assert_eq!(errors.len(), 2);
-        assert_eq!(km.lookup(KeyChord::ctrl('x')), Some(&Action::Quit));
+        assert_eq!(
+            km.lookup(KeyChord::ctrl('x'), Context::Global),
+            Some(&Action::Quit)
+        );
+    }
+
+    #[test]
+    fn interface_context_shadows_global_bindings() {
+        let km = Keymap::defaults();
+        let enter = KeyChord::plain(KeyCode::Enter);
+        assert_eq!(km.lookup(enter, Context::Global), Some(&Action::NewLine));
+        assert_eq!(
+            km.lookup(enter, Context::Interface),
+            Some(&Action::EditProperty)
+        );
+        let delete = KeyChord::plain(KeyCode::Delete);
+        assert_eq!(
+            km.lookup(delete, Context::Interface),
+            Some(&Action::DeleteSelection)
+        );
     }
 
     #[test]

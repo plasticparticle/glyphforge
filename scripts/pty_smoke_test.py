@@ -77,7 +77,7 @@ pt = plain(text)
 # Ratatui redraws only changed cells, so exact layout checks live in the
 # TestBackend unit tests; here we only check the glyph reached the terminal.
 assert "漢" in pt, "typed wide glyph rendered: " + pt[-600:]
-assert "Unsaved changes" in pt, "dirty confirmation shown"
+assert "Unsaved" in pt and "changes" in pt, "dirty confirmation shown (diff-rendered)"
 print("smoke 1 ok: typing + dirty quit + terminal restore")
 
 # 2. Clean quit is immediate; F1 help renders.
@@ -150,4 +150,17 @@ assert "Services" in text and "System Monitor" in text, "example components rend
 assert "Nothing" in text and "undo" in text, "undo reported in the status bar (diff-rendered)"
 assert "Minimal Dark" in text, "document theme shown in the header"
 print("smoke 6 ok: example project opens and renders")
+# 7. Interface Mode on a copy of the example: select, nudge, save, reopen.
+import shutil
+work = os.path.join(home, "work.glyph")
+shutil.copy(example, work)
+code, out = run(binary, home, keys=[(b"]", 0.3), (b"\x1b[C", 0.3), (b"\x13", 0.4), (b"\x11", 0.3)], args=(work,), cols=120, rows=36)
+text = plain(out.decode("utf-8", "replace"))
+assert code == 0, f"exit {code}"
+assert "INTERFACE" in text, "example opens in Interface Mode (artwork layer is a hidden asset)"
+assert "sel:" in text, "selection shown in the status bar"
+assert "Inspector" in text
+saved = open(work, encoding="utf-8").read()
+assert '"mode": "absolute"' in saved and '"x": 1' in saved, "nudged root component was saved absolutely"
+print("smoke 7 ok: interface mode select, nudge, save")
 print("ALL SMOKE TESTS PASSED")

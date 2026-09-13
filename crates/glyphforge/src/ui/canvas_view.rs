@@ -54,7 +54,35 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
         draw_cells(&cells, viewport, canvas_area, buf, depth, paper);
     }
 
-    if focused && !app.ui.help_open {
+    // Selection overlay: highlight the selected component's outline and
+    // mark the bottom-right resize handle.
+    if let Some(rect) = app
+        .selection()
+        .and_then(|id| app.cached_layout().and_then(|l| l.rect(id)))
+    {
+        let sel = styles::selection(app);
+        for pos in rect.positions() {
+            let on_edge = pos.x == rect.x
+                || pos.y == rect.y
+                || u32::from(pos.x) + 1 == rect.right()
+                || u32::from(pos.y) + 1 == rect.bottom();
+            if !on_edge || !viewport.contains(pos) {
+                continue;
+            }
+            let sx = canvas_area.x + (pos.x - viewport.x);
+            let sy = canvas_area.y + (pos.y - viewport.y);
+            if let Some(cell) = buf.cell_mut((sx, sy)) {
+                cell.set_style(sel);
+                let is_corner =
+                    u32::from(pos.x) + 1 == rect.right() && u32::from(pos.y) + 1 == rect.bottom();
+                if is_corner && rect.width > 1 && rect.height > 1 {
+                    cell.set_symbol("◆");
+                }
+            }
+        }
+    }
+
+    if focused && !app.ui.help_open && app.prompt.is_none() {
         let c = app.editor.cursor;
         if viewport.contains(c) {
             let sx = canvas_area.x + (c.x - viewport.x);
@@ -164,6 +192,41 @@ mod tests {
         app.mark_edited();
         let rows = screen(&mut app, 30, 8);
         assert!(rows[2].contains("╭ Metrics ─╮"), "{:?}", rows[2]);
+    }
+
+    #[test]
+    fn selection_overlay_and_inspector_render() {
+        use glyphforge_core::layout::Layout;
+        use glyphforge_core::{Component, ObjectId};
+        let mut app = test_app(Size::new(30, 8));
+        let panel = Component::new(ObjectId::slugify("metrics"), "panel")
+            .with_prop("title", "Metrics")
+            .with_layout(Layout::absolute(0, 0, 12, 3));
+        app.session
+            .create_component(panel, None, None, None)
+            .unwrap();
+        app.dispatch(Action::LayerNext);
+        app.dispatch(Action::SelectNext);
+        let rows = screen(&mut app, 100, 16);
+        let all = rows.join("\n");
+        assert!(all.contains("◆"), "resize handle drawn: {all}");
+        assert!(all.contains("Inspector"), "{all}");
+        assert!(
+            all.contains("id     metrics") || all.contains("metrics"),
+            "{all}"
+        );
+        assert!(all.contains("INTERFACE"), "{all}");
+    }
+
+    #[test]
+    fn prompt_renders_with_suggestions() {
+        let mut app = test_app(Size::new(30, 8));
+        app.dispatch(Action::LayerNext);
+        app.dispatch(Action::AddComponent);
+        let rows = screen(&mut app, 100, 16);
+        let all = rows.join("\n");
+        assert!(all.contains("Add component"), "{all}");
+        assert!(all.contains("panel") && all.contains("label"), "{all}");
     }
 
     #[test]

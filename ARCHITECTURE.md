@@ -353,9 +353,20 @@ Milestone 14 adds a modification-time poll and documents the
   Document mutations go through `Session` as patches, so the editor gets
   undo/redo, dirty tracking and agent transactions from the core.
 - **Event loop.** Draw when something changed, poll events with a tick,
-  route keys through the help overlay, the keymap, Vim navigation, then
-  text insertion. Typing on an artwork layer records `set_cells` into an
-  open transaction that closes on the next non-edit action.
+  route keys through an open prompt, the help overlay, the keymap (the
+  `Interface` context shadows `Global` while the active layer holds
+  components), Vim navigation, then text insertion. Typing on an artwork
+  layer records `set_cells` into an open transaction that closes on the
+  next non-edit action.
+- **Interface Mode.** Selection is editor state (an `ObjectId`). Hit
+  testing and nudging use the solved `LayoutResult` of the active layer,
+  cached per frame like the composite. Nudge, resize, add, edit and delete
+  are `move`, `resize`, `create_component`, `set_property` and
+  `delete_component` operations; a mouse drag opens one transaction and
+  records an operation per motion event, so undo removes the whole drag.
+  The `Prompt` (input line with candidates) serves select-by-id, add
+  component, edit property and save-as, and is the base of the command
+  palette.
 - **Terminal lifecycle.** An RAII guard enables raw mode, the alternate
   screen, mouse, bracketed paste, focus events and kitty keyboard flags
   when supported; a panic hook restores everything first.

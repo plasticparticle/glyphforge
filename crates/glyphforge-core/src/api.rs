@@ -7,9 +7,10 @@ use crate::component::Component;
 use crate::document::{Canvas, CanvasError, Document, Size};
 use crate::history::{History, HistoryError, Origin};
 use crate::id::ObjectId;
+use crate::layout::{Layout, LayoutResult};
 use crate::patch::{Operation, Patch};
 use crate::project::{self, ProjectError};
-use crate::render::{self, Registry};
+use crate::render::{self, Registry, RenderContext};
 use crate::validate::{self, Diagnostic};
 use crate::value::Value;
 
@@ -229,6 +230,76 @@ impl Session {
         )?)
     }
 
+    /// Solved layout of one interface layer of `screen`, at the screen's
+    /// size or `size`. An artwork layer yields an empty result.
+    pub fn layout(
+        &self,
+        screen: &ObjectId,
+        layer: &ObjectId,
+        size: Option<Size>,
+    ) -> Result<LayoutResult, ApiError> {
+        let s = self
+            .doc
+            .screen(screen)
+            .ok_or_else(|| ApiError::NoSuchScreen(screen.clone()))?;
+        let Some(roots) = s.layer(layer).and_then(crate::document::Layer::components) else {
+            return Ok(LayoutResult::default());
+        };
+        let ctx = RenderContext {
+            theme: &self.doc.theme,
+            screen: Some(s),
+        };
+        Ok(render::solve_components(
+            roots,
+            size.unwrap_or(s.size()),
+            &ctx,
+            &self.registry,
+        ))
+    }
+
+    /// Creates a component of `kind` with the renderer's default size and
+    /// properties, placed absolutely at (`x`, `y`) under `parent` or as a
+    /// root of `layer`. The id is derived from `name` and made unique.
+    pub fn add_component(
+        &mut self,
+        kind: &str,
+        name: Option<&str>,
+        x: u16,
+        y: u16,
+        parent: Option<ObjectId>,
+        layer: Option<ObjectId>,
+    ) -> Result<ObjectId, ApiError> {
+        let renderer = self.registry.renderer(kind);
+        let base = ObjectId::slugify(name.unwrap_or(kind));
+        let id = base.unique_among(|c| self.doc.has_id(c));
+        let mut layout = match renderer.default_size() {
+            Some(size) => Layout::absolute(x, y, size.width, size.height),
+            None => Layout {
+                placement: crate::layout::Placement::Absolute { x, y },
+                width: crate::layout::Dimension::Content,
+                height: crate::layout::Dimension::Content,
+                ..Layout::default()
+            },
+        };
+        if kind == "panel" || kind == "group" {
+            layout.container.direction = crate::layout::Direction::Vertical;
+        }
+        let mut component = Component::new(id.clone(), kind).with_layout(layout);
+        for (k, v) in renderer.default_props() {
+            component.props.insert(k.to_owned(), v);
+        }
+        self.single(
+            Operation::CreateComponent {
+                component,
+                parent,
+                layer,
+                index: None,
+            },
+            &format!("Add {kind}"),
+        )?;
+        Ok(id)
+    }
+
     /// Plain-text preview of a screen.
     pub fn render_text(&self, screen: &ObjectId, size: Option<Size>) -> Result<String, ApiError> {
         let canvas = self.render(screen, size)?;
@@ -311,6 +382,24 @@ mod tests {
         );
         assert!(s.is_dirty());
         assert!(matches!(s.save(), Err(ApiError::NoPath)));
+    }
+
+    #[test]
+    fn add_component_uses_defaults_and_unique_ids() {
+        let mut s = Session::new(Document::new(Size::new(40, 10)).unwrap());
+        let a = s.add_component("panel", None, 1, 1, None, None).unwrap();
+        let b = s.add_component("panel", None, 2, 2, None, None).unwrap();
+        let c = s
+            .add_component("label", Some("CPU Load"), 0, 0, Some(a.clone()), None)
+            .unwrap();
+        assert_eq!(a.as_str(), "panel");
+        assert_eq!(b.as_str(), "panel-2");
+        assert_eq!(c.as_str(), "cpu-load");
+        assert_eq!(s.component(&a).unwrap().prop_str("title"), Some("Panel"));
+        let layout = s.layout(&id!("main"), &id!("main-ui"), None).unwrap();
+        assert_eq!(layout.rect(&a).unwrap().width, 20);
+        assert_eq!(layout.rect(&c).unwrap().width, 5, "label sizes to its text");
+        assert_eq!(s.history().undo_len(), 3);
     }
 
     #[test]

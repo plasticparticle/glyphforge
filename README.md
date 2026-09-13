@@ -13,9 +13,9 @@ knows nothing about either.
 > Status: the foundations are in place (semantic model with stable ids,
 > layout solver, style tokens and themes, transactional patches,
 > undo/redo, rendering pipeline, versioned diff-friendly project format,
-> validator, application API, headless CLI). The interactive editor
-> currently edits artwork layers; Interface Mode editing tools follow.
-> See [ROADMAP.md](ROADMAP.md).
+> validator, application API, headless CLI). The editor edits artwork
+> layers cell by cell and interface layers by selecting, nudging,
+> resizing, adding and editing components. See [ROADMAP.md](ROADMAP.md).
 
 ## Two editing models, one document
 
@@ -86,7 +86,25 @@ guide arrive with the packaging milestone.
 
 ## Editor keys
 
-All bindings are configurable.
+All bindings are configurable. The mode follows the active layer: an
+interface layer puts the editor in INTERFACE mode, an artwork layer in
+SUBCELL mode (Ctrl+PgUp/PgDn switch layers).
+
+Interface mode:
+
+| Key | Action |
+|-----|--------|
+| `]` / `[`, click | Select the next / previous component, or the one under the mouse |
+| Ctrl+F | Select a component by id (jumps to its layer and screen) |
+| Arrows | Nudge the selection (or move the cursor when nothing is selected) |
+| Shift+Arrows | Resize the selection |
+| Mouse drag | Move; dragging the `◆` corner resizes |
+| `a` | Add a component at the cursor (inside the selection if any): `kind [name]` |
+| Enter | Edit a property of the selection: `key=value` (empty value removes) |
+| Delete | Delete the selection |
+| Esc | Clear the selection |
+
+Subcell mode and global:
 
 | Key | Action |
 |-----|--------|
@@ -95,7 +113,7 @@ All bindings are configurable.
 | Backspace / Delete | Erase left / erase at cursor |
 | Enter | Next row, back to the column where typing started |
 | Ctrl+Z / Ctrl+Y | Undo / redo (a typed word is one step) |
-| Ctrl+S | Save (`glyphforge design.glyph` sets the path) |
+| Ctrl+S / Ctrl+Shift+S | Save / save as |
 | Ctrl+N | New document |
 | Ctrl+PgUp / Ctrl+PgDn | Switch the active layer |
 | Ctrl+Shift+O | Use the current Omarchy theme for the document |

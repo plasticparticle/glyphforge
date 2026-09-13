@@ -21,13 +21,65 @@ impl App {
             self.new_armed = false;
         }
         // Continuous edits form one transaction; anything else closes it.
-        if !matches!(
-            action,
-            Action::InsertText(_) | Action::Backspace | Action::DeleteForward
-        ) {
+        // A mouse drag keeps its own transaction open until the button is released.
+        if self.drag.is_none()
+            && !matches!(
+                action,
+                Action::InsertText(_) | Action::Backspace | Action::DeleteForward
+            )
+        {
             self.commit_edits();
         }
         match action {
+            Action::SelectNext => self.select_step(true),
+            Action::SelectPrev => self.select_step(false),
+            Action::SelectById => self.open_select_by_id(),
+            Action::SelectAt(pos) => {
+                self.ui.focus = Focus::Canvas;
+                self.set_cursor(pos, None);
+                self.select_at(pos);
+            }
+            Action::MoveSelection(dir) => {
+                if !self.move_selection(dir) {
+                    self.move_cursor(dir);
+                }
+            }
+            Action::ResizeSelection(dir) => {
+                if !self.resize_selection(dir) {
+                    self.set_status(StatusKind::Info, "Select a component to resize it");
+                }
+            }
+            Action::AddComponent => self.open_add_component(),
+            Action::EditProperty => self.open_edit_property(),
+            Action::DeleteSelection => self.delete_selection(),
+            Action::SaveDocumentAs => self.open_save_as(),
+            Action::PromptInput(c) => {
+                if let Some(p) = self.prompt.as_mut() {
+                    p.insert(c);
+                }
+            }
+            Action::PromptBackspace => {
+                if let Some(p) = self.prompt.as_mut() {
+                    p.backspace();
+                }
+            }
+            Action::PromptNext => {
+                if let Some(p) = self.prompt.as_mut() {
+                    p.next();
+                }
+            }
+            Action::PromptPrev => {
+                if let Some(p) = self.prompt.as_mut() {
+                    p.prev();
+                }
+            }
+            Action::PromptComplete => {
+                if let Some(p) = self.prompt.as_mut() {
+                    p.complete();
+                }
+            }
+            Action::PromptSubmit => self.submit_prompt(),
+            Action::PromptCancel => self.prompt = None,
             Action::Quit => self.quit(),
             Action::ToggleHelp => self.ui.help_open = !self.ui.help_open,
             Action::Cancel => self.cancel(),
@@ -99,11 +151,9 @@ impl App {
             Action::NewDocument => self.new_document(),
             Action::SaveDocument => self.save(),
             Action::OpenDocument
-            | Action::SaveDocumentAs
             | Action::Copy
             | Action::Cut
             | Action::Paste
-            | Action::DeleteSelection
             | Action::CommandPalette => {
                 let title = descriptor_of(&action).map_or("This action", |d| d.title);
                 self.set_status(
@@ -210,8 +260,12 @@ impl App {
     }
 
     fn cancel(&mut self) {
-        if self.ui.help_open {
+        if self.prompt.is_some() {
+            self.prompt = None;
+        } else if self.ui.help_open {
             self.ui.help_open = false;
+        } else if self.editor.selection.is_some() {
+            self.editor.selection = None;
         } else if self.ui.vim_navigation && self.editor.mode == EditorMode::Insert {
             self.editor.mode = EditorMode::Normal;
         } else {
@@ -272,11 +326,17 @@ impl App {
         let layer = &layers[next];
         let msg = format!("Layer: {} ({})", layer.name, layer.kind().name());
         self.editor.layer = layer.id.clone();
+        self.editor.selection = None;
+        self.layout_cache_clear();
         self.clamp_cursor();
         self.set_status(StatusKind::Info, msg);
     }
 
-    fn move_cursor(&mut self, dir: Direction) {
+    pub(super) fn layout_cache_clear(&mut self) {
+        self.mark_edited();
+    }
+
+    pub(super) fn move_cursor(&mut self, dir: Direction) {
         let (dx, dy) = delta(dir);
         let c = self.editor.cursor;
         let mut target = Position::new(
@@ -299,7 +359,7 @@ impl App {
 
     /// Clamps `pos` into the screen, snaps off wide-glyph tails, scrolls
     /// the viewport and optionally records a new line-start column.
-    fn set_cursor(&mut self, pos: Position, line_start: Option<u16>) {
+    pub(super) fn set_cursor(&mut self, pos: Position, line_start: Option<u16>) {
         let size = self.doc_size();
         let mut pos = Position::new(
             pos.x.min(size.width.saturating_sub(1)),
@@ -634,6 +694,168 @@ mod tests {
     #[allow(non_snake_case)]
     fn Theme_minimal() -> glyphforge_core::Theme {
         glyphforge_core::Theme::minimal_dark()
+    }
+
+    fn interface_app() -> App {
+        let mut app = app(40, 12);
+        app.dispatch(Action::LayerNext); // main-ui
+        assert_eq!(app.design_mode(), crate::app::DesignMode::Interface);
+        app
+    }
+
+    fn submit(app: &mut App, text: &str) {
+        app.prompt.as_mut().unwrap().input = text.to_owned();
+        app.dispatch(Action::PromptSubmit);
+    }
+
+    #[test]
+    fn add_select_move_resize_delete_with_undo() {
+        let mut app = interface_app();
+        app.dispatch(Action::CursorTo(Position::new(3, 2)));
+        app.dispatch(Action::AddComponent);
+        assert!(app.prompt.is_some());
+        submit(&mut app, "panel Metrics");
+        let id = app.selection().cloned().unwrap();
+        assert_eq!(id.as_str(), "metrics");
+        assert_eq!(
+            app.layout().rect(&id),
+            Some(glyphforge_core::Rect::new(3, 2, 20, 6))
+        );
+
+        app.dispatch(Action::MoveSelection(Direction::Right));
+        app.dispatch(Action::MoveSelection(Direction::Down));
+        assert_eq!(app.layout().rect(&id).unwrap().x, 4);
+        assert_eq!(app.layout().rect(&id).unwrap().y, 3);
+        app.dispatch(Action::ResizeSelection(Direction::Right));
+        app.dispatch(Action::ResizeSelection(Direction::Up));
+        assert_eq!(app.layout().rect(&id).unwrap().width, 21);
+        assert_eq!(app.layout().rect(&id).unwrap().height, 5);
+
+        app.dispatch(Action::Undo);
+        assert_eq!(
+            app.layout().rect(&id).unwrap().height,
+            6,
+            "each nudge is one undo step"
+        );
+
+        app.dispatch(Action::EditProperty);
+        submit(&mut app, "title=Latency");
+        assert_eq!(
+            app.doc().component(&id).unwrap().prop_str("title"),
+            Some("Latency")
+        );
+
+        app.dispatch(Action::DeleteSelection);
+        assert!(app.doc().component(&id).is_none());
+        assert!(app.selection().is_none());
+        app.dispatch(Action::Undo);
+        assert!(app.doc().component(&id).is_some(), "delete is undoable");
+    }
+
+    #[test]
+    fn arrows_move_cursor_when_nothing_is_selected() {
+        let mut app = interface_app();
+        app.dispatch(Action::MoveSelection(Direction::Right));
+        assert_eq!(app.editor.cursor, Position::new(1, 0));
+    }
+
+    #[test]
+    fn select_cycles_and_hit_tests() {
+        let mut app = interface_app();
+        app.dispatch(Action::AddComponent);
+        submit(&mut app, "panel a");
+        app.dispatch(Action::Cancel); // clear selection so the next panel is a root
+        app.dispatch(Action::CursorTo(Position::new(25, 0)));
+        app.dispatch(Action::AddComponent);
+        submit(&mut app, "label b");
+        app.dispatch(Action::Cancel);
+        assert!(app.selection().is_none());
+        app.dispatch(Action::SelectNext);
+        assert_eq!(app.selection().unwrap().as_str(), "a");
+        app.dispatch(Action::SelectNext);
+        assert_eq!(app.selection().unwrap().as_str(), "b");
+        app.dispatch(Action::SelectNext);
+        assert_eq!(app.selection().unwrap().as_str(), "a", "wraps around");
+        app.dispatch(Action::SelectPrev);
+        assert_eq!(app.selection().unwrap().as_str(), "b");
+        app.dispatch(Action::SelectAt(Position::new(5, 5)));
+        assert_eq!(app.selection().unwrap().as_str(), "a");
+        app.dispatch(Action::SelectAt(Position::new(39, 11)));
+        assert!(app.selection().is_none(), "clicking empty space deselects");
+    }
+
+    #[test]
+    fn child_is_added_inside_selection_and_found_by_id() {
+        let mut app = interface_app();
+        app.dispatch(Action::AddComponent);
+        submit(&mut app, "panel box");
+        app.dispatch(Action::CursorTo(Position::new(2, 2)));
+        app.dispatch(Action::AddComponent);
+        submit(&mut app, "label inner");
+        let doc = app.doc();
+        assert_eq!(
+            doc.component(&glyphforge_core::ObjectId::slugify("box"))
+                .unwrap()
+                .children[0]
+                .id
+                .as_str(),
+            "inner"
+        );
+        // Deepest component wins the hit test.
+        app.dispatch(Action::SelectAt(Position::new(2, 2)));
+        assert_eq!(app.selection().unwrap().as_str(), "inner");
+        // Jump by id from an artwork layer switches layers.
+        app.dispatch(Action::LayerPrev);
+        assert!(app.on_artwork_layer());
+        app.dispatch(Action::SelectById);
+        submit(&mut app, "box");
+        assert!(!app.on_artwork_layer());
+        assert_eq!(app.selection().unwrap().as_str(), "box");
+    }
+
+    #[test]
+    fn mouse_drag_moves_and_resizes_as_single_transactions() {
+        let mut app = interface_app();
+        app.dispatch(Action::AddComponent);
+        submit(&mut app, "panel p");
+        let id = app.selection().cloned().unwrap();
+        let before = app.session.history().undo_len();
+        assert!(app.begin_drag(Position::new(5, 3)));
+        app.drag_to(Position::new(7, 4));
+        app.drag_to(Position::new(9, 5));
+        app.end_drag();
+        assert_eq!(app.layout().rect(&id).unwrap().x, 4);
+        assert_eq!(app.layout().rect(&id).unwrap().y, 2);
+        assert_eq!(
+            app.session.history().undo_len(),
+            before + 1,
+            "one transaction per drag"
+        );
+        // Bottom-right corner resizes: rect is 4,2 20x6 -> corner at 23,7.
+        assert!(app.begin_drag(Position::new(23, 7)));
+        app.drag_to(Position::new(25, 8));
+        app.end_drag();
+        assert_eq!(app.layout().rect(&id).unwrap().width, 22);
+        assert_eq!(app.layout().rect(&id).unwrap().height, 7);
+        assert!(
+            !app.begin_drag(Position::new(39, 11)),
+            "drag outside the selection does nothing"
+        );
+    }
+
+    #[test]
+    fn save_as_prompt_writes_file() {
+        let mut app = app(5, 1);
+        app.dispatch(Action::InsertText("a".into()));
+        let dir = std::env::temp_dir().join(format!("glyphforge-saveas-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("saved.glyph");
+        app.dispatch(Action::SaveDocumentAs);
+        submit(&mut app, &path.display().to_string());
+        assert!(path.exists());
+        assert!(!app.dirty());
+        assert_eq!(app.title(), "saved.glyph");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

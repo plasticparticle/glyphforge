@@ -5,6 +5,7 @@ pub mod header;
 pub mod help;
 pub mod layout;
 pub mod panels;
+pub mod prompt;
 pub mod status_bar;
 
 use ratatui::Frame;
@@ -37,6 +38,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>) {
     if app.ui.help_open {
         help::render(app, frame, area);
     }
+    prompt::render(app, frame, area);
 }
 
 /// Style helpers shared by widgets. Every colour comes from a UI theme
@@ -77,6 +79,12 @@ pub(crate) mod styles {
 
     pub fn warning(app: &App) -> Style {
         text(app).fg(tok(app, "warning"))
+    }
+
+    pub fn selection(app: &App) -> Style {
+        Style::default()
+            .fg(tok(app, "selection-foreground"))
+            .bg(tok(app, "selection"))
     }
 
     pub fn paper(app: &App) -> Style {

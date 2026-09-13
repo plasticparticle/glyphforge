@@ -21,6 +21,17 @@ pub trait ComponentRenderer: std::fmt::Debug + Send + Sync {
         None
     }
 
+    /// A sensible size for a freshly created instance placed absolutely,
+    /// or `None` when the kind sizes itself to its content.
+    fn default_size(&self) -> Option<Size> {
+        Some(Size::new(20, 6))
+    }
+
+    /// Properties a new instance starts with, so it is visible at once.
+    fn default_props(&self) -> Vec<(&'static str, crate::value::Value)> {
+        Vec::new()
+    }
+
     /// Cells consumed by borders and similar chrome.
     fn chrome_inset(&self, _component: &Component, _ctx: &RenderContext<'_>) -> Edges {
         Edges::ZERO
@@ -154,6 +165,10 @@ impl ComponentRenderer for Panel {
         "panel"
     }
 
+    fn default_props(&self) -> Vec<(&'static str, crate::value::Value)> {
+        vec![("title", "Panel".into())]
+    }
+
     fn chrome_inset(&self, c: &Component, ctx: &RenderContext<'_>) -> Edges {
         match border_of(c, ctx.theme) {
             BorderFamily::None => Edges::ZERO,
@@ -208,6 +223,14 @@ impl ComponentRenderer for Label {
         "label"
     }
 
+    fn default_size(&self) -> Option<Size> {
+        None
+    }
+
+    fn default_props(&self) -> Vec<(&'static str, crate::value::Value)> {
+        vec![("text", "Label".into())]
+    }
+
     fn intrinsic_size(&self, c: &Component, _: &RenderContext<'_>) -> Option<Size> {
         Some(Size::new(painter::text_width(text_of(c)), 1))
     }
@@ -235,6 +258,14 @@ pub struct Heading;
 impl ComponentRenderer for Heading {
     fn kind(&self) -> &'static str {
         "heading"
+    }
+
+    fn default_size(&self) -> Option<Size> {
+        None
+    }
+
+    fn default_props(&self) -> Vec<(&'static str, crate::value::Value)> {
+        vec![("text", "Heading".into())]
     }
 
     fn intrinsic_size(&self, c: &Component, _: &RenderContext<'_>) -> Option<Size> {
@@ -266,6 +297,14 @@ pub struct Button;
 impl ComponentRenderer for Button {
     fn kind(&self) -> &'static str {
         "button"
+    }
+
+    fn default_size(&self) -> Option<Size> {
+        None
+    }
+
+    fn default_props(&self) -> Vec<(&'static str, crate::value::Value)> {
+        vec![("label", "OK".into())]
     }
 
     fn intrinsic_size(&self, c: &Component, _: &RenderContext<'_>) -> Option<Size> {
@@ -314,6 +353,10 @@ pub struct Divider;
 impl ComponentRenderer for Divider {
     fn kind(&self) -> &'static str {
         "divider"
+    }
+
+    fn default_size(&self) -> Option<Size> {
+        Some(Size::new(10, 1))
     }
 
     fn intrinsic_size(&self, _: &Component, _: &RenderContext<'_>) -> Option<Size> {
@@ -365,6 +408,10 @@ impl Artwork {
 impl ComponentRenderer for Artwork {
     fn kind(&self) -> &'static str {
         "artwork"
+    }
+
+    fn default_size(&self) -> Option<Size> {
+        None
     }
 
     fn intrinsic_size(&self, c: &Component, ctx: &RenderContext<'_>) -> Option<Size> {

@@ -29,29 +29,46 @@ pub fn render_left(app: &App, frame: &mut Frame<'_>, area: Rect) {
     let [mode_area, keys_area] =
         Layout::vertical([Constraint::Length(4), Constraint::Min(3)]).areas(area);
 
-    let mode_lines = vec![
-        Line::from(vec![
-            Span::styled("Type", styles::accent(app)),
-            Span::styled(
-                if app.on_artwork_layer() {
-                    " (artwork)"
-                } else {
-                    " (needs artwork layer)"
-                },
-                styles::muted(app),
-            ),
-        ]),
-        Line::from(Span::styled(
-            format!("mode {}", app.editor.mode.title()),
-            styles::text(app),
-        )),
-    ];
+    let interface = !app.on_artwork_layer();
+    let mode_lines = if interface {
+        vec![
+            Line::from(vec![
+                Span::styled("Select", styles::accent(app)),
+                Span::styled(" (interface)", styles::muted(app)),
+            ]),
+            Line::from(Span::styled("a add  ⏎ edit  del", styles::text(app))),
+        ]
+    } else {
+        vec![
+            Line::from(vec![
+                Span::styled("Type", styles::accent(app)),
+                Span::styled(" (artwork)", styles::muted(app)),
+            ]),
+            Line::from(Span::styled(
+                format!("mode {}", app.editor.mode.title()),
+                styles::text(app),
+            )),
+        ]
+    };
     frame.render_widget(
         Paragraph::new(mode_lines).block(block(app, "Tool", focused)),
         mode_area,
     );
 
-    let shortcuts: &[(&str, Action)] = &[
+    let interface_shortcuts: &[(&str, Action)] = &[
+        ("next/prev", Action::SelectNext),
+        ("find by id", Action::SelectById),
+        ("add", Action::AddComponent),
+        ("edit prop", Action::EditProperty),
+        ("nudge", Action::MoveSelection(Direction::Right)),
+        ("resize", Action::ResizeSelection(Direction::Right)),
+        ("delete", Action::DeleteSelection),
+        ("layer", Action::LayerNext),
+        ("undo", Action::Undo),
+        ("save", Action::SaveDocument),
+        ("quit", Action::Quit),
+    ];
+    let artwork_shortcuts: &[(&str, Action)] = &[
         ("move", Action::CursorMove(Direction::Right)),
         ("help", Action::ToggleHelp),
         ("left panel", Action::ToggleLeftPanel),
@@ -64,12 +81,19 @@ pub fn render_left(app: &App, frame: &mut Frame<'_>, area: Rect) {
         ("save", Action::SaveDocument),
         ("quit", Action::Quit),
     ];
+    let shortcuts = if interface {
+        interface_shortcuts
+    } else {
+        artwork_shortcuts
+    };
     let lines: Vec<Line<'_>> = shortcuts
         .iter()
         .map(|(label, action)| {
             let keys = app.keymap.chords_for(action);
             let key = match (label, keys.first()) {
-                (&"move", _) => "arrows".to_owned(),
+                (&"move" | &"nudge", _) => "arrows".to_owned(),
+                (&"resize", _) => "shift+arrows".to_owned(),
+                (&"next/prev", _) => "] [".to_owned(),
                 (_, Some(k)) => k.to_string(),
                 (_, None) => "unbound".to_owned(),
             };
@@ -87,8 +111,9 @@ pub fn render_left(app: &App, frame: &mut Frame<'_>, area: Rect) {
 
 pub fn render_right(app: &App, frame: &mut Frame<'_>, area: Rect) {
     let focused = app.ui.focus == Focus::RightPanel;
+    let props_height = if app.on_artwork_layer() { 9 } else { 14 };
     let [layers_area, props_area] =
-        Layout::vertical([Constraint::Min(3), Constraint::Length(9)]).areas(area);
+        Layout::vertical([Constraint::Min(3), Constraint::Length(props_height)]).areas(area);
 
     // Layers of the active screen, top-most first.
     let lines: Vec<Line<'_>> = app
@@ -122,6 +147,11 @@ pub fn render_right(app: &App, frame: &mut Frame<'_>, area: Rect) {
         Paragraph::new(lines).block(block(app, &title, focused)),
         layers_area,
     );
+
+    if !app.on_artwork_layer() {
+        render_inspector(app, frame, props_area, focused);
+        return;
+    }
 
     // Properties of the cell under the cursor (active layer).
     let cursor = app.editor.cursor;
@@ -188,5 +218,55 @@ pub fn render_right(app: &App, frame: &mut Frame<'_>, area: Rect) {
     frame.render_widget(
         Paragraph::new(lines).block(block(app, "Cell", focused)),
         props_area,
+    );
+}
+
+/// The inspector: identity, geometry and properties of the selection.
+fn render_inspector(app: &App, frame: &mut Frame<'_>, area: Rect, focused: bool) {
+    let row = |k: &str, v: String| {
+        Line::from(vec![
+            Span::styled(format!("{k:<7}"), styles::muted(app)),
+            Span::styled(v, styles::text(app)),
+        ])
+    };
+    let lines: Vec<Line<'_>> = match app.selection().cloned() {
+        None => vec![
+            Line::from(Span::styled("nothing selected", styles::muted(app))),
+            Line::from(Span::styled("] [ cycle, click, Ctrl+F", styles::muted(app))),
+            Line::from(Span::styled("a adds a component", styles::muted(app))),
+        ],
+        Some(id) => {
+            let Some(c) = app.doc().component(&id) else {
+                return;
+            };
+            let rect = app.cached_layout().and_then(|l| l.rect(&id));
+            let mut lines = vec![
+                Line::from(vec![
+                    Span::styled(c.kind.clone(), styles::accent(app)),
+                    Span::styled(format!("  {}", app.placement_text(&id)), styles::muted(app)),
+                ]),
+                row("id", id.to_string()),
+            ];
+            if let Some(r) = rect {
+                lines.push(row("x y", format!("{} {}", r.x, r.y)));
+                lines.push(row("w h", format!("{} {}", r.width, r.height)));
+            }
+            lines.push(row("width", c.layout.width.to_string()));
+            lines.push(row("height", c.layout.height.to_string()));
+            if !c.children.is_empty() {
+                lines.push(row("kids", c.children.len().to_string()));
+            }
+            for (k, v) in &c.props {
+                let text = v.to_string();
+                let max = usize::from(area.width.saturating_sub(10));
+                let shown: String = text.chars().take(max).collect();
+                lines.push(row(k, shown));
+            }
+            lines
+        }
+    };
+    frame.render_widget(
+        Paragraph::new(lines).block(block(app, "Inspector", focused)),
+        area,
     );
 }

@@ -1,10 +1,13 @@
 //! Application state and the single dispatch entry point.
 
 mod dispatch;
+mod interface;
+mod prompt;
 mod run;
 mod viewport;
 
 use glyphforge_core::api::Session;
+use glyphforge_core::layout::LayoutResult;
 use glyphforge_core::{Canvas, CellStyle, Document, Layer, ObjectId, Position, Size, Theme};
 use ratatui::layout::Rect as RatRect;
 
@@ -13,6 +16,8 @@ use crate::input::Keymap;
 use crate::omarchy::{self, OmarchyPaths};
 use crate::terminal::{ColorDepth, TerminalCapabilities};
 
+pub use interface::Drag;
+pub use prompt::Prompt;
 pub use run::{RunError, run};
 pub use viewport::Viewport;
 
@@ -30,6 +35,22 @@ impl Focus {
             Self::Canvas => "canvas",
             Self::LeftPanel => "left panel",
             Self::RightPanel => "right panel",
+        }
+    }
+}
+
+/// Which editing model the active layer uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DesignMode {
+    Interface,
+    Subcell,
+}
+
+impl DesignMode {
+    pub const fn title(self) -> &'static str {
+        match self {
+            Self::Interface => "INTERFACE",
+            Self::Subcell => "SUBCELL",
         }
     }
 }
@@ -85,6 +106,8 @@ pub struct EditorState {
     pub line_start_x: u16,
     pub style: CellStyle,
     pub mode: EditorMode,
+    /// Selected component (Interface Mode).
+    pub selection: Option<ObjectId>,
 }
 
 /// Where the UI chrome theme came from.
@@ -118,7 +141,10 @@ pub struct App {
     pub status: Option<StatusMessage>,
     pub omarchy_paths: OmarchyPaths,
     pub is_omarchy: bool,
+    pub prompt: Option<Prompt>,
+    pub drag: Option<Drag>,
     composite_cache: Option<Canvas>,
+    layout_cache: Option<LayoutResult>,
     frame_area: RatRect,
     quit_armed: bool,
     new_armed: bool,
@@ -158,6 +184,7 @@ impl App {
                 } else {
                     EditorMode::Insert
                 },
+                selection: None,
             },
             session: init.session,
             ui: UiState {
@@ -176,7 +203,10 @@ impl App {
             status: None,
             omarchy_paths: init.omarchy_paths,
             is_omarchy,
+            prompt: None,
+            drag: None,
             composite_cache: None,
+            layout_cache: None,
             frame_area: RatRect::default(),
             quit_armed: false,
             new_armed: false,
@@ -202,12 +232,15 @@ impl App {
         app
     }
 
-    /// The top-most artwork layer, which is where typing goes.
+    /// The layer to start editing on: the top-most visible artwork layer,
+    /// otherwise the top-most visible layer of any kind (a design whose
+    /// artwork is only a hidden asset opens in Interface Mode).
     fn default_edit_layer(layers: &[Layer]) -> Option<ObjectId> {
         layers
             .iter()
             .rev()
-            .find(|l| l.cells().is_some())
+            .find(|l| l.visible && l.cells().is_some())
+            .or_else(|| layers.iter().rev().find(|l| l.visible))
             .map(|l| l.id.clone())
     }
 
@@ -299,8 +332,13 @@ impl App {
         self.composite_cache.as_ref()
     }
 
+    pub const fn cached_layout(&self) -> Option<&LayoutResult> {
+        self.layout_cache.as_ref()
+    }
+
     pub fn mark_edited(&mut self) {
         self.composite_cache = None;
+        self.layout_cache = None;
         self.quit_armed = false;
         self.new_armed = false;
     }
@@ -321,6 +359,7 @@ impl App {
             .viewport
             .ensure_visible(self.editor.cursor, size);
         let _ = self.composite();
+        let _ = self.layout();
     }
 
     /// (Re)loads the UI chrome theme according to the configured source.
@@ -367,6 +406,7 @@ impl App {
         self.editor.cursor = Position::ORIGIN;
         self.editor.line_start_x = 0;
         self.editor.viewport.offset = Position::ORIGIN;
+        self.editor.selection = None;
         self.mark_edited();
     }
 }

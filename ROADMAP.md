@@ -82,10 +82,22 @@ with stable codes.
 
 ## Editor milestones
 
-### E1 — Interface Mode editing  `[ ]`
-Selection of components by click and by id, move/resize with keyboard and
-mouse (through `move`/`resize` operations), inspector panel with editable
-properties, create components from the palette, delete, reparent.
+### E1 — Interface Mode editing  `[~]`
+- [x] Mode follows the active layer (interface -> INTERFACE, artwork -> SUBCELL)
+- [x] Selection by click, by `]`/`[` cycling and by id prompt (Ctrl+F, jumps
+      across layers and screens); selection outline with resize handle
+- [x] Nudge with arrows, resize with Shift+arrows, mouse drag to move and
+      corner drag to resize; each an undoable `move`/`resize` operation,
+      a drag is one transaction
+- [x] Add components from a prompt with kind completion (`a`), as roots or
+      inside the selection, with per-kind default size and properties
+- [x] Edit properties by prompt (`Enter`, `key=value`), delete (`Delete`)
+- [x] Inspector panel (kind, id, geometry, layout dimensions, properties)
+- [x] Save As prompt (Ctrl+Shift+S)
+- [ ] Reparent (move a component into another container)
+- [ ] Multi-selection
+- [ ] Editing layout fields (direction, gap, padding) from the inspector
+      without typing `set_layout` JSON
 
 ### E2 — Alignment and geometry  `[ ]`
 Snap to grid and neighbours, alignment guides while dragging, align and

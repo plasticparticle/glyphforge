@@ -5,7 +5,7 @@ use std::time::Duration;
 use crossterm::event::{self, Event, MouseButton, MouseEvent, MouseEventKind};
 
 use super::{App, EditorMode, Focus};
-use crate::actions::{Action, Direction, vim_navigation};
+use crate::actions::{Action, Context, Direction, vim_navigation};
 use crate::config::ThemeSource;
 use crate::input::{Key, KeyCode, key_from_crossterm};
 use crate::render::screen_to_document;
@@ -76,6 +76,22 @@ fn handle_event(app: &mut App, ev: &Event) -> bool {
 /// Routes a key: help overlay first, then the keymap, then Vim navigation,
 /// then text insertion.
 pub(crate) fn handle_key(app: &mut App, key: Key) {
+    if app.prompt.is_some() {
+        let action = match key.code {
+            KeyCode::Esc => Action::PromptCancel,
+            KeyCode::Enter => Action::PromptSubmit,
+            KeyCode::Backspace => Action::PromptBackspace,
+            KeyCode::Down => Action::PromptNext,
+            KeyCode::Up => Action::PromptPrev,
+            KeyCode::Tab => Action::PromptComplete,
+            _ => match key.text_char() {
+                Some(c) => Action::PromptInput(c),
+                None => return,
+            },
+        };
+        app.dispatch(action);
+        return;
+    }
     if app.ui.help_open {
         if matches!(key.code, KeyCode::Esc | KeyCode::F(1) | KeyCode::Char('q')) {
             app.ui.help_open = false;
@@ -83,8 +99,17 @@ pub(crate) fn handle_key(app: &mut App, key: Key) {
         return;
     }
     let chord = key.chord();
-    let bound = app.keymap.lookup(chord).cloned();
-    let inserting = app.ui.focus == Focus::Canvas && app.editor.mode == EditorMode::Insert;
+    let context = if app.on_artwork_layer() {
+        Context::Global
+    } else {
+        Context::Interface
+    };
+    let bound = app.keymap.lookup(chord, context).cloned();
+    // Text insertion only exists on artwork layers; interface layers treat
+    // plain keys as commands.
+    let inserting = app.ui.focus == Focus::Canvas
+        && app.editor.mode == EditorMode::Insert
+        && app.on_artwork_layer();
 
     // In insert mode plain printable keys insert text even if a binding
     // exists for the bare character (bindings on bare characters are meant
@@ -126,15 +151,22 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
         return false;
     }
     let layout = ui::layout::compute(app.last_frame_area(), &app.ui);
+    let doc_pos = screen_to_document(
+        (m.column, m.row),
+        layout.canvas,
+        app.editor.viewport.rect(),
+        glyphforge_core::Rect::from_size(app.doc_size()),
+    );
     match m.kind {
         MouseEventKind::Down(MouseButton::Left) => {
-            if let Some(pos) = screen_to_document(
-                (m.column, m.row),
-                layout.canvas,
-                app.editor.viewport.rect(),
-                glyphforge_core::Rect::from_size(app.doc_size()),
-            ) {
-                app.dispatch(Action::CursorTo(pos));
+            if let Some(pos) = doc_pos {
+                if app.on_artwork_layer() {
+                    app.dispatch(Action::CursorTo(pos));
+                } else if !app.begin_drag(pos) {
+                    app.dispatch(Action::SelectAt(pos));
+                    // A fresh selection can be dragged right away.
+                    app.begin_drag(pos);
+                }
             } else if layout
                 .left
                 .is_some_and(|r| r.contains((m.column, m.row).into()))
@@ -149,6 +181,21 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
                 app.ui.focus = Focus::Canvas;
             }
             true
+        }
+        MouseEventKind::Drag(MouseButton::Left) => {
+            if app.drag.is_some() {
+                if let Some(pos) = doc_pos {
+                    app.drag_to(pos);
+                }
+                true
+            } else {
+                false
+            }
+        }
+        MouseEventKind::Up(MouseButton::Left) => {
+            let had = app.drag.is_some();
+            app.end_drag();
+            had
         }
         MouseEventKind::ScrollUp => {
             app.dispatch(Action::ScrollView(Direction::Up));
@@ -225,6 +272,31 @@ mod tests {
         assert!(app.dirty(), "in insert mode 'l' is text");
         handle_key(&mut app, Key::new(KeyCode::Esc, Modifiers::NONE));
         assert_eq!(app.editor.mode, EditorMode::Normal);
+    }
+
+    #[test]
+    fn prompt_captures_keys_until_closed() {
+        let mut app = test_app(Size::new(10, 2));
+        app.editor.viewport.size = Size::new(10, 2);
+        handle_key(&mut app, Key::new(KeyCode::Char('f'), Modifiers::CTRL));
+        assert!(app.prompt.is_none(), "no components yet: prompt not opened");
+        app.dispatch(Action::SaveDocumentAs);
+        assert!(app.prompt.is_some());
+        handle_key(&mut app, key('x'));
+        assert!(app.prompt.as_ref().unwrap().input.ends_with('x'));
+        assert!(!app.dirty(), "typing went to the prompt, not the canvas");
+        handle_key(&mut app, Key::new(KeyCode::Esc, Modifiers::NONE));
+        assert!(app.prompt.is_none());
+    }
+
+    #[test]
+    fn interface_layer_treats_plain_keys_as_commands() {
+        let mut app = test_app(Size::new(10, 2));
+        app.editor.viewport.size = Size::new(10, 2);
+        app.dispatch(Action::LayerNext);
+        handle_key(&mut app, key('a'));
+        assert!(app.prompt.is_some(), "'a' opens the add-component prompt");
+        assert!(!app.dirty());
     }
 
     #[test]

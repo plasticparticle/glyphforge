@@ -140,6 +140,24 @@ pub fn render_components(
     Ok((canvas, result))
 }
 
+/// Solves the layout of one interface layer at `size` without rendering.
+pub fn solve_components(
+    roots: &[Component],
+    size: Size,
+    ctx: &RenderContext<'_>,
+    registry: &Registry,
+) -> LayoutResult {
+    let resolved: Vec<Component> = roots
+        .iter()
+        .filter_map(|c| c.resolve_responsive(size.width))
+        .collect();
+    let measure = RegistryMeasure {
+        registry,
+        ctx: *ctx,
+    };
+    layout::solve(&resolved, Rect::from_size(size), &measure)
+}
+
 /// Renders a screen: visible layers bottom to top, artwork composited as
 /// is, interface layers rendered through the registry. `size` overrides
 /// the screen size for responsive previews (artwork is clipped).
