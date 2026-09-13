@@ -1,0 +1,4 @@
+/target
+*.tuiforge.autosave
+*.tuiforge.recovery
+.direnv
