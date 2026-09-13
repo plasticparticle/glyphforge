@@ -82,7 +82,7 @@ with stable codes.
 
 ## Editor milestones
 
-### E1 — Interface Mode editing  `[~]`
+### E1 — Interface Mode editing  `[x]`
 - [x] Mode follows the active layer (interface -> INTERFACE, artwork -> SUBCELL)
 - [x] Selection by click, by `]`/`[` cycling and by id prompt (Ctrl+F, jumps
       across layers and screens); selection outline with resize handle
@@ -94,14 +94,32 @@ with stable codes.
 - [x] Edit properties by prompt (`Enter`, `key=value`), delete (`Delete`)
 - [x] Inspector panel (kind, id, geometry, layout dimensions, properties)
 - [x] Save As prompt (Ctrl+Shift+S)
-- [ ] Reparent (move a component into another container)
-- [ ] Multi-selection
+- [x] Multi-selection: `{` `}` extend, Ctrl+A all, shift-click toggles;
+      nudging, resizing, property edits and deletion apply to the whole
+      selection as one undo step
+- [x] Reparent: `alt+p` moves the selection into the component under the
+      cursor, or back to the top level (`reparent` operation, guarded
+      against cycles)
 - [ ] Editing layout fields (direction, gap, padding) from the inspector
       without typing `set_layout` JSON
+- [ ] Proportional resize of a multi-selection (resizing by drag is
+      limited to a single component)
 
-### E2 — Alignment and geometry  `[ ]`
-Snap to grid and neighbours, alignment guides while dragging, align and
-distribute operations on multi-selection, equal size.
+### E2 — Alignment and geometry  `[~]`
+- [x] `geometry` module in the core: bounding box, align (6 modes),
+      distribute on both axes, match sizes, and snapping; pure functions
+      that emit patch operations, so the CLI and agents share them
+- [x] Align `alt+arrows`, centres `alt+c` / `alt+shift+c`, distribute
+      `alt+d` / `alt+shift+d`, match size `alt+w` / `alt+shift+w`; each
+      one transaction, components laid out by a parent are reported as
+      skipped rather than ripped out of their container
+- [x] `set_size` operation so matching widths cannot silently freeze a
+      `fill` height
+- [x] Snapping while dragging to sibling and screen edges and centres,
+      with guides drawn on the canvas; `alt+s` and `[ui] snap` toggle it
+- [ ] Grid and rulers, and snapping to them (`SnapTargets::add_grid` is
+      implemented and tested, but there is no grid feature to feed it yet)
+- [ ] Equal spacing between exactly two components (needs a gap concept)
 
 ### E3 — Subcell Mode tools  `[ ]`
 Tool trait and registry; pencil, eraser, text, rectangle selection with

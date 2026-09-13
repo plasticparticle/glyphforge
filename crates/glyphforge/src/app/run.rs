@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use crossterm::event::{self, Event, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{self, Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 
 use super::{App, EditorMode, Focus};
 use crate::actions::{Action, Context, Direction, vim_navigation};
@@ -162,6 +162,8 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
             if let Some(pos) = doc_pos {
                 if app.on_artwork_layer() {
                     app.dispatch(Action::CursorTo(pos));
+                } else if m.modifiers.contains(KeyModifiers::SHIFT) {
+                    app.dispatch(Action::ExtendSelectAt(pos));
                 } else if !app.begin_drag(pos) {
                     app.dispatch(Action::SelectAt(pos));
                     // A fresh selection can be dragged right away.

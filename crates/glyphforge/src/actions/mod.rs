@@ -4,6 +4,7 @@
 use std::sync::OnceLock;
 
 use glyphforge_core::Position;
+use glyphforge_core::geometry::{Align, Axis};
 
 /// Direction for cursor and viewport movement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -30,9 +31,18 @@ pub enum Action {
     SelectNext,
     SelectPrev,
     SelectById,
+    SelectAll,
     SelectAt(Position),
+    ExtendSelectNext,
+    ExtendSelectPrev,
+    ExtendSelectAt(Position),
     MoveSelection(Direction),
     ResizeSelection(Direction),
+    AlignSelection(Align),
+    DistributeSelection(Axis),
+    EqualizeSelection(Axis),
+    ReparentSelection,
+    ToggleSnap,
     AddComponent,
     EditProperty,
     // Prompt (internal, not bindable)
@@ -187,6 +197,21 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("shrink-left", "Resize Selection Narrower", Interface, Interface, Action::ResizeSelection(Direction::Left), keys: ["shift+left"], kw: ["width", "resize"], aliases: [], implemented: true),
             desc!("grow-down", "Resize Selection Taller", Interface, Interface, Action::ResizeSelection(Direction::Down), keys: ["shift+down"], kw: ["height", "resize"], aliases: [], implemented: true),
             desc!("shrink-up", "Resize Selection Shorter", Interface, Interface, Action::ResizeSelection(Direction::Up), keys: ["shift+up"], kw: ["height", "resize"], aliases: [], implemented: true),
+            desc!("select-all", "Select All Components", Interface, Interface, Action::SelectAll, keys: ["ctrl+a"], kw: ["everything", "multi"], aliases: [], implemented: true),
+            desc!("extend-select-next", "Add Next Component To Selection", Interface, Interface, Action::ExtendSelectNext, keys: ["}"], kw: ["multi", "extend"], aliases: [], implemented: true),
+            desc!("extend-select-prev", "Add Previous Component To Selection", Interface, Interface, Action::ExtendSelectPrev, keys: ["{"], kw: ["multi", "extend"], aliases: [], implemented: true),
+            desc!("align-left", "Align Left Edges", Interface, Interface, Action::AlignSelection(Align::Left), keys: ["alt+left"], kw: ["align", "edges", "tidy"], aliases: [], implemented: true),
+            desc!("align-right", "Align Right Edges", Interface, Interface, Action::AlignSelection(Align::Right), keys: ["alt+right"], kw: ["align", "edges", "tidy"], aliases: [], implemented: true),
+            desc!("align-top", "Align Top Edges", Interface, Interface, Action::AlignSelection(Align::Top), keys: ["alt+up"], kw: ["align", "edges", "tidy"], aliases: [], implemented: true),
+            desc!("align-bottom", "Align Bottom Edges", Interface, Interface, Action::AlignSelection(Align::Bottom), keys: ["alt+down"], kw: ["align", "edges", "tidy"], aliases: [], implemented: true),
+            desc!("align-center-x", "Align Horizontal Centres", Interface, Interface, Action::AlignSelection(Align::CenterX), keys: ["alt+c"], kw: ["align", "centre", "center", "middle"], aliases: [], implemented: true),
+            desc!("align-center-y", "Align Vertical Centres", Interface, Interface, Action::AlignSelection(Align::CenterY), keys: ["alt+shift+c"], kw: ["align", "centre", "center", "middle"], aliases: [], implemented: true),
+            desc!("distribute-horizontally", "Distribute Horizontally", Interface, Interface, Action::DistributeSelection(Axis::Horizontal), keys: ["alt+d"], kw: ["spacing", "spread", "even", "gaps"], aliases: [], implemented: true),
+            desc!("distribute-vertically", "Distribute Vertically", Interface, Interface, Action::DistributeSelection(Axis::Vertical), keys: ["alt+shift+d"], kw: ["spacing", "spread", "even", "gaps"], aliases: [], implemented: true),
+            desc!("equalize-width", "Match Widths", Interface, Interface, Action::EqualizeSelection(Axis::Horizontal), keys: ["alt+w"], kw: ["same", "size", "equal"], aliases: [], implemented: true),
+            desc!("equalize-height", "Match Heights", Interface, Interface, Action::EqualizeSelection(Axis::Vertical), keys: ["alt+shift+w"], kw: ["same", "size", "equal"], aliases: [], implemented: true),
+            desc!("reparent", "Move Selection Into Component Under Cursor", Interface, Interface, Action::ReparentSelection, keys: ["alt+p"], kw: ["nest", "group", "parent", "container"], aliases: [], implemented: true),
+            desc!("toggle-snap", "Toggle Snapping", View, Action::ToggleSnap, keys: ["alt+s"], kw: ["guides", "align", "magnet"], aliases: [], implemented: true),
             desc!("backspace", "Erase Left", Edit, Action::Backspace, keys: ["backspace"], kw: ["delete", "erase"], aliases: [], implemented: true),
             desc!("delete-forward", "Erase At Cursor", Edit, Action::DeleteForward, keys: ["delete"], kw: ["delete", "erase", "clear"], aliases: [], implemented: true),
             desc!("new-line", "New Line", Edit, Action::NewLine, keys: ["enter"], kw: ["return", "next row"], aliases: [], implemented: true),

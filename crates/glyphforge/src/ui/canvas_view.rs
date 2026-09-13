@@ -1,5 +1,6 @@
 //! The canvas: the document seen through the viewport.
 
+use glyphforge_core::geometry::Guide;
 use ratatui::Frame;
 use ratatui::layout::{Position as RPosition, Rect};
 use ratatui::style::Modifier;
@@ -54,13 +55,44 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
         draw_cells(&cells, viewport, canvas_area, buf, depth, paper);
     }
 
-    // Selection overlay: highlight the selected component's outline and
-    // mark the bottom-right resize handle.
-    if let Some(rect) = app
-        .selection()
-        .and_then(|id| app.cached_layout().and_then(|l| l.rect(id)))
-    {
-        let sel = styles::selection(app);
+    // Snap guides, drawn under the outlines so an outline stays readable
+    // where the two cross.
+    let guide_style = styles::guide(app);
+    for guide in app.active_guides() {
+        match *guide {
+            Guide::Vertical(x) => {
+                if x < viewport.x || u32::from(x) >= viewport.right() {
+                    continue;
+                }
+                let sx = canvas_area.x + (x - viewport.x);
+                for sy in canvas_area.top()..canvas_area.bottom() {
+                    if let Some(cell) = buf.cell_mut((sx, sy)) {
+                        cell.set_symbol("\u{2506}").set_style(guide_style);
+                    }
+                }
+            }
+            Guide::Horizontal(y) => {
+                if y < viewport.y || u32::from(y) >= viewport.bottom() {
+                    continue;
+                }
+                let sy = canvas_area.y + (y - viewport.y);
+                for sx in canvas_area.left()..canvas_area.right() {
+                    if let Some(cell) = buf.cell_mut((sx, sy)) {
+                        cell.set_symbol("\u{2504}").set_style(guide_style);
+                    }
+                }
+            }
+        }
+    }
+
+    // Selection overlay: outline every selected component, and mark the
+    // resize handle when exactly one is selected.
+    let single = app.selection().len() == 1;
+    let sel = styles::selection(app);
+    for id in app.selection() {
+        let Some(rect) = app.cached_layout().and_then(|l| l.rect(id)) else {
+            continue;
+        };
         for pos in rect.positions() {
             let on_edge = pos.x == rect.x
                 || pos.y == rect.y
@@ -75,8 +107,8 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
                 cell.set_style(sel);
                 let is_corner =
                     u32::from(pos.x) + 1 == rect.right() && u32::from(pos.y) + 1 == rect.bottom();
-                if is_corner && rect.width > 1 && rect.height > 1 {
-                    cell.set_symbol("◆");
+                if single && is_corner && rect.width > 1 && rect.height > 1 {
+                    cell.set_symbol("\u{25c6}");
                 }
             }
         }
@@ -227,6 +259,48 @@ mod tests {
         let all = rows.join("\n");
         assert!(all.contains("Add component"), "{all}");
         assert!(all.contains("panel") && all.contains("label"), "{all}");
+    }
+
+    #[test]
+    fn multi_selection_outlines_all_and_the_inspector_summarises() {
+        let mut app = test_app(Size::new(40, 10));
+        app.dispatch(Action::LayerNext);
+        for (name, x) in [("a", 0u16), ("b", 14)] {
+            app.dispatch(Action::Cancel);
+            app.dispatch(Action::CursorTo(Position::new(x, 0)));
+            app.dispatch(Action::AddComponent);
+            app.prompt.as_mut().unwrap().input = format!("panel {name}");
+            app.dispatch(Action::PromptSubmit);
+        }
+        app.dispatch(Action::SelectAll);
+        let rows = screen(&mut app, 100, 16);
+        let all = rows.join("\n");
+        assert!(all.contains("2 components"), "inspector summarises: {all}");
+        assert!(
+            !all.contains("◆"),
+            "no resize handle while several are selected"
+        );
+        assert!(all.contains("sel: 2 components"), "status bar: {all}");
+    }
+
+    #[test]
+    fn snap_guides_are_drawn_during_a_drag() {
+        let mut app = test_app(Size::new(40, 10));
+        app.dispatch(Action::LayerNext);
+        app.dispatch(Action::AddComponent);
+        app.prompt.as_mut().unwrap().input = "panel p".to_owned();
+        app.dispatch(Action::PromptSubmit);
+        // Pull the panel so its centre lands on the canvas centre.
+        assert!(app.begin_drag(Position::new(2, 2)));
+        app.drag_to(Position::new(6, 4));
+        assert!(!app.active_guides().is_empty());
+        let rows = screen(&mut app, 100, 16);
+        let all = rows.join("\n");
+        assert!(
+            all.contains('┄') || all.contains('┆'),
+            "a guide line is drawn: {all}"
+        );
+        app.end_drag();
     }
 
     #[test]

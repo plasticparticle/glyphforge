@@ -6,7 +6,7 @@ use glyphforge_core::history::Origin;
 use glyphforge_core::patch::{CellWrite, Operation, Patch};
 use glyphforge_core::{Cell, Document, Grapheme, Layer, Position, Size};
 
-use super::{App, EditorMode, Focus, StatusKind, UiThemeOrigin};
+use super::{App, EditorMode, Focus, StatusKind, UiThemeOrigin, delta};
 use crate::actions::{Action, Direction, descriptor_of};
 
 impl App {
@@ -39,6 +39,19 @@ impl App {
                 self.set_cursor(pos, None);
                 self.select_at(pos);
             }
+            Action::ExtendSelectAt(pos) => {
+                self.ui.focus = Focus::Canvas;
+                self.set_cursor(pos, None);
+                self.extend_at(pos);
+            }
+            Action::ExtendSelectNext => self.extend_step(true),
+            Action::ExtendSelectPrev => self.extend_step(false),
+            Action::SelectAll => self.select_all(),
+            Action::AlignSelection(mode) => self.align_selection(mode),
+            Action::DistributeSelection(axis) => self.distribute_selection(axis),
+            Action::EqualizeSelection(axis) => self.equalize_selection(axis),
+            Action::ReparentSelection => self.reparent_selection(),
+            Action::ToggleSnap => self.toggle_snap(),
             Action::MoveSelection(dir) => {
                 if !self.move_selection(dir) {
                     self.move_cursor(dir);
@@ -264,8 +277,8 @@ impl App {
             self.prompt = None;
         } else if self.ui.help_open {
             self.ui.help_open = false;
-        } else if self.editor.selection.is_some() {
-            self.editor.selection = None;
+        } else if !self.editor.selection.is_empty() {
+            self.editor.selection.clear();
         } else if self.ui.vim_navigation && self.editor.mode == EditorMode::Insert {
             self.editor.mode = EditorMode::Normal;
         } else {
@@ -326,7 +339,7 @@ impl App {
         let layer = &layers[next];
         let msg = format!("Layer: {} ({})", layer.name, layer.kind().name());
         self.editor.layer = layer.id.clone();
-        self.editor.selection = None;
+        self.editor.selection.clear();
         self.layout_cache_clear();
         self.clamp_cursor();
         self.set_status(StatusKind::Info, msg);
@@ -480,15 +493,6 @@ impl App {
     /// Whether the active layer is an artwork layer.
     pub fn on_artwork_layer(&self) -> bool {
         self.active_layer().and_then(Layer::cells).is_some()
-    }
-}
-
-const fn delta(dir: Direction) -> (i32, i32) {
-    match dir {
-        Direction::Up => (0, -1),
-        Direction::Down => (0, 1),
-        Direction::Left => (-1, 0),
-        Direction::Right => (1, 0),
     }
 }
 
@@ -703,6 +707,10 @@ mod tests {
         app
     }
 
+    fn id_of(name: &str) -> glyphforge_core::ObjectId {
+        glyphforge_core::ObjectId::new(name).unwrap()
+    }
+
     fn submit(app: &mut App, text: &str) {
         app.prompt.as_mut().unwrap().input = text.to_owned();
         app.dispatch(Action::PromptSubmit);
@@ -715,7 +723,7 @@ mod tests {
         app.dispatch(Action::AddComponent);
         assert!(app.prompt.is_some());
         submit(&mut app, "panel Metrics");
-        let id = app.selection().cloned().unwrap();
+        let id = app.primary().cloned().unwrap();
         assert_eq!(id.as_str(), "metrics");
         assert_eq!(
             app.layout().rect(&id),
@@ -747,7 +755,7 @@ mod tests {
 
         app.dispatch(Action::DeleteSelection);
         assert!(app.doc().component(&id).is_none());
-        assert!(app.selection().is_none());
+        assert!(app.selection().is_empty());
         app.dispatch(Action::Undo);
         assert!(app.doc().component(&id).is_some(), "delete is undoable");
     }
@@ -769,19 +777,19 @@ mod tests {
         app.dispatch(Action::AddComponent);
         submit(&mut app, "label b");
         app.dispatch(Action::Cancel);
-        assert!(app.selection().is_none());
+        assert!(app.selection().is_empty());
         app.dispatch(Action::SelectNext);
-        assert_eq!(app.selection().unwrap().as_str(), "a");
+        assert_eq!(app.primary().unwrap().as_str(), "a");
         app.dispatch(Action::SelectNext);
-        assert_eq!(app.selection().unwrap().as_str(), "b");
+        assert_eq!(app.primary().unwrap().as_str(), "b");
         app.dispatch(Action::SelectNext);
-        assert_eq!(app.selection().unwrap().as_str(), "a", "wraps around");
+        assert_eq!(app.primary().unwrap().as_str(), "a", "wraps around");
         app.dispatch(Action::SelectPrev);
-        assert_eq!(app.selection().unwrap().as_str(), "b");
+        assert_eq!(app.primary().unwrap().as_str(), "b");
         app.dispatch(Action::SelectAt(Position::new(5, 5)));
-        assert_eq!(app.selection().unwrap().as_str(), "a");
+        assert_eq!(app.primary().unwrap().as_str(), "a");
         app.dispatch(Action::SelectAt(Position::new(39, 11)));
-        assert!(app.selection().is_none(), "clicking empty space deselects");
+        assert!(app.selection().is_empty(), "clicking empty space deselects");
     }
 
     #[test]
@@ -803,22 +811,23 @@ mod tests {
         );
         // Deepest component wins the hit test.
         app.dispatch(Action::SelectAt(Position::new(2, 2)));
-        assert_eq!(app.selection().unwrap().as_str(), "inner");
+        assert_eq!(app.primary().unwrap().as_str(), "inner");
         // Jump by id from an artwork layer switches layers.
         app.dispatch(Action::LayerPrev);
         assert!(app.on_artwork_layer());
         app.dispatch(Action::SelectById);
         submit(&mut app, "box");
         assert!(!app.on_artwork_layer());
-        assert_eq!(app.selection().unwrap().as_str(), "box");
+        assert_eq!(app.primary().unwrap().as_str(), "box");
     }
 
     #[test]
     fn mouse_drag_moves_and_resizes_as_single_transactions() {
         let mut app = interface_app();
+        app.snap_enabled = false;
         app.dispatch(Action::AddComponent);
         submit(&mut app, "panel p");
-        let id = app.selection().cloned().unwrap();
+        let id = app.primary().cloned().unwrap();
         let before = app.session.history().undo_len();
         assert!(app.begin_drag(Position::new(5, 3)));
         app.drag_to(Position::new(7, 4));
@@ -840,6 +849,197 @@ mod tests {
         assert!(
             !app.begin_drag(Position::new(39, 11)),
             "drag outside the selection does nothing"
+        );
+    }
+
+    #[test]
+    fn dragging_snaps_to_the_canvas_and_reports_a_guide() {
+        use glyphforge_core::geometry::Guide;
+        let mut app = interface_app();
+        app.dispatch(Action::AddComponent);
+        submit(&mut app, "panel p");
+        let id = app.primary().cloned().unwrap();
+        assert!(app.snap_enabled);
+        // The canvas is 40x12, the panel 20x6: dragging its centre within
+        // one cell of the canvas centre snaps it there.
+        assert!(app.begin_drag(Position::new(2, 2)));
+        app.drag_to(Position::new(6, 4));
+        assert_eq!(
+            app.layout().rect(&id).unwrap().y,
+            3,
+            "snapped onto the centre row"
+        );
+        assert!(app.active_guides().contains(&Guide::Horizontal(6)));
+        app.end_drag();
+        assert!(app.active_guides().is_empty());
+
+        app.dispatch(Action::ToggleSnap);
+        assert!(!app.snap_enabled);
+        assert!(app.begin_drag(Position::new(6, 4)));
+        app.drag_to(Position::new(6, 5));
+        assert_eq!(
+            app.layout().rect(&id).unwrap().y,
+            4,
+            "without snapping the delta is exact"
+        );
+        app.end_drag();
+    }
+
+    #[test]
+    fn extend_selection_and_select_all() {
+        let mut app = interface_app();
+        for name in ["a", "b", "c"] {
+            app.dispatch(Action::Cancel);
+            app.dispatch(Action::AddComponent);
+            submit(&mut app, &format!("panel {name}"));
+        }
+        app.dispatch(Action::Cancel);
+        app.dispatch(Action::SelectNext);
+        assert_eq!(app.selection().len(), 1);
+        app.dispatch(Action::ExtendSelectNext);
+        assert_eq!(app.selection().len(), 2);
+        assert_eq!(app.primary().unwrap().as_str(), "b");
+        app.dispatch(Action::ExtendSelectPrev);
+        assert_eq!(
+            app.selection().len(),
+            3,
+            "extending backwards wraps to the last one"
+        );
+        app.dispatch(Action::Cancel);
+        assert!(app.selection().is_empty());
+        app.dispatch(Action::SelectAll);
+        assert_eq!(app.selection().len(), 3);
+        // Clicking one component replaces the whole selection.
+        app.dispatch(Action::SelectAt(Position::new(1, 1)));
+        assert_eq!(app.selection().len(), 1);
+        // Shift-clicking adds and removes.
+        app.dispatch(Action::ExtendSelectAt(Position::new(1, 1)));
+        assert!(
+            app.selection().is_empty(),
+            "shift-clicking a selected component removes it"
+        );
+    }
+
+    #[test]
+    fn nudging_and_deleting_apply_to_the_whole_selection_in_one_step() {
+        let mut app = interface_app();
+        for (name, x) in [("a", 0u16), ("b", 22)] {
+            app.dispatch(Action::Cancel);
+            app.dispatch(Action::CursorTo(Position::new(x, 0)));
+            app.dispatch(Action::AddComponent);
+            submit(&mut app, &format!("panel {name}"));
+        }
+        app.dispatch(Action::SelectAll);
+        let before = app.session.history().undo_len();
+        app.dispatch(Action::MoveSelection(Direction::Down));
+        assert_eq!(
+            app.session.history().undo_len(),
+            before + 1,
+            "one undo step for both"
+        );
+        assert_eq!(app.layout().rect(&id_of("a")).unwrap().y, 1);
+        assert_eq!(app.layout().rect(&id_of("b")).unwrap().y, 1);
+        app.dispatch(Action::Undo);
+        assert_eq!(app.layout().rect(&id_of("a")).unwrap().y, 0);
+
+        app.dispatch(Action::SelectAll);
+        app.dispatch(Action::EditProperty);
+        submit(&mut app, "title=Shared");
+        assert_eq!(
+            app.doc().component(&id_of("b")).unwrap().prop_str("title"),
+            Some("Shared")
+        );
+
+        app.dispatch(Action::SelectAll);
+        app.dispatch(Action::DeleteSelection);
+        assert!(app.doc().components().next().is_none());
+        assert!(app.selection().is_empty());
+        app.dispatch(Action::Undo);
+        assert_eq!(
+            app.doc().components().count(),
+            2,
+            "one undo brings both back"
+        );
+    }
+
+    #[test]
+    fn align_distribute_and_match_size_need_two_components() {
+        use glyphforge_core::geometry::{Align, Axis};
+        let mut app = interface_app();
+        app.dispatch(Action::AddComponent);
+        submit(&mut app, "panel only");
+        app.dispatch(Action::AlignSelection(Align::Left));
+        assert!(
+            app.status.as_ref().unwrap().text.contains("at least two"),
+            "{:?}",
+            app.status
+        );
+
+        for (name, x, y) in [("a", 0u16, 0u16), ("b", 10, 4), ("c", 30, 8)] {
+            app.dispatch(Action::Cancel);
+            app.dispatch(Action::CursorTo(Position::new(x, y)));
+            app.dispatch(Action::AddComponent);
+            submit(&mut app, &format!("label {name}"));
+        }
+        app.dispatch(Action::Cancel);
+        app.dispatch(Action::SelectAt(Position::new(0, 0)));
+        app.dispatch(Action::ExtendSelectAt(Position::new(10, 4)));
+        app.dispatch(Action::ExtendSelectAt(Position::new(30, 8)));
+        assert_eq!(app.selection().len(), 3);
+
+        app.dispatch(Action::AlignSelection(Align::Left));
+        for name in ["a", "b", "c"] {
+            assert_eq!(app.layout().rect(&id_of(name)).unwrap().x, 0, "{name}");
+        }
+        app.dispatch(Action::Undo);
+        assert_eq!(
+            app.layout().rect(&id_of("b")).unwrap().x,
+            10,
+            "one undo for the whole align"
+        );
+
+        app.dispatch(Action::DistributeSelection(Axis::Vertical));
+        assert_eq!(app.layout().rect(&id_of("b")).unwrap().y, 4);
+        app.dispatch(Action::EqualizeSelection(Axis::Horizontal));
+        let width = app.layout().rect(&id_of("a")).unwrap().width;
+        assert_eq!(app.layout().rect(&id_of("b")).unwrap().width, width);
+    }
+
+    #[test]
+    fn reparent_moves_the_selection_under_the_cursor() {
+        let mut app = interface_app();
+        app.dispatch(Action::AddComponent);
+        submit(&mut app, "panel host");
+        app.dispatch(Action::Cancel);
+        app.dispatch(Action::CursorTo(Position::new(25, 0)));
+        app.dispatch(Action::AddComponent);
+        submit(&mut app, "label guest");
+        // The cursor sits inside the host, so the guest moves into it.
+        app.dispatch(Action::CursorTo(Position::new(2, 2)));
+        app.dispatch(Action::SelectById);
+        submit(&mut app, "guest");
+        app.dispatch(Action::CursorTo(Position::new(2, 2)));
+        app.dispatch(Action::ReparentSelection);
+        assert_eq!(
+            app.doc().component(&id_of("host")).unwrap().children[0]
+                .id
+                .as_str(),
+            "guest"
+        );
+        // Reparenting onto empty space lifts it back to the top level.
+        app.dispatch(Action::CursorTo(Position::new(38, 11)));
+        app.dispatch(Action::ReparentSelection);
+        assert!(
+            app.doc()
+                .component(&id_of("host"))
+                .unwrap()
+                .children
+                .is_empty()
+        );
+        app.dispatch(Action::Undo);
+        assert_eq!(
+            app.doc().component(&id_of("host")).unwrap().children.len(),
+            1
         );
     }
 

@@ -229,12 +229,49 @@ fn render_inspector(app: &App, frame: &mut Frame<'_>, area: Rect, focused: bool)
             Span::styled(v, styles::text(app)),
         ])
     };
-    let lines: Vec<Line<'_>> = match app.selection().cloned() {
+    let multi = app.selection().len() > 1;
+    let lines: Vec<Line<'_>> = match app.primary().cloned() {
         None => vec![
             Line::from(Span::styled("nothing selected", styles::muted(app))),
             Line::from(Span::styled("] [ cycle, click, Ctrl+F", styles::muted(app))),
+            Line::from(Span::styled("{ } extend, Ctrl+A all", styles::muted(app))),
             Line::from(Span::styled("a adds a component", styles::muted(app))),
         ],
+        Some(_) if multi => {
+            let n = app.selection().len();
+            let mut lines = vec![Line::from(Span::styled(
+                format!("{n} components"),
+                styles::accent(app),
+            ))];
+            if let Some(r) = app.selection_bounds() {
+                lines.push(row("x y", format!("{} {}", r.x, r.y)));
+                lines.push(row("w h", format!("{} {}", r.width, r.height)));
+            }
+            lines.push(Line::default());
+            lines.push(Line::from(Span::styled(
+                "alt+arrows align",
+                styles::muted(app),
+            )));
+            lines.push(Line::from(Span::styled(
+                "alt+d distribute",
+                styles::muted(app),
+            )));
+            lines.push(Line::from(Span::styled(
+                "alt+w match size",
+                styles::muted(app),
+            )));
+            lines.push(Line::from(Span::styled(
+                "alt+p reparent",
+                styles::muted(app),
+            )));
+            for id in app.selection() {
+                lines.push(Line::from(Span::styled(
+                    format!("  {id}"),
+                    styles::text(app),
+                )));
+            }
+            lines
+        }
         Some(id) => {
             let Some(c) = app.doc().component(&id) else {
                 return;

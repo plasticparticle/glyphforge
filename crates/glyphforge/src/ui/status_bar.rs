@@ -49,9 +49,23 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
             styles::muted(app),
         ));
     }
-    if let Some(id) = app.selection() {
+    match app.selection() {
+        [] => {}
+        [one] => {
+            spans.push(Span::styled("│", styles::muted(app)));
+            spans.push(Span::styled(format!(" sel: {one} "), styles::accent(app)));
+        }
+        many => {
+            spans.push(Span::styled("│", styles::muted(app)));
+            spans.push(Span::styled(
+                format!(" sel: {} components ", many.len()),
+                styles::accent(app),
+            ));
+        }
+    }
+    if !app.snap_enabled {
         spans.push(Span::styled("│", styles::muted(app)));
-        spans.push(Span::styled(format!(" sel: {id} "), styles::accent(app)));
+        spans.push(Span::styled(" no snap ", styles::muted(app)));
     }
     if let Some(status) = &app.status {
         spans.push(Span::styled("│ ", styles::muted(app)));

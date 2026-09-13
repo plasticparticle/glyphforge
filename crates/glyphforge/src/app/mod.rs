@@ -106,8 +106,8 @@ pub struct EditorState {
     pub line_start_x: u16,
     pub style: CellStyle,
     pub mode: EditorMode,
-    /// Selected component (Interface Mode).
-    pub selection: Option<ObjectId>,
+    /// Selected components (Interface Mode), in selection order.
+    pub selection: Vec<ObjectId>,
 }
 
 /// Where the UI chrome theme came from.
@@ -143,6 +143,8 @@ pub struct App {
     pub is_omarchy: bool,
     pub prompt: Option<Prompt>,
     pub drag: Option<Drag>,
+    /// Whether dragging snaps to neighbouring components.
+    pub snap_enabled: bool,
     composite_cache: Option<Canvas>,
     layout_cache: Option<LayoutResult>,
     frame_area: RatRect,
@@ -167,6 +169,7 @@ impl App {
         let is_omarchy = init.omarchy_paths.is_omarchy();
         let color_depth = init.caps.effective_color_depth(init.config.ui.color_mode);
         let vim = init.config.ui.vim_navigation;
+        let snap = init.config.ui.snap;
         let doc = init.session.document();
         let screen = doc.first_screen();
         let layer = Self::default_edit_layer(screen.layers())
@@ -184,7 +187,7 @@ impl App {
                 } else {
                     EditorMode::Insert
                 },
-                selection: None,
+                selection: Vec::new(),
             },
             session: init.session,
             ui: UiState {
@@ -205,6 +208,7 @@ impl App {
             is_omarchy,
             prompt: None,
             drag: None,
+            snap_enabled: snap,
             composite_cache: None,
             layout_cache: None,
             frame_area: RatRect::default(),
@@ -339,6 +343,7 @@ impl App {
     pub fn mark_edited(&mut self) {
         self.composite_cache = None;
         self.layout_cache = None;
+        self.prune_selection();
         self.quit_armed = false;
         self.new_armed = false;
     }
@@ -406,8 +411,19 @@ impl App {
         self.editor.cursor = Position::ORIGIN;
         self.editor.line_start_x = 0;
         self.editor.viewport.offset = Position::ORIGIN;
-        self.editor.selection = None;
+        self.editor.selection.clear();
         self.mark_edited();
+    }
+}
+
+/// Cell delta of a direction, shared by cursor movement and nudging.
+pub(super) const fn delta(dir: crate::actions::Direction) -> (i32, i32) {
+    use crate::actions::Direction;
+    match dir {
+        Direction::Up => (0, -1),
+        Direction::Down => (0, 1),
+        Direction::Left => (-1, 0),
+        Direction::Right => (1, 0),
     }
 }
 

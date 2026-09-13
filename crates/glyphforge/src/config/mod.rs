@@ -51,6 +51,8 @@ pub struct UiConfig {
     pub show_left_panel: bool,
     pub show_right_panel: bool,
     pub vim_navigation: bool,
+    /// Pull dragged components onto neighbouring edges and centres.
+    pub snap: bool,
     /// Preferred colour output: `auto`, `truecolor`, `ansi256`, `ansi16`.
     pub color_mode: ColorMode,
 }
@@ -110,6 +112,7 @@ impl Default for UiConfig {
             show_left_panel: true,
             show_right_panel: true,
             vim_navigation: false,
+            snap: true,
             color_mode: ColorMode::Auto,
         }
     }

@@ -51,6 +51,7 @@ theme.rs         Theme, style tokens, fallback chain, built-in themes
 boxdraw.rs       Border families and glyph tables (topology later)
 document/        Grapheme, Color, Cell, Canvas (+ diff-friendly repr),
                  Layer (artwork | interface), Screen, Document
+geometry.rs      bounding box, align, distribute, match size, snapping
 patch.rs         Operation, Patch: validated, transactional, invertible
 history.rs       Transaction, Origin, History (undo/redo, open strokes)
 render/          RenderContext, Registry, ComponentRenderer, painter,
@@ -224,12 +225,18 @@ Every change to a document is a `Patch { operations[] }`. Operations
 address objects by id:
 
 ```
-move, resize, set_property, set_layout,
-create_component, delete_component,
+move, resize, set_size, set_property, set_layout,
+create_component, delete_component, reparent,
 set_cells,
 create_layer, delete_layer, update_layer, reorder_layer,
 set_theme
 ```
+
+`resize` fixes both axes, as its name says; `set_size` changes one axis
+and leaves the other alone, which is what matching widths across a
+selection needs so a `fill` height is not silently frozen. `reparent`
+moves a component within its layer and refuses to make a component a
+child of itself or of its own descendant.
 
 `Patch::apply(&mut Document) -> Result<Patch>`:
 
@@ -249,6 +256,32 @@ Humans and agents use the same operations. The editor's typing produces
 `set_layout`. There is no second mutation path.
 
 ---
+
+## 7a. Geometry intelligence
+
+`geometry` turns rectangles into patch operations: `bounds`, `align`
+(left, right, top, bottom, and both centre axes), `distribute` on either
+axis, `equalize`, and `snap` against a set of candidate lines. All of it
+is pure, integer and unit tested, and all of it goes through the same
+operations a user or an agent would send.
+
+Two rules are deliberate and tested:
+
+- **A component its parent lays out is never moved.** Aligning a flow
+  child would rip it out of its container, so such items are returned in
+  `Plan::skipped` and the editor says how many it left alone. They still
+  count toward the bounding box, so a floating panel can be aligned to a
+  laid-out label.
+- **Distributing never grows the selection.** With fewer than three
+  items, or when the items already overlap, the plan is empty rather than
+  pushing the outermost item beyond the box the user can see.
+
+Snapping collects the start edge, the exclusive end edge and the centre
+of every candidate rectangle (siblings, the screen, later a grid) and
+pulls the dragged rectangle onto the nearest line within one cell. The
+smallest movement wins, ties prefer edges over centres, and an alignment
+that needs no movement at all beats one that does. The matched lines come
+back as `Guide`s, which the canvas draws while the drag lasts.
 
 ## 8. History
 
@@ -367,6 +400,12 @@ Milestone 14 adds a modification-time poll and documents the
   The `Prompt` (input line with candidates) serves select-by-id, add
   component, edit property and save-as, and is the base of the command
   palette.
+- **Selection is a list.** `editor.selection` holds ids in selection
+  order; the last one is the "primary" the inspector describes and the
+  parent that `a` adds into. Every command that changes geometry or
+  properties builds one patch for the whole selection, so it is one undo
+  step. Ids that disappear (undo, delete) are pruned whenever the
+  document changes.
 - **Terminal lifecycle.** An RAII guard enables raw mode, the alternate
   screen, mouse, bracketed paste, focus events and kitty keyboard flags
   when supported; a panic hook restores everything first.

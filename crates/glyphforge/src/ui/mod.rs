@@ -87,6 +87,14 @@ pub(crate) mod styles {
             .bg(tok(app, "selection"))
     }
 
+    /// Snap guides: visible but quieter than the selection.
+    pub fn guide(app: &App) -> Style {
+        Style::default()
+            .fg(tok(app, "primary"))
+            .bg(tok(app, "background"))
+            .add_modifier(Modifier::DIM)
+    }
+
     pub fn paper(app: &App) -> Style {
         Style::default()
             .fg(tok(app, "foreground"))

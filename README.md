@@ -68,10 +68,11 @@ A patch:
 ] }
 ```
 
-Operations: `move`, `resize`, `set_property`, `set_layout`,
-`create_component`, `delete_component`, `set_cells`, `create_layer`,
-`delete_layer`, `update_layer`, `reorder_layer`, `set_theme`. The same
-`Session` API drives the editor, the CLI and (later) an MCP server.
+Operations: `move`, `resize`, `set_size`, `set_property`, `set_layout`,
+`create_component`, `delete_component`, `reparent`, `set_cells`,
+`create_layer`, `delete_layer`, `update_layer`, `reorder_layer`,
+`set_theme`. The same `Session` API drives the editor, the CLI and
+(later) an MCP server, including alignment and snapping.
 
 ## Install
 
@@ -95,14 +96,28 @@ Interface mode:
 | Key | Action |
 |-----|--------|
 | `]` / `[`, click | Select the next / previous component, or the one under the mouse |
+| `}` / `{`, shift-click | Add the next / previous component to the selection, or toggle the clicked one |
+| Ctrl+A | Select every component on the layer |
 | Ctrl+F | Select a component by id (jumps to its layer and screen) |
 | Arrows | Nudge the selection (or move the cursor when nothing is selected) |
 | Shift+Arrows | Resize the selection |
-| Mouse drag | Move; dragging the `◆` corner resizes |
-| `a` | Add a component at the cursor (inside the selection if any): `kind [name]` |
-| Enter | Edit a property of the selection: `key=value` (empty value removes) |
+| Mouse drag | Move the selection; dragging the `◆` corner resizes a single component |
+| Alt+Arrows | Align left / right / top / bottom edges |
+| Alt+C, Alt+Shift+C | Align horizontal / vertical centres |
+| Alt+D, Alt+Shift+D | Distribute horizontally / vertically |
+| Alt+W, Alt+Shift+W | Match widths / heights |
+| Alt+P | Move the selection into the component under the cursor, or back to the top level |
+| Alt+S | Toggle snapping |
+| `a` | Add a component at the cursor (inside the selection if exactly one is selected): `kind [name]` |
+| Enter | Set a property on the selection: `key=value` (empty value removes) |
 | Delete | Delete the selection |
 | Esc | Clear the selection |
+
+Nudging, resizing, aligning, property edits and deletion apply to the
+whole selection and count as one undo step. Components that their parent
+lays out are reported as skipped instead of being pulled out of their
+container. Dragging snaps to the edges and centres of neighbouring
+components and of the screen, and draws a guide where it snapped.
 
 Subcell mode and global:
 
@@ -138,6 +153,7 @@ default_height = 24
 show_left_panel = true
 show_right_panel = true
 vim_navigation = false      # h/j/k/l/0/$ in normal mode, i enters insert mode
+snap = true                 # pull dragged components onto neighbouring lines
 color_mode = "auto"         # auto | truecolor | ansi256 | ansi16
 
 [theme]

@@ -7,6 +7,10 @@ The harness answers the terminal queries the editor sends (cursor position,
 device attributes) so the run matches a real terminal. Exact screen content
 is asserted by the Ratatui TestBackend unit tests; this script checks the
 terminal lifecycle, key handling, theme detection and error surfacing.
+
+Assert only on SHORT substrings. Ratatui writes a diff of the screen, so a
+long phrase is often split across unrelated cursor moves and never appears
+contiguously in the captured stream, even though the user sees it.
 """
 import os, pty, sys, time, select, signal, struct, fcntl, termios, subprocess, re
 
@@ -163,4 +167,23 @@ assert "Inspector" in text
 saved = open(work, encoding="utf-8").read()
 assert '"mode": "absolute"' in saved and '"x": 1' in saved, "nudged root component was saved absolutely"
 print("smoke 7 ok: interface mode select, nudge, save")
+# 8. Multi-selection and alignment in a fresh document.
+keys = [
+    (b"\x1b[5;5~", 0.3),                      # Ctrl+PgUp: switch to the UI layer
+    (b"a", 0.2), (b"panel one\r", 0.4),        # add the first panel
+    (b"\x1b", 0.2),                           # clear the selection
+    (b"\x1b[C\x1b[C\x1b[C\x1b[B\x1b[B", 0.3),  # move the cursor away
+    (b"a", 0.2), (b"panel two\r", 0.4),        # add the second panel
+    (b"\x1b", 0.2),
+    (b"]", 0.2), (b"}", 0.3),                  # select one, extend to two
+    (b"\x1b[1;3A", 0.4),                      # Alt+Up: align top edges
+    (b"\x11", 0.3), (b"\x11", 0.3),
+]
+code, out = run(binary, home, keys=keys, cols=120, rows=30)
+text = plain(out.decode("utf-8", "replace"))
+assert code == 0, f"exit {code}"
+assert "INTERFACE" in text, "the UI layer switches the editor into Interface Mode"
+assert "2 components" in text, "the inspector summarises the multi-selection"
+assert "Aligned" in text, f"alignment ran: {text[-400:]}"
+print("smoke 8 ok: multi-selection and alignment")
 print("ALL SMOKE TESTS PASSED")

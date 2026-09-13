@@ -53,10 +53,29 @@ pub enum Operation {
         property: String,
         value: Value,
     },
+    /// Sets one size axis without touching the other, so equalising
+    /// widths does not silently freeze a `fill` height.
+    SetSize {
+        target: ObjectId,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        width: Option<Dimension>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        height: Option<Dimension>,
+    },
     /// Replaces the whole layout of a component.
     SetLayout {
         target: ObjectId,
         layout: Layout,
+    },
+    /// Moves a component to another parent within the same layer, or to
+    /// the layer's roots when `parent` is absent. `index` counts
+    /// positions after the component has been taken out.
+    Reparent {
+        target: ObjectId,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent: Option<ObjectId>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        index: Option<usize>,
     },
     /// Adds a component under `parent`, or as a root of `layer`.
     CreateComponent {
@@ -112,8 +131,10 @@ impl Operation {
         match self {
             Self::Move { target, .. }
             | Self::Resize { target, .. }
+            | Self::SetSize { target, .. }
             | Self::SetProperty { target, .. }
             | Self::SetLayout { target, .. }
+            | Self::Reparent { target, .. }
             | Self::DeleteComponent { target }
             | Self::DeleteLayer { target }
             | Self::UpdateLayer { target, .. }
@@ -130,7 +151,9 @@ impl Operation {
             Self::Move { .. } => "move",
             Self::Resize { .. } => "resize",
             Self::SetProperty { .. } => "set_property",
+            Self::SetSize { .. } => "set_size",
             Self::SetLayout { .. } => "set_layout",
+            Self::Reparent { .. } => "reparent",
             Self::CreateComponent { .. } => "create_component",
             Self::DeleteComponent { .. } => "delete_component",
             Self::SetCells { .. } => "set_cells",
@@ -219,6 +242,12 @@ pub enum OperationError {
     IndexOutOfRange { index: usize, max: usize },
     #[error("cell ({x}, {y}) is outside layer {layer}")]
     CellOutOfBounds { layer: ObjectId, x: u16, y: u16 },
+    #[error(
+        "{parent} cannot become the parent of {target}: it is {target} itself or one of its children"
+    )]
+    CircularParent { target: ObjectId, parent: ObjectId },
+    #[error("{other} is not on the same layer as {target}")]
+    NotInSameLayer { target: ObjectId, other: ObjectId },
 }
 
 fn component_mut<'a>(
@@ -239,7 +268,9 @@ fn apply_one(doc: &mut Document, op: &Operation) -> Result<Operation, OperationE
     match op {
         Operation::Move { .. }
         | Operation::Resize { .. }
+        | Operation::SetSize { .. }
         | Operation::SetLayout { .. }
+        | Operation::Reparent { .. }
         | Operation::SetProperty { .. }
         | Operation::CreateComponent { .. }
         | Operation::DeleteComponent { .. } => apply_component_op(doc, op),
@@ -288,6 +319,29 @@ fn apply_component_op(doc: &mut Document, op: &Operation) -> Result<Operation, O
                 layout: before,
             })
         }
+        Operation::SetSize {
+            target,
+            width,
+            height,
+        } => {
+            let c = component_mut(doc, target)?;
+            let before = c.layout;
+            if let Some(w) = width {
+                c.layout.width = *w;
+            }
+            if let Some(h) = height {
+                c.layout.height = *h;
+            }
+            Ok(Operation::SetLayout {
+                target: target.clone(),
+                layout: before,
+            })
+        }
+        Operation::Reparent {
+            target,
+            parent,
+            index,
+        } => apply_reparent(doc, target, parent.as_ref(), *index),
         Operation::SetProperty {
             target,
             property,
@@ -384,6 +438,68 @@ fn apply_component_op(doc: &mut Document, op: &Operation) -> Result<Operation, O
         }
         _ => unreachable!("dispatched by apply_one"),
     }
+}
+
+/// Moves `target` under `new_parent` inside its own layer.
+fn apply_reparent(
+    doc: &mut Document,
+    target: &ObjectId,
+    new_parent: Option<&ObjectId>,
+    index: Option<usize>,
+) -> Result<Operation, OperationError> {
+    let layer = doc
+        .layer_of_component(target)
+        .ok_or_else(|| OperationError::NotAComponent(target.clone()))?;
+    if layer.locked {
+        return Err(DocumentError::LayerLocked(layer.id.clone()).into());
+    }
+    let layer_id = layer.id.clone();
+    let layer = doc
+        .layer_mut(&layer_id)
+        .ok_or_else(|| OperationError::NotALayer(layer_id.clone()))?;
+    let roots = layer
+        .components_mut()
+        .ok_or(DocumentError::WrongLayerKind {
+            expected: "interface",
+            actual: "artwork",
+        })?;
+    let (old_parent, old_index) =
+        tree::locate(roots, target).ok_or_else(|| OperationError::NotAComponent(target.clone()))?;
+    if let Some(parent) = new_parent {
+        if parent == target {
+            return Err(OperationError::CircularParent {
+                target: target.clone(),
+                parent: parent.clone(),
+            });
+        }
+        let subtree = tree::find(roots, target)
+            .ok_or_else(|| OperationError::NotAComponent(target.clone()))?;
+        if subtree.find(parent).is_some() {
+            return Err(OperationError::CircularParent {
+                target: target.clone(),
+                parent: parent.clone(),
+            });
+        }
+        if tree::find(roots, parent).is_none() {
+            return Err(OperationError::NotInSameLayer {
+                target: target.clone(),
+                other: parent.clone(),
+            });
+        }
+    }
+    let component =
+        tree::remove(roots, target).ok_or_else(|| OperationError::NotAComponent(target.clone()))?;
+    let idx = index.unwrap_or(usize::MAX);
+    if !tree::insert(roots, new_parent, idx, component) {
+        return Err(OperationError::NotAComponent(
+            new_parent.cloned().unwrap_or_else(|| target.clone()),
+        ));
+    }
+    Ok(Operation::Reparent {
+        target: target.clone(),
+        parent: old_parent,
+        index: Some(old_index),
+    })
 }
 
 fn apply_set_cells(
@@ -796,6 +912,118 @@ mod tests {
         assert_eq!(doc.theme.id, id!("minimal-dark"));
         inverse.apply(&mut doc).unwrap();
         assert_eq!(doc.theme.id, id!("terminal"));
+    }
+
+    #[test]
+    fn set_size_touches_one_axis_only() {
+        let mut doc = doc_with_panel();
+        Patch::single(Operation::SetLayout {
+            target: id!("metrics"),
+            layout: Layout {
+                width: Dimension::Fixed(10),
+                height: Dimension::Fill,
+                ..Layout::default()
+            },
+        })
+        .apply(&mut doc)
+        .unwrap();
+        let inverse = Patch::single(Operation::SetSize {
+            target: id!("metrics"),
+            width: Some(Dimension::Fixed(24)),
+            height: None,
+        })
+        .apply(&mut doc)
+        .unwrap();
+        let layout = doc.component(&id!("metrics")).unwrap().layout;
+        assert_eq!(layout.width, Dimension::Fixed(24));
+        assert_eq!(
+            layout.height,
+            Dimension::Fill,
+            "the other axis is untouched"
+        );
+        inverse.apply(&mut doc).unwrap();
+        assert_eq!(
+            doc.component(&id!("metrics")).unwrap().layout.width,
+            Dimension::Fixed(10)
+        );
+    }
+
+    #[test]
+    fn reparent_moves_a_component_and_inverts() {
+        let mut doc = doc_with_panel();
+        Patch::single(Operation::CreateComponent {
+            component: Component::new(id!("other"), "panel"),
+            parent: None,
+            layer: None,
+            index: None,
+        })
+        .apply(&mut doc)
+        .unwrap();
+        let original = doc.clone();
+        let inverse = Patch::single(Operation::Reparent {
+            target: id!("cpu"),
+            parent: Some(id!("other")),
+            index: None,
+        })
+        .apply(&mut doc)
+        .unwrap();
+        assert!(doc.component(&id!("metrics")).unwrap().children.is_empty());
+        assert_eq!(
+            doc.component(&id!("other")).unwrap().children[0].id,
+            id!("cpu")
+        );
+        inverse.apply(&mut doc).unwrap();
+        assert_eq!(doc, original);
+    }
+
+    #[test]
+    fn reparent_to_roots_and_index_clamping() {
+        let mut doc = doc_with_panel();
+        Patch::single(Operation::Reparent {
+            target: id!("cpu"),
+            parent: None,
+            index: Some(99),
+        })
+        .apply(&mut doc)
+        .unwrap();
+        let roots = doc.layer(&id!("main-ui")).unwrap().components().unwrap();
+        assert_eq!(roots.len(), 2);
+        assert_eq!(roots[1].id, id!("cpu"));
+    }
+
+    #[test]
+    fn reparent_rejects_cycles_and_foreign_parents() {
+        let mut doc = doc_with_panel();
+        let err = Patch::single(Operation::Reparent {
+            target: id!("metrics"),
+            parent: Some(id!("cpu")),
+            index: None,
+        })
+        .apply(&mut doc)
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("cannot become the parent"),
+            "{err}"
+        );
+        let err = Patch::single(Operation::Reparent {
+            target: id!("metrics"),
+            parent: Some(id!("metrics")),
+            index: None,
+        })
+        .apply(&mut doc)
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("cannot become the parent"),
+            "{err}"
+        );
+        let err = Patch::single(Operation::Reparent {
+            target: id!("cpu"),
+            parent: Some(id!("ghost")),
+            index: None,
+        })
+        .apply(&mut doc)
+        .unwrap_err();
+        assert!(err.to_string().contains("not on the same layer"), "{err}");
     }
 
     #[test]
