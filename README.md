@@ -1,10 +1,10 @@
-# TUIForge
+# GlyphForge
 
 A full-screen terminal application for visually designing terminal user
 interfaces and ANSI/Unicode artwork. Think ACiDDraw meets a lightweight
 Figma, built for the terminal, with first-class Omarchy Linux integration.
 
-TUIForge is written in Rust on top of Ratatui and Crossterm. The document
+GlyphForge is written in Rust on top of Ratatui and Crossterm. The document
 model (`tuiforge-core`) is independent of the rendering library.
 
 > Status: early development. Milestone 0 (skeleton, terminal lifecycle,
