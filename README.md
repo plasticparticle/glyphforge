@@ -456,6 +456,13 @@ pixel_precision = "auto"    # auto | on | off: pixel-precise reports for Pixel M
 Logs go to `$XDG_STATE_HOME/glyphforge/glyphforge.log`; set
 `GLYPHFORGE_LOG=debug` for detail.
 
+Autosave (`[autosave] enabled = true`, `interval_seconds = 60`) writes
+unsaved work to a hidden sibling (`.design.glyph.autosave`; unnamed
+documents go to the state directory). The design file itself is only
+written when you save, and saving removes the autosave. When Glyphforge
+starts on a file whose autosave is newer, it offers to restore or discard
+the autosaved changes.
+
 ## Omarchy
 
 Under Omarchy Linux, Glyphforge reads the active theme from

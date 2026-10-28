@@ -332,6 +332,10 @@ impl App {
     }
 
     fn quit(&mut self) {
+        if !self.dirty() {
+            // Nothing unsaved: an autosave would only be stale.
+            self.clear_autosave();
+        }
         if self.dirty() && !self.quit_armed {
             self.quit_armed = true;
             self.set_status(
@@ -370,7 +374,10 @@ impl App {
 
     fn save(&mut self) {
         match self.session.save() {
-            Ok(path) => self.set_status(StatusKind::Info, format!("Saved {}", path.display())),
+            Ok(path) => {
+                self.clear_autosave();
+                self.set_status(StatusKind::Info, format!("Saved {}", path.display()));
+            }
             Err(glyphforge_core::api::ApiError::NoPath) => self.set_status(
                 StatusKind::Warning,
                 "No file path yet: start Glyphforge with a file name (glyphforge design.glyph). Save As arrives with the file dialogs.",

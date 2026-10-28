@@ -309,6 +309,8 @@ Theme change polling and `theme-set.d` hook, checks in the four Omarchy
 terminals, `.desktop` entry, AppStream metadata, PKGBUILD, install script,
 installation guide.
 
-### P10 — Autosave and recovery  `[ ]`
-Autosave to a sibling file on a timer, recovery prompt on start, never
-overwriting the original silently.
+### P10 — Autosave and recovery  `[x]`
+- [x] Autosave of unsaved work to a hidden sibling on a timer (atomic
+      write), removed on save and on a clean quit
+- [x] Recovery prompt on start when the autosave is newer; restoring
+      keeps the document unsaved; the original is never overwritten

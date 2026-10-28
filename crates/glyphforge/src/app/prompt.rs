@@ -36,6 +36,8 @@ pub enum PromptKind {
     EditData,
     InsertSymbol,
     OpenDocument,
+    /// Restore or discard an autosave found on start.
+    Recover,
     ImportLibrary,
     ExportLibrary,
     GlyphPalette,

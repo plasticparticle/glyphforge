@@ -204,6 +204,7 @@ fn start(
     if config_mouse_enabled {
         app.pixel_mouse = pixel_cell;
     }
+    app.offer_recovery();
     let result = app::run(&mut app, &mut guard);
     drop(guard);
     result?;

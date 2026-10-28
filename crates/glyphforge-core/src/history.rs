@@ -75,6 +75,12 @@ impl History {
         self.saved_depth = Some(self.undo.len());
     }
 
+    /// Marks the document as differing from its file (a recovered
+    /// autosave, for example).
+    pub fn mark_unsaved(&mut self) {
+        self.saved_depth = None;
+    }
+
     pub fn has_open_transaction(&self) -> bool {
         self.open.is_some()
     }

@@ -648,6 +648,7 @@ impl App {
             PromptKind::ImportImage => self.submit_import_image(&prompt.input),
             PromptKind::EditData => self.submit_edit_data(&prompt.input),
             PromptKind::InsertSymbol => self.submit_insert_symbol(&value),
+            PromptKind::Recover => self.submit_recover(&value),
             PromptKind::OpenDocument => {
                 let path = std::path::PathBuf::from(prompt.input.trim());
                 match glyphforge_core::api::Session::open(&path) {
@@ -669,8 +670,13 @@ impl App {
                     return;
                 }
                 let path = std::path::PathBuf::from(&value);
+                let before = self.autosave_file();
                 match self.session.save_as(&path) {
                     Ok(()) => {
+                        if let Some(old) = before {
+                            let _ = std::fs::remove_file(old);
+                        }
+                        self.clear_autosave();
                         self.set_status(StatusKind::Info, format!("Saved {}", path.display()));
                     }
                     Err(e) => self.report_error(&e),

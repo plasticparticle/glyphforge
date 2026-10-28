@@ -1,6 +1,7 @@
 //! Application state and the single dispatch entry point.
 
 mod arrange;
+mod autosave;
 mod brushes;
 mod commands;
 mod dispatch;
@@ -205,6 +206,8 @@ pub struct App {
     pub review: Option<review::Review>,
     /// Proposals waiting next to the file, as last counted.
     pub pending_proposals: usize,
+    /// When the document was last autosaved.
+    last_autosave: Option<std::time::Instant>,
     last_proposal_poll: Option<std::time::Instant>,
     /// The open command palette.
     pub palette: Option<commands::CommandPalette>,
@@ -315,6 +318,7 @@ impl App {
             gradient_editor: None,
             review: None,
             pending_proposals: 0,
+            last_autosave: None,
             last_proposal_poll: None,
             palette: None,
             recent_commands: Vec::new(),

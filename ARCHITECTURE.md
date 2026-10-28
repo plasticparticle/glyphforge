@@ -621,6 +621,13 @@ drag opens one transaction and
 - **Readable chrome.** `styles::muted` uses the muted token only when it
   provably contrasts with the background; the terminal's own palette is
   unknown, so otherwise the normal foreground is dimmed.
+- **Autosave.** The run loop calls `maybe_autosave` every tick: a dirty
+  session is serialised to `.NAME.autosave` beside the file (or the state
+  directory for unnamed documents) on the configured interval, via a
+  temporary file and a rename. Saves and clean quits delete it; at start
+  `offer_recovery` compares modification times and prompts. A restored
+  autosave is loaded as a new session bound to the original path and
+  marked unsaved (`History::mark_unsaved`).
 - **Terminal lifecycle.** An RAII guard enables raw mode, the alternate
   screen, mouse, bracketed paste, focus events and kitty keyboard flags
   when supported; a panic hook restores everything first.

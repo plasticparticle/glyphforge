@@ -84,6 +84,11 @@ impl Session {
         &self.history
     }
 
+    /// Marks the session as differing from its file.
+    pub fn mark_unsaved(&mut self) {
+        self.history.mark_unsaved();
+    }
+
     pub fn is_dirty(&self) -> bool {
         self.history.is_dirty()
     }
