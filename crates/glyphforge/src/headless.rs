@@ -95,13 +95,14 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
             screen,
             width,
             height,
-        } => {
-            let session = Session::open(&file)?;
-            let id = screen_id(&session, screen.as_deref())?;
-            let text = session.render_text(&id, size_arg(width, height))?;
-            writeln!(out, "{text}").map_err(write_err(&file))?;
-            Ok(0)
-        }
+            color,
+        } => render(
+            &file,
+            screen.as_deref(),
+            size_arg(width, height),
+            &color,
+            out,
+        ),
         Command::Validate {
             file,
             width,
@@ -315,6 +316,43 @@ struct ImportArgs {
 }
 
 /// A screen (or, for `handoff`, the whole design) in an export format.
+/// `glyphforge render`: a screen as ANSI colour or plain text.
+fn render(
+    file: &Path,
+    screen: Option<&str>,
+    size: Option<Size>,
+    color: &str,
+    out: &mut dyn Write,
+) -> Result<u8, HeadlessError> {
+    let session = Session::open(file)?;
+    let id = screen_id(&session, screen)?;
+    let text = match render_depth(color) {
+        Some(depth) => glyphforge_core::export::ansi::to_ansi(&session.render(&id, size)?, depth),
+        None => session.render_text(&id, size)?,
+    };
+    writeln!(out, "{}", text.trim_end_matches('\n')).map_err(write_err(file))?;
+    Ok(0)
+}
+
+/// The colour depth `render --color` asks for: `auto` colours only a
+/// terminal without `NO_COLOR`, in truecolour when `COLORTERM` says so.
+fn render_depth(choice: &str) -> Option<glyphforge_core::export::ansi::Depth> {
+    use glyphforge_core::export::ansi::Depth;
+    use std::io::IsTerminal;
+    let wanted = match choice {
+        "always" => true,
+        "never" => false,
+        _ => std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none(),
+    };
+    let truecolor =
+        std::env::var("COLORTERM").is_ok_and(|v| v.contains("truecolor") || v.contains("24bit"));
+    wanted.then_some(if truecolor || choice == "always" {
+        Depth::TrueColor
+    } else {
+        Depth::Ansi256
+    })
+}
+
 pub fn export_text(
     session: &Session,
     screen: &ObjectId,
@@ -575,8 +613,20 @@ mod tests {
             screen: None,
             width: None,
             height: None,
+            color: "never".into(),
         });
         assert!(text.starts_with("╔ Metrics ═══╗"), "{text}");
+        let (_, coloured) = run_str(Command::Render {
+            file: file.clone(),
+            screen: None,
+            width: None,
+            height: None,
+            color: "always".into(),
+        });
+        assert!(
+            coloured.contains("\x1b[90m"),
+            "colour escapes: {coloured:?}"
+        );
         let (_, text) = run_str(Command::Inspect {
             file: file.clone(),
             json: false,

@@ -50,7 +50,7 @@ pub enum Command {
         #[arg(long)]
         json: bool,
     },
-    /// Render a screen as plain text.
+    /// Render a screen (in colour on a terminal, plain text otherwise).
     Render {
         file: PathBuf,
         /// Screen id (default: the first screen).
@@ -61,6 +61,10 @@ pub enum Command {
         width: Option<u16>,
         #[arg(long, requires = "width")]
         height: Option<u16>,
+        /// Colours: `auto` when writing to a terminal (unless `NO_COLOR` is
+        /// set), `always`, or `never` for plain text.
+        #[arg(long, default_value = "auto", value_parser = ["auto", "always", "never"])]
+        color: String,
     },
     /// Validate layout and report problems; exits 1 when errors exist.
     Validate {

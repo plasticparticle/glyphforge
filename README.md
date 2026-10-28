@@ -169,7 +169,7 @@ semantic ids, not coordinates:
 glyphforge inspect  design.glyph            # outline: screens, layers, components
 glyphforge inspect  design.glyph --json     # the full document
 glyphforge apply    design.glyph patch.json # validated, transactional, undoable
-glyphforge render   design.glyph            # plain-text preview
+glyphforge render   design.glyph            # preview: colour on a terminal, plain text in pipes (--color)
 glyphforge validate design.glyph --strict   # exit 1 on problems
 glyphforge validate design.glyph --advice   # plus design suggestions (opinions)
 glyphforge kinds    [KIND] [--json]         # component kinds, their properties and types
