@@ -19,14 +19,35 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
     );
     let mode = match app.design_mode() {
         crate::app::DesignMode::Interface => app.design_mode().title().to_owned(),
-        crate::app::DesignMode::Subcell => {
-            format!("{} {}", app.design_mode().title(), app.editor.mode.title())
-        }
+        crate::app::DesignMode::Pixel => format!(
+            "{} {} {}",
+            app.design_mode().title(),
+            app.paint.tool.title().to_ascii_uppercase(),
+            app.raster().map_or("", |r| r.mode.name())
+        ),
+        crate::app::DesignMode::Subcell => match app.paint.tool {
+            crate::app::Tool::Text => {
+                format!("{} {}", app.design_mode().title(), app.editor.mode.title())
+            }
+            tool => format!(
+                "{} {}",
+                app.design_mode().title(),
+                tool.title().to_ascii_uppercase()
+            ),
+        },
     };
     let mut spans = vec![
         Span::styled(format!(" {mode} "), styles::accent(app)),
         Span::styled("│", styles::muted(app)),
-        Span::styled(format!(" x:{} y:{} ", c.x, c.y), styles::text(app)),
+        Span::styled(
+            if app.on_raster_layer() {
+                let p = app.pixel_cursor();
+                format!(" x:{} y:{} px {},{} ", c.x, c.y, p.x, p.y)
+            } else {
+                format!(" x:{} y:{} ", c.x, c.y)
+            },
+            styles::text(app),
+        ),
         Span::styled("│", styles::muted(app)),
         Span::styled(
             format!(" {}×{} ", size.width, size.height),
@@ -35,6 +56,13 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
         Span::styled("│", styles::muted(app)),
         Span::styled(layer_text, styles::text(app)),
     ];
+    if app.on_artwork_layer() || app.on_raster_layer() {
+        spans.push(Span::styled("│", styles::muted(app)));
+        spans.push(Span::styled(
+            format!(" {} ", app.brush_sample()),
+            crate::render::to_ratatui_style(app.editor.style, app.color_depth),
+        ));
+    }
     if app.ui.focus != crate::app::Focus::Canvas {
         spans.push(Span::styled("│", styles::muted(app)));
         spans.push(Span::styled(

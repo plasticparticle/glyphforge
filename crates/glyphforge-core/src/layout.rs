@@ -494,7 +494,7 @@ fn flow_rects(
                 continue;
             }
             let exact = remaining * w;
-            let base = exact / total_weight;
+            let base = exact.checked_div(total_weight).unwrap_or(0);
             sizes[i] = base as u16;
             assigned += base;
             fractions.push((i, exact % total_weight));
@@ -631,8 +631,7 @@ fn grid_rects(
     let row_space = u32::from(inner.height)
         .saturating_sub(gap * (rows as u32 - 1))
         .saturating_sub(fixed_total);
-    if flex_rows > 0 {
-        let each = row_space / flex_rows;
+    if let Some(each) = row_space.checked_div(flex_rows) {
         let mut extra = row_space % flex_rows;
         for (h, flexible) in row_heights.iter_mut().zip(&flexible_rows) {
             if *flexible {

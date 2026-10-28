@@ -82,6 +82,25 @@ impl TerminalCapabilities {
         }
     }
 
+    /// Whether the terminal is known to report pixel-precise mouse
+    /// positions (SGR-Pixels, mode 1016). Multiplexers that do not forward
+    /// the mode are excluded; herdr forwards it.
+    pub fn pixel_mouse_candidate(env: impl Fn(&str) -> Option<String>) -> bool {
+        let term = env("TERM").unwrap_or_default();
+        let program = env("TERM_PROGRAM").unwrap_or_default().to_ascii_lowercase();
+        let herdr = env("HERDR_ENV").is_some_and(|v| v == "1");
+        if !herdr
+            && (env("TMUX").is_some() || env("ZELLIJ").is_some() || term.starts_with("screen"))
+        {
+            return false;
+        }
+        herdr
+            || env("KITTY_WINDOW_ID").is_some()
+            || matches!(program.as_str(), "ghostty" | "kitty" | "wezterm")
+            || matches!(term.as_str(), "xterm-ghostty" | "xterm-kitty" | "wezterm")
+            || term.starts_with("foot")
+    }
+
     /// The colour depth to use given the user's preference.
     pub fn effective_color_depth(&self, preference: ColorMode) -> ColorDepth {
         match preference {
@@ -190,5 +209,29 @@ mod tests {
             caps.effective_color_depth(ColorMode::TrueColor),
             ColorDepth::TrueColor
         );
+    }
+
+    #[test]
+    fn pixel_mouse_candidates() {
+        assert!(TerminalCapabilities::pixel_mouse_candidate(env(&[(
+            "TERM_PROGRAM",
+            "ghostty"
+        )])));
+        assert!(TerminalCapabilities::pixel_mouse_candidate(env(&[(
+            "KITTY_WINDOW_ID",
+            "3"
+        )])));
+        assert!(TerminalCapabilities::pixel_mouse_candidate(env(&[
+            ("TERM_PROGRAM", "ghostty"),
+            ("HERDR_ENV", "1")
+        ])));
+        assert!(!TerminalCapabilities::pixel_mouse_candidate(env(&[
+            ("TERM_PROGRAM", "ghostty"),
+            ("TMUX", "/tmp/tmux")
+        ])));
+        assert!(!TerminalCapabilities::pixel_mouse_candidate(env(&[(
+            "TERM",
+            "alacritty"
+        )])));
     }
 }

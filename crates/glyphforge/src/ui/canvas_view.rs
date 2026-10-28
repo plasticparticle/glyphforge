@@ -7,7 +7,7 @@ use ratatui::widgets::{Block, BorderType, Borders};
 
 use super::styles;
 use crate::app::{App, Focus};
-use crate::render::draw_cells;
+use crate::render::{draw_cells, to_ratatui_style};
 
 pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: Rect) {
     let focused = app.ui.focus == Focus::Canvas;
@@ -24,6 +24,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
         })
         .style(styles::text(app));
     frame.render_widget(block, block_area);
+    super::paint_frame(app, frame, block_area, focused);
     if canvas_area.width == 0 || canvas_area.height == 0 {
         return;
     }
@@ -48,10 +49,32 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
     }
     // Compositing happens once per edit; the cache is filled by `App::composite`.
     // Rendering takes `&App`, so we recompute here only if the cache is cold.
-    if let Some(cells) = app.cached_composite() {
+    if let Some(preview) = app.pixel_preview() {
+        draw_cells(&preview, viewport, canvas_area, buf, depth, paper);
+    } else if let Some(cells) = app.cached_composite() {
         draw_cells(cells, viewport, canvas_area, buf, depth, paper);
     } else if let Ok(cells) = app.session.render(&app.editor.screen, None) {
         draw_cells(&cells, viewport, canvas_area, buf, depth, paper);
+    }
+
+    // Shape preview: the line, rectangle or box that Space or releasing the
+    // mouse button will draw.
+    if let Some(anchor) = app.paint.anchor {
+        for w in app.shape_writes(anchor, app.editor.cursor) {
+            let pos = glyphforge_core::Position::new(w.x, w.y);
+            let Some(glyph) = w.cell.as_glyph() else {
+                continue;
+            };
+            if !viewport.contains(pos) {
+                continue;
+            }
+            let sx = canvas_area.x + (pos.x - viewport.x);
+            let sy = canvas_area.y + (pos.y - viewport.y);
+            if let Some(cell) = buf.cell_mut((sx, sy)) {
+                cell.set_symbol(glyph.as_str())
+                    .set_style(to_ratatui_style(w.cell.style, depth));
+            }
+        }
     }
 
     // Selection overlay: highlight the selected component's outline and
@@ -82,7 +105,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
         }
     }
 
-    if focused && !app.ui.help_open && app.prompt.is_none() {
+    if focused && !app.ui.help_open && app.prompt.is_none() && app.menu.is_none() {
         let c = app.editor.cursor;
         if viewport.contains(c) {
             let sx = canvas_area.x + (c.x - viewport.x);
@@ -157,14 +180,45 @@ mod tests {
     }
 
     #[test]
-    fn panels_render_layer_list_and_keys() {
+    fn panels_render_layer_list_and_palette() {
         let mut app = test_app(Size::new(10, 3));
-        let rows = screen(&mut app, 100, 14);
+        let rows = screen(&mut app, 100, 30);
         let all = rows.join("\n");
         assert!(all.contains("Artwork"), "{all}");
         assert!(all.contains("UI"), "{all}");
         assert!(all.contains("Layers"), "{all}");
-        assert!(all.contains("Keys"), "{all}");
+        for block in ["Tools · Text", "Brush", "Brushes", "Colours", "Keys"] {
+            assert!(all.contains(block), "{block}: {all}");
+        }
+        assert!(all.contains("b Brush"), "tool keys shown: {all}");
+        assert!(all.contains("┼ single ╭ rounded"), "brush palette: {all}");
+        assert!(
+            all.contains("‹ Lines ┼") && all.contains("1/22 ›"),
+            "page line: {all}"
+        );
+    }
+
+    #[test]
+    fn colour_picker_and_shape_preview_render() {
+        use crate::app::{ColorTarget, Tool};
+        let mut app = test_app(Size::new(20, 6));
+        app.dispatch(Action::SelectTool(Tool::Rect));
+        app.dispatch(Action::SetBrushGlyph("@".into()));
+        app.dispatch(Action::ToolPress(Position::new(1, 1)));
+        app.dispatch(Action::ToolDrag(Position::new(4, 3)));
+        let rows = screen(&mut app, 120, 30);
+        let all = rows.join("\n");
+        assert!(all.contains("@@@@"), "rectangle previewed: {all}");
+        assert!(!app.dirty());
+        assert!(all.contains("SUBCELL RECT"), "{all}");
+        app.dispatch(Action::ToolRelease);
+
+        app.dispatch(Action::OpenColorPicker(ColorTarget::Background));
+        let rows = screen(&mut app, 120, 30);
+        let all = rows.join("\n");
+        assert!(all.contains("Choose background colour"), "{all}");
+        assert!(all.contains("Tab fg/bg"), "{all}");
+        assert!(all.contains("[]"), "selected swatch marked: {all}");
     }
 
     #[test]

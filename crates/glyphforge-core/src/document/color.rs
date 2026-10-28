@@ -65,6 +65,64 @@ impl Color {
         }
     }
 
+    /// Approximate RGB value, using the xterm palette for indexed colours.
+    /// `Default` has no known value.
+    pub fn to_rgb(self) -> Option<(u8, u8, u8)> {
+        const BASE: [(u8, u8, u8); 16] = [
+            (0, 0, 0),
+            (205, 0, 0),
+            (0, 205, 0),
+            (205, 205, 0),
+            (0, 0, 238),
+            (205, 0, 205),
+            (0, 205, 205),
+            (229, 229, 229),
+            (127, 127, 127),
+            (255, 0, 0),
+            (0, 255, 0),
+            (255, 255, 0),
+            (92, 92, 255),
+            (255, 0, 255),
+            (0, 255, 255),
+            (255, 255, 255),
+        ];
+        const STEPS: [u8; 6] = [0, 95, 135, 175, 215, 255];
+        match self {
+            Self::Default => None,
+            Self::Rgb(r, g, b) => Some((r, g, b)),
+            Self::Indexed(i) if i < 16 => Some(BASE[usize::from(i)]),
+            Self::Indexed(i) if i >= 232 => {
+                let v = 8 + (i - 232) * 10;
+                Some((v, v, v))
+            }
+            Self::Indexed(i) => {
+                let n = i - 16;
+                Some((
+                    STEPS[usize::from(n / 36)],
+                    STEPS[usize::from((n / 6) % 6)],
+                    STEPS[usize::from(n % 6)],
+                ))
+            }
+        }
+    }
+
+    /// Whether dark text reads better on this colour. `false` for `Default`.
+    pub fn is_light(self) -> bool {
+        self.to_rgb().is_some_and(|(r, g, b)| {
+            u32::from(r) * 299 + u32::from(g) * 587 + u32::from(b) * 114 > 140_000
+        })
+    }
+
+    /// Black or white, whichever contrasts with this colour.
+    #[must_use]
+    pub fn contrast(self) -> Self {
+        if self.is_light() {
+            Self::BLACK
+        } else {
+            Self::BRIGHT_WHITE
+        }
+    }
+
     /// Linear mix of two RGB colours; `t = 0` yields `self`, `t = 1` yields
     /// `other`. Non-RGB inputs are returned as `self`.
     #[must_use]
@@ -211,6 +269,15 @@ mod tests {
         );
         assert_eq!(Color::Indexed(4).quantize_256(), Color::Indexed(4));
         assert_eq!(Color::Default.quantize_256(), Color::Default);
+    }
+
+    #[test]
+    fn rgb_approximation_and_contrast() {
+        assert_eq!(Color::Indexed(196).to_rgb(), Some((255, 0, 0)));
+        assert_eq!(Color::Indexed(244).to_rgb(), Some((128, 128, 128)));
+        assert_eq!(Color::Default.to_rgb(), None);
+        assert_eq!(Color::Indexed(15).contrast(), Color::BLACK);
+        assert_eq!(Color::Indexed(4).contrast(), Color::BRIGHT_WHITE);
     }
 
     #[test]

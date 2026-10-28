@@ -1,7 +1,11 @@
 //! Application state and the single dispatch entry point.
 
+mod brushes;
 mod dispatch;
 mod interface;
+mod menu;
+mod paint;
+mod pixels;
 mod prompt;
 mod run;
 mod viewport;
@@ -16,7 +20,12 @@ use crate::input::Keymap;
 use crate::omarchy::{self, OmarchyPaths};
 use crate::terminal::{ColorDepth, TerminalCapabilities};
 
+#[cfg(test)]
+pub use brushes::BRUSH_PAGES;
+pub use brushes::{BOX_STYLES, BrushKind, PaletteEntry};
 pub use interface::Drag;
+pub use menu::{Menu, MenuEntry};
+pub use paint::{ColorPicker, ColorTarget, PaintState, Tool, color_label, is_light, picker_rows};
 pub use prompt::Prompt;
 pub use run::{RunError, run};
 pub use viewport::Viewport;
@@ -44,6 +53,7 @@ impl Focus {
 pub enum DesignMode {
     Interface,
     Subcell,
+    Pixel,
 }
 
 impl DesignMode {
@@ -51,6 +61,7 @@ impl DesignMode {
         match self {
             Self::Interface => "INTERFACE",
             Self::Subcell => "SUBCELL",
+            Self::Pixel => "PIXEL",
         }
     }
 }
@@ -115,6 +126,8 @@ pub struct EditorState {
 pub enum UiThemeOrigin {
     Builtin,
     Omarchy,
+    /// One of the built-in themes, chosen in the menu or the config.
+    Named,
 }
 
 impl UiThemeOrigin {
@@ -122,6 +135,7 @@ impl UiThemeOrigin {
         match self {
             Self::Builtin => "builtin",
             Self::Omarchy => "omarchy",
+            Self::Named => "theme",
         }
     }
 }
@@ -142,7 +156,18 @@ pub struct App {
     pub omarchy_paths: OmarchyPaths,
     pub is_omarchy: bool,
     pub prompt: Option<Prompt>,
+    pub menu: Option<Menu>,
+    /// The chosen built-in theme id; `None` follows Omarchy or the terminal.
+    pub ui_theme_choice: Option<String>,
+    /// Where the chosen theme is remembered.
+    pub state_dir: Option<std::path::PathBuf>,
+    pub picker: Option<ColorPicker>,
     pub drag: Option<Drag>,
+    /// Subcell Mode tool, brush and colour state.
+    pub paint: PaintState,
+    /// Cell size in pixels when the terminal reports pixel-precise mouse
+    /// positions (mode 1016 is active).
+    pub pixel_mouse: Option<(u16, u16)>,
     composite_cache: Option<Canvas>,
     layout_cache: Option<LayoutResult>,
     frame_area: RatRect,
@@ -160,6 +185,8 @@ pub struct AppInit {
     pub keymap: Keymap,
     pub omarchy_paths: OmarchyPaths,
     pub startup_warnings: Vec<String>,
+    /// XDG state directory, for remembering the chosen theme.
+    pub state_dir: Option<std::path::PathBuf>,
 }
 
 impl App {
@@ -204,7 +231,13 @@ impl App {
             omarchy_paths: init.omarchy_paths,
             is_omarchy,
             prompt: None,
+            menu: None,
+            ui_theme_choice: None,
+            state_dir: init.state_dir,
+            picker: None,
             drag: None,
+            paint: PaintState::default(),
+            pixel_mouse: None,
             composite_cache: None,
             layout_cache: None,
             frame_area: RatRect::default(),
@@ -213,6 +246,7 @@ impl App {
             should_quit: false,
         };
         app.load_ui_theme();
+        app.restore_ui_theme();
         if !app.caps.unicode {
             app.set_status(
                 StatusKind::Warning,
@@ -407,7 +441,25 @@ impl App {
         self.editor.line_start_x = 0;
         self.editor.viewport.offset = Position::ORIGIN;
         self.editor.selection = None;
+        self.paint.anchor = None;
+        self.paint.stroke = None;
+        self.paint.pixel_anchor = None;
+        self.paint.pixel_stroke = None;
         self.mark_edited();
+    }
+
+    /// Where key bindings are looked up for the current state.
+    pub fn key_context(&self) -> crate::actions::Context {
+        use crate::actions::Context;
+        if self.on_raster_layer() {
+            Context::Paint
+        } else if !self.on_artwork_layer() {
+            Context::Interface
+        } else if self.paint.tool == Tool::Text {
+            Context::Global
+        } else {
+            Context::Paint
+        }
     }
 }
 
@@ -424,5 +476,6 @@ pub(crate) fn test_app(size: Size) -> App {
             config_dir: PathBuf::from("/nonexistent"),
         },
         startup_warnings: Vec::new(),
+        state_dir: None,
     })
 }

@@ -103,15 +103,80 @@ with stable codes.
 Snap to grid and neighbours, alignment guides while dragging, align and
 distribute operations on multi-selection, equal size.
 
-### E3 — Subcell Mode tools  `[ ]`
-Tool trait and registry; pencil, eraser, text, rectangle selection with
-move/copy/cut/paste/fill; line/box tools with topology-aware junctions
-(`boxdraw` gains the merge tables); sub-cell raster (half, quarter,
-Braille, shading) encoded to glyphs.
+### E3 — Subcell Mode tools  `[~]`
+- [x] Tool palette in the left panel (mouse and keys): text, brush, eraser,
+      line, rectangle, box, fill, picker; `paint` key context so bare
+      letters are tool keys while painting
+- [x] Core `paint` module: Bresenham lines, outlines, box frames in a
+      chosen border family, flood fill, wide-glyph-safe stamping
+- [x] Strokes are one transaction, shapes preview until release (or the
+      second Space), fills and shapes are one `set_cells` patch each
+- [x] Paged glyph palette in semantic groups (blocks, quadrants, sextants,
+      light/heavy/double box lines and junctions covering U+2500–U+259F,
+      triangles, shapes, symbols, UI, arrows, Braille, ASCII, math); page
+      keys, wheel and `‹ ›`; searchable glyph prompt; any unbound character
+      sets the brush
+- [x] Box tool style: single, rounded, double, heavy, ASCII
+- [x] Semantic brushes: auto-joining line brushes (topology table for
+      every box-drawing glyph in `boxdraw`, merging with loose-end
+      detection, fallbacks for missing Unicode mixtures, unjoining eraser);
+      pattern brushes (shade ramp, checker, rows, columns, dots, gradient);
+      button stamps in twelve styles and UI stamps (checkbox, radio, toggle,
+      progress, scrollbar, key hint, tab, rule, spinner) in core `stamp`,
+      placed by click or sized by the Rect/Line tools; stamp label
+- [x] Choosing a tool on an interface layer activates an artwork layer or
+      adds a "Paint" layer (undoable)
+- [ ] Rectangle selection with move/copy/cut/paste
+- [ ] Dashed line brushes (dashed glyphs only exist for straight runs)
+- [ ] Brush sizes on artwork layers (pixel layers have them, see E8)
+- [ ] Attribute toggles (bold, italic, underline) in the palette
 
-### E4 — Colours and palettes  `[ ]`
-Foreground/background pickers (16/256/RGB), recent and palette colours,
-token picker for components, colour-depth preview modes.
+### E4 — Colours and palettes  `[~]`
+- [x] Foreground/background from the ANSI 16 swatches (left/right click)
+- [x] 256-colour picker popup (default, base, cube, greys, recent), mouse
+      and keyboard; prompt for names, indices and `#rrggbb`
+- [x] Recent colours, swap, reset, picker tool / right-click pick
+- [ ] RGB picker (hue/lightness) beyond typing `#rrggbb`
+- [ ] Token picker for components, colour-depth preview modes
+
+### E8 — Pixel Mode  `[~]`
+- [x] Raster layers (`LayerContent::Raster`) with half, quadrant, sextant
+      and Braille modes; schema v2 with migration; row-coded storage
+- [x] Encoder: two best colours per cell, glyph tables, transparency over
+      the layers beneath, Braille majority colour
+- [x] Palette limits (truecolor, 256, 16) with ordered (Bayer) and shade
+      glyph dithering, and both combined
+- [x] Dynamic drop shadow: offset, blur, opacity, colour; rendered hard,
+      ordered, or as per-cell shade glyphs
+- [x] Gradient library in the document (stops), six presets; linear and
+      radial fills as smooth, hard bands, dithered sub-cells or shade glyphs
+- [x] Pixel tools: brush with size, eraser, line, rectangle, filled box,
+      flood fill, picker, gradient; previews; one undo step each
+- [x] Pixel-precise mouse (SGR-Pixels 1016) in Ghostty, kitty, WezTerm,
+      foot and herdr; cell-precise fallback and a keyboard pixel cursor
+- [x] Patch operations `set_pixels`, `update_raster`, `replace_raster`,
+      `set_gradient`, `delete_gradient`; `inspect` lists rasters and
+      gradients
+- [ ] Octant mode (2×4 blocks, Unicode 16) once fonts support it
+- [ ] Error-diffusion dithering (Floyd–Steinberg, Atkinson) as an option
+- [ ] Gradient editor with draggable stops; OKLab interpolation
+- [ ] Pixel selection, move and copy; image import (PNG → raster)
+- [ ] `artwork` component referencing a raster layer region
+
+### E9 — Menu and themes  `[~]`
+- [x] Esc menu (btop style): resume, theme, help, save, save as, new
+      document, quit; keyboard and mouse; Esc cancels first, then opens it
+- [x] Ten designed themes (forge-dark, paper, cobalt, verdant, lagoon,
+      amber-crt, phosphor, nebula, aurora, ember) plus the adaptive system
+      theme, with preview swatches, a contrast test and persistence
+- [x] Live preview: scrolling the theme list applies themes at once, Enter
+      keeps one, Esc restores what was there
+- [x] Gradient frames (`frame-from`/`frame-to`): panel and popup borders
+      fade across the screen, dimmed when unfocused
+- [x] Muted chrome text falls back to a dimmed foreground when the theme's
+      muted colour cannot be shown to contrast
+- [ ] Theme editor (edit tokens in the app, save as a theme file)
+- [ ] Per-document theme picker in the same menu
 
 ### E5 — Command palette and context actions  `[ ]`
 Ctrl+Space (and the Ctrl+P fallback), fuzzy matching over titles,

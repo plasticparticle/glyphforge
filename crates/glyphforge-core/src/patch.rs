@@ -11,8 +11,35 @@ use crate::component::{Component, tree};
 use crate::document::{Cell, CellChange, Document, DocumentError, Layer, LayerKind, Position};
 use crate::id::ObjectId;
 use crate::layout::{Dimension, Layout, Placement};
+use crate::raster::draw::PixelWrite;
+use crate::raster::{Dither, DropShadow, Gradient, PaletteLimit, RasterLayer, RasterMode};
 use crate::theme::Theme;
 use crate::value::Value;
+
+/// A drop shadow change in [`Operation::UpdateRaster`]: `"off"` or
+/// `{"set": {...}}`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ShadowUpdate {
+    Off,
+    Set(DropShadow),
+}
+
+impl ShadowUpdate {
+    pub const fn from_option(shadow: Option<DropShadow>) -> Self {
+        match shadow {
+            Some(s) => Self::Set(s),
+            None => Self::Off,
+        }
+    }
+
+    pub const fn to_option(self) -> Option<DropShadow> {
+        match self {
+            Self::Off => None,
+            Self::Set(s) => Some(s),
+        }
+    }
+}
 
 /// One cell write inside a [`Operation::SetCells`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -76,6 +103,37 @@ pub enum Operation {
         layer: ObjectId,
         cells: Vec<CellWrite>,
     },
+    /// Writes pixels on a raster layer.
+    SetPixels {
+        layer: ObjectId,
+        pixels: Vec<PixelWrite>,
+    },
+    /// Changes the render settings of a raster layer. Changing the mode
+    /// resamples the pixels.
+    UpdateRaster {
+        target: ObjectId,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mode: Option<RasterMode>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dither: Option<Dither>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        palette: Option<PaletteLimit>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        shadow: Option<ShadowUpdate>,
+    },
+    /// Replaces the whole content of a raster layer (the inverse of a mode
+    /// change).
+    ReplaceRaster {
+        target: ObjectId,
+        raster: RasterLayer,
+    },
+    /// Adds a gradient, or replaces the one with the same id.
+    SetGradient {
+        gradient: Gradient,
+    },
+    DeleteGradient {
+        target: ObjectId,
+    },
     /// Adds a layer to `screen` at `index` (top when omitted).
     CreateLayer {
         layer: Layer,
@@ -117,9 +175,13 @@ impl Operation {
             | Self::DeleteComponent { target }
             | Self::DeleteLayer { target }
             | Self::UpdateLayer { target, .. }
-            | Self::ReorderLayer { target, .. } => Some(target),
+            | Self::ReorderLayer { target, .. }
+            | Self::UpdateRaster { target, .. }
+            | Self::ReplaceRaster { target, .. }
+            | Self::DeleteGradient { target } => Some(target),
+            Self::SetGradient { gradient } => Some(&gradient.id),
             Self::CreateComponent { component, .. } => Some(&component.id),
-            Self::SetCells { layer, .. } => Some(layer),
+            Self::SetCells { layer, .. } | Self::SetPixels { layer, .. } => Some(layer),
             Self::CreateLayer { layer, .. } => Some(&layer.id),
             Self::SetTheme { .. } => None,
         }
@@ -134,6 +196,11 @@ impl Operation {
             Self::CreateComponent { .. } => "create_component",
             Self::DeleteComponent { .. } => "delete_component",
             Self::SetCells { .. } => "set_cells",
+            Self::SetPixels { .. } => "set_pixels",
+            Self::UpdateRaster { .. } => "update_raster",
+            Self::ReplaceRaster { .. } => "replace_raster",
+            Self::SetGradient { .. } => "set_gradient",
+            Self::DeleteGradient { .. } => "delete_gradient",
             Self::CreateLayer { .. } => "create_layer",
             Self::DeleteLayer { .. } => "delete_layer",
             Self::UpdateLayer { .. } => "update_layer",
@@ -219,6 +286,10 @@ pub enum OperationError {
     IndexOutOfRange { index: usize, max: usize },
     #[error("cell ({x}, {y}) is outside layer {layer}")]
     CellOutOfBounds { layer: ObjectId, x: u16, y: u16 },
+    #[error("pixel ({x}, {y}) is outside raster layer {layer}")]
+    PixelOutOfBounds { layer: ObjectId, x: u16, y: u16 },
+    #[error("{0} is not a gradient")]
+    NotAGradient(ObjectId),
 }
 
 fn component_mut<'a>(
@@ -244,6 +315,11 @@ fn apply_one(doc: &mut Document, op: &Operation) -> Result<Operation, OperationE
         | Operation::CreateComponent { .. }
         | Operation::DeleteComponent { .. } => apply_component_op(doc, op),
         Operation::SetCells { layer, cells } => apply_set_cells(doc, layer, cells),
+        Operation::SetPixels { .. }
+        | Operation::UpdateRaster { .. }
+        | Operation::ReplaceRaster { .. }
+        | Operation::SetGradient { .. }
+        | Operation::DeleteGradient { .. } => apply_raster_op(doc, op),
         Operation::CreateLayer { .. }
         | Operation::DeleteLayer { .. }
         | Operation::UpdateLayer { .. }
@@ -431,6 +507,121 @@ fn apply_set_cells(
         layer: layer.clone(),
         cells: before,
     })
+}
+
+fn raster_mut<'a>(
+    doc: &'a mut Document,
+    id: &ObjectId,
+) -> Result<&'a mut RasterLayer, OperationError> {
+    let layer = doc
+        .layer_mut(id)
+        .ok_or_else(|| OperationError::NotALayer(id.clone()))?;
+    if layer.locked {
+        return Err(DocumentError::LayerLocked(id.clone()).into());
+    }
+    let actual = layer.kind().name();
+    layer.raster_mut().ok_or(
+        DocumentError::WrongLayerKind {
+            expected: "raster",
+            actual,
+        }
+        .into(),
+    )
+}
+
+fn apply_raster_op(doc: &mut Document, op: &Operation) -> Result<Operation, OperationError> {
+    match op {
+        Operation::SetPixels { layer, pixels } => {
+            let raster = raster_mut(doc, layer)?;
+            let mut before: Vec<PixelWrite> = Vec::with_capacity(pixels.len());
+            for w in pixels {
+                if let Some(old) = raster.pixels.set(w.x, w.y, w.pixel) {
+                    before.push(PixelWrite { pixel: old, ..*w });
+                } else {
+                    for b in before.iter().rev() {
+                        raster.pixels.set(b.x, b.y, b.pixel);
+                    }
+                    return Err(OperationError::PixelOutOfBounds {
+                        layer: layer.clone(),
+                        x: w.x,
+                        y: w.y,
+                    });
+                }
+            }
+            before.reverse();
+            Ok(Operation::SetPixels {
+                layer: layer.clone(),
+                pixels: before,
+            })
+        }
+        Operation::UpdateRaster {
+            target,
+            mode,
+            dither,
+            palette,
+            shadow,
+        } => {
+            let raster = raster_mut(doc, target)?;
+            let inverse = if mode.is_some_and(|m| m != raster.mode) {
+                Operation::ReplaceRaster {
+                    target: target.clone(),
+                    raster: raster.clone(),
+                }
+            } else {
+                Operation::UpdateRaster {
+                    target: target.clone(),
+                    mode: None,
+                    dither: dither.map(|_| raster.dither),
+                    palette: palette.map(|_| raster.palette),
+                    shadow: shadow.map(|_| ShadowUpdate::from_option(raster.shadow)),
+                }
+            };
+            if let Some(m) = mode {
+                raster.set_mode(*m);
+            }
+            if let Some(d) = dither {
+                raster.dither = *d;
+            }
+            if let Some(p) = palette {
+                raster.palette = *p;
+            }
+            if let Some(s) = shadow {
+                raster.shadow = s.to_option();
+            }
+            Ok(inverse)
+        }
+        Operation::ReplaceRaster { target, raster } => {
+            let current = raster_mut(doc, target)?;
+            let before = std::mem::replace(current, raster.clone());
+            Ok(Operation::ReplaceRaster {
+                target: target.clone(),
+                raster: before,
+            })
+        }
+        Operation::SetGradient { gradient } => {
+            if let Some(existing) = doc.gradients.iter_mut().find(|g| g.id == gradient.id) {
+                let before = std::mem::replace(existing, gradient.clone());
+                return Ok(Operation::SetGradient { gradient: before });
+            }
+            if doc.has_id(&gradient.id) {
+                return Err(DocumentError::DuplicateId(gradient.id.clone()).into());
+            }
+            doc.gradients.push(gradient.clone());
+            Ok(Operation::DeleteGradient {
+                target: gradient.id.clone(),
+            })
+        }
+        Operation::DeleteGradient { target } => {
+            let index = doc
+                .gradients
+                .iter()
+                .position(|g| &g.id == target)
+                .ok_or_else(|| OperationError::NotAGradient(target.clone()))?;
+            let removed = doc.gradients.remove(index);
+            Ok(Operation::SetGradient { gradient: removed })
+        }
+        _ => unreachable!("dispatched by apply_one"),
+    }
 }
 
 fn apply_layer_op(doc: &mut Document, op: &Operation) -> Result<Operation, OperationError> {
@@ -682,14 +873,14 @@ mod tests {
         });
         let inv2 = p2.apply(&mut doc).unwrap();
         let canvas = doc.layer(&art).unwrap().cells().unwrap();
-        assert!(
+        assert_eq!(
             canvas
                 .get(Position::new(0, 0))
                 .unwrap()
                 .as_glyph()
                 .unwrap()
-                .as_str()
-                == " "
+                .as_str(),
+            " "
         );
         inv2.apply(&mut doc).unwrap();
         inv1.apply(&mut doc).unwrap();
@@ -820,5 +1011,131 @@ mod tests {
         );
         let back: Patch = serde_json::from_str(&json).unwrap();
         assert_eq!(back, p);
+    }
+
+    #[test]
+    fn raster_operations_apply_and_invert() {
+        use crate::document::Color;
+        use crate::raster::{GradientStop, Pixel};
+        let mut doc = Document::new(Size::new(4, 2)).unwrap();
+        let layer = Layer::raster_layer(id!("px"), "Pixels", Size::new(1, 1), RasterMode::Half);
+        Patch::single(Operation::CreateLayer {
+            layer,
+            screen: None,
+            index: None,
+        })
+        .apply(&mut doc)
+        .unwrap();
+        let px = |doc: &Document, x, y| {
+            doc.layer(&id!("px"))
+                .unwrap()
+                .raster()
+                .unwrap()
+                .pixels
+                .get(x, y)
+        };
+        assert_eq!(
+            doc.layer(&id!("px")).unwrap().raster().unwrap().cells(),
+            Size::new(4, 2),
+            "sized to the screen"
+        );
+
+        let red = Pixel::Solid(Color::Indexed(1));
+        let set = Patch::single(Operation::SetPixels {
+            layer: id!("px"),
+            pixels: vec![PixelWrite {
+                x: 3,
+                y: 1,
+                pixel: red,
+            }],
+        });
+        let undo = set.apply(&mut doc).unwrap();
+        assert_eq!(px(&doc, 3, 1), Some(red));
+        undo.apply(&mut doc).unwrap();
+        assert_eq!(px(&doc, 3, 1), Some(Pixel::Clear));
+
+        let out = Patch::single(Operation::SetPixels {
+            layer: id!("px"),
+            pixels: vec![
+                PixelWrite {
+                    x: 0,
+                    y: 0,
+                    pixel: red,
+                },
+                PixelWrite {
+                    x: 99,
+                    y: 0,
+                    pixel: red,
+                },
+            ],
+        })
+        .apply(&mut doc);
+        assert!(out.is_err());
+        assert_eq!(px(&doc, 0, 0), Some(Pixel::Clear), "rolled back");
+
+        set.apply(&mut doc).unwrap();
+        let before = doc.clone();
+        let mode = Patch::single(Operation::UpdateRaster {
+            target: id!("px"),
+            mode: Some(RasterMode::Sextant),
+            dither: Some(Dither::Shade),
+            palette: None,
+            shadow: Some(ShadowUpdate::Set(DropShadow::default())),
+        });
+        let undo = mode.apply(&mut doc).unwrap();
+        let raster = doc.layer(&id!("px")).unwrap().raster().unwrap();
+        assert_eq!(
+            (raster.mode, raster.dither),
+            (RasterMode::Sextant, Dither::Shade)
+        );
+        assert!(raster.shadow.is_some());
+        undo.apply(&mut doc).unwrap();
+        assert_eq!(doc, before, "a mode change undoes losslessly");
+        let json = serde_json::to_string(&mode).unwrap();
+        assert!(
+            json.contains("\"op\":\"update_raster\"") && json.contains("\"set\""),
+            "{json}"
+        );
+
+        let wrong = Patch::single(Operation::SetPixels {
+            layer: id!("main-artwork"),
+            pixels: vec![],
+        });
+        assert!(wrong.apply(&mut doc).is_err());
+
+        let g = Gradient::new(
+            id!("sunset"),
+            "Sunset",
+            vec![
+                GradientStop {
+                    at: 0,
+                    color: Color::Indexed(1),
+                },
+                GradientStop {
+                    at: 100,
+                    color: Color::Indexed(3),
+                },
+            ],
+        )
+        .unwrap();
+        let undo = Patch::single(Operation::SetGradient {
+            gradient: g.clone(),
+        })
+        .apply(&mut doc)
+        .unwrap();
+        assert!(doc.has_id(&id!("sunset")));
+        assert!(
+            Patch::single(Operation::SetGradient {
+                gradient: Gradient {
+                    id: id!("px"),
+                    ..g.clone()
+                }
+            })
+            .apply(&mut doc)
+            .is_err(),
+            "gradient ids are document ids"
+        );
+        undo.apply(&mut doc).unwrap();
+        assert!(doc.gradient(&id!("sunset")).is_none());
     }
 }

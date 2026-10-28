@@ -8,7 +8,7 @@ use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 
 use super::styles;
 use crate::actions::{Action, Direction};
-use crate::app::{App, Focus};
+use crate::app::{App, Focus, Tool};
 
 fn block<'a>(app: &App, title: &'a str, focused: bool) -> Block<'a> {
     Block::default()
@@ -19,41 +19,42 @@ fn block<'a>(app: &App, title: &'a str, focused: bool) -> Block<'a> {
         .title_style(if focused {
             styles::accent(app)
         } else {
-            styles::muted(app)
+            styles::text(app)
         })
         .style(styles::text(app))
 }
 
 pub fn render_left(app: &App, frame: &mut Frame<'_>, area: Rect) {
     let focused = app.ui.focus == Focus::LeftPanel;
+    if app.on_artwork_layer() || app.on_raster_layer() {
+        super::palette::render(app, frame, area, focused);
+        return;
+    }
     let [mode_area, keys_area] =
-        Layout::vertical([Constraint::Length(4), Constraint::Min(3)]).areas(area);
+        Layout::vertical([Constraint::Length(5), Constraint::Min(3)]).areas(area);
 
-    let interface = !app.on_artwork_layer();
-    let mode_lines = if interface {
-        vec![
-            Line::from(vec![
-                Span::styled("Select", styles::accent(app)),
-                Span::styled(" (interface)", styles::muted(app)),
-            ]),
-            Line::from(Span::styled("a add  ⏎ edit  del", styles::text(app))),
-        ]
-    } else {
-        vec![
-            Line::from(vec![
-                Span::styled("Type", styles::accent(app)),
-                Span::styled(" (artwork)", styles::muted(app)),
-            ]),
-            Line::from(Span::styled(
-                format!("mode {}", app.editor.mode.title()),
-                styles::text(app),
-            )),
-        ]
-    };
+    let brush_key = app
+        .keymap
+        .chords_for(&Action::SelectTool(Tool::Brush))
+        .into_iter()
+        .find(|c| c.mods.alt)
+        .map_or_else(|| "Ctrl+PgUp".to_owned(), |c| c.to_string());
+    let mode_lines = vec![
+        Line::from(vec![
+            Span::styled("Select", styles::accent(app)),
+            Span::styled(" (interface)", styles::muted(app)),
+        ]),
+        Line::from(Span::styled("a add  ⏎ edit  del", styles::text(app))),
+        Line::from(vec![
+            Span::styled(brush_key, styles::accent(app)),
+            Span::styled(" paint tools", styles::muted(app)),
+        ]),
+    ];
     frame.render_widget(
         Paragraph::new(mode_lines).block(block(app, "Tool", focused)),
         mode_area,
     );
+    super::paint_frame(app, frame, mode_area, focused);
 
     let interface_shortcuts: &[(&str, Action)] = &[
         ("next/prev", Action::SelectNext),
@@ -68,30 +69,13 @@ pub fn render_left(app: &App, frame: &mut Frame<'_>, area: Rect) {
         ("save", Action::SaveDocument),
         ("quit", Action::Quit),
     ];
-    let artwork_shortcuts: &[(&str, Action)] = &[
-        ("move", Action::CursorMove(Direction::Right)),
-        ("help", Action::ToggleHelp),
-        ("left panel", Action::ToggleLeftPanel),
-        ("right panel", Action::ToggleRightPanel),
-        ("all panels", Action::TogglePanels),
-        ("focus", Action::FocusNext),
-        ("scroll", Action::ScrollView(Direction::Down)),
-        ("layer", Action::LayerNext),
-        ("undo", Action::Undo),
-        ("save", Action::SaveDocument),
-        ("quit", Action::Quit),
-    ];
-    let shortcuts = if interface {
-        interface_shortcuts
-    } else {
-        artwork_shortcuts
-    };
+    let shortcuts = interface_shortcuts;
     let lines: Vec<Line<'_>> = shortcuts
         .iter()
         .map(|(label, action)| {
             let keys = app.keymap.chords_for(action);
             let key = match (label, keys.first()) {
-                (&"move" | &"nudge", _) => "arrows".to_owned(),
+                (&"nudge", _) => "arrows".to_owned(),
                 (&"resize", _) => "shift+arrows".to_owned(),
                 (&"next/prev", _) => "] [".to_owned(),
                 (_, Some(k)) => k.to_string(),
@@ -107,11 +91,18 @@ pub fn render_left(app: &App, frame: &mut Frame<'_>, area: Rect) {
         Paragraph::new(lines).block(block(app, "Keys", focused)),
         keys_area,
     );
+    super::paint_frame(app, frame, keys_area, focused);
 }
 
 pub fn render_right(app: &App, frame: &mut Frame<'_>, area: Rect) {
     let focused = app.ui.focus == Focus::RightPanel;
-    let props_height = if app.on_artwork_layer() { 9 } else { 14 };
+    let props_height = if app.on_artwork_layer() {
+        9
+    } else if app.on_raster_layer() {
+        10
+    } else {
+        14
+    };
     let [layers_area, props_area] =
         Layout::vertical([Constraint::Min(3), Constraint::Length(props_height)]).areas(area);
 
@@ -129,6 +120,7 @@ pub fn render_right(app: &App, frame: &mut Frame<'_>, area: Rect) {
             let kind = match layer.kind() {
                 LayerKind::Artwork => "art",
                 LayerKind::Interface => "ui ",
+                LayerKind::Raster => "px ",
             };
             let style = if active {
                 styles::accent(app)
@@ -147,7 +139,12 @@ pub fn render_right(app: &App, frame: &mut Frame<'_>, area: Rect) {
         Paragraph::new(lines).block(block(app, &title, focused)),
         layers_area,
     );
+    super::paint_frame(app, frame, layers_area, focused);
 
+    if app.on_raster_layer() {
+        render_pixel_info(app, frame, props_area, focused);
+        return;
+    }
     if !app.on_artwork_layer() {
         render_inspector(app, frame, props_area, focused);
         return;
@@ -219,6 +216,53 @@ pub fn render_right(app: &App, frame: &mut Frame<'_>, area: Rect) {
         Paragraph::new(lines).block(block(app, "Cell", focused)),
         props_area,
     );
+    super::paint_frame(app, frame, props_area, focused);
+}
+
+/// Pixel layer settings and the pixel under the pixel cursor.
+fn render_pixel_info(app: &App, frame: &mut Frame<'_>, area: Rect, focused: bool) {
+    let Some(raster) = app.raster() else { return };
+    let row = |k: &str, v: String| {
+        Line::from(vec![
+            Span::styled(format!("{k:<7}"), styles::muted(app)),
+            Span::styled(v, styles::text(app)),
+        ])
+    };
+    let p = app.pixel_cursor();
+    let pixel = raster.pixels.get(p.x, p.y).unwrap_or_default();
+    let (cw, ch) = raster.mode.cell_px();
+    let lines = vec![
+        row("pixel", format!("{},{} ({}×{}/cell)", p.x, p.y, cw, ch)),
+        row("value", pixel.to_string()),
+        row(
+            "mode",
+            format!("{} {}", raster.mode.sample(), raster.mode.name()),
+        ),
+        row("dither", raster.dither.name().to_owned()),
+        row("colors", raster.palette.name().to_owned()),
+        row(
+            "shadow",
+            raster.shadow.map_or_else(
+                || "off".to_owned(),
+                |s| format!("{},{} soft {} {}%", s.dx, s.dy, s.softness, s.opacity),
+            ),
+        ),
+        row("brush", format!("{} px", app.paint.pixel_size)),
+        row(
+            "mouse",
+            if app.pixel_mouse.is_some() {
+                "pixel-precise"
+            } else {
+                "per cell"
+            }
+            .to_owned(),
+        ),
+    ];
+    frame.render_widget(
+        Paragraph::new(lines).block(block(app, "Pixel layer", focused)),
+        area,
+    );
+    super::paint_frame(app, frame, area, focused);
 }
 
 /// The inspector: identity, geometry and properties of the selection.
@@ -269,4 +313,5 @@ fn render_inspector(app: &App, frame: &mut Frame<'_>, area: Rect, focused: bool)
         Paragraph::new(lines).block(block(app, "Inspector", focused)),
         area,
     );
+    super::paint_frame(app, frame, area, focused);
 }

@@ -37,6 +37,21 @@ static RAW_MODE: AtomicBool = AtomicBool::new(false);
 static ALT_SCREEN: AtomicBool = AtomicBool::new(false);
 static MOUSE: AtomicBool = AtomicBool::new(false);
 static KEYBOARD_FLAGS: AtomicBool = AtomicBool::new(false);
+static PIXEL_MOUSE: AtomicBool = AtomicBool::new(false);
+
+/// SGR-Pixels mouse reports (mode 1016): coordinates in pixels.
+const ENABLE_PIXEL_MOUSE: &str = "\x1b[?1016h";
+const DISABLE_PIXEL_MOUSE: &str = "\x1b[?1016l";
+
+/// The size of one cell in pixels, when the terminal reports its pixel
+/// size.
+pub fn cell_pixel_size() -> Option<(u16, u16)> {
+    let size = crossterm::terminal::window_size().ok()?;
+    if size.width == 0 || size.height == 0 || size.columns == 0 || size.rows == 0 {
+        return None;
+    }
+    Some((size.width / size.columns, size.height / size.rows)).filter(|(w, h)| *w > 0 && *h > 0)
+}
 
 /// Best-effort restoration of the terminal. Safe to call more than once and
 /// from a panic hook.
@@ -44,6 +59,9 @@ pub fn restore_terminal() {
     let mut out = io::stdout();
     if KEYBOARD_FLAGS.swap(false, Ordering::SeqCst) {
         let _ = execute!(out, PopKeyboardEnhancementFlags);
+    }
+    if PIXEL_MOUSE.swap(false, Ordering::SeqCst) {
+        let _ = out.write_all(DISABLE_PIXEL_MOUSE.as_bytes());
     }
     if MOUSE.swap(false, Ordering::SeqCst) {
         let _ = execute!(out, DisableMouseCapture);
@@ -82,9 +100,10 @@ pub struct TerminalGuard {
 
 impl TerminalGuard {
     /// Enters raw mode, the alternate screen, and enables mouse, paste and
-    /// focus reporting. Keyboard enhancement is probed and enabled when
+    /// focus reporting (with pixel-precise mouse reports when
+    /// `pixel_mouse`). Keyboard enhancement is probed and enabled when
     /// supported.
-    pub fn enter(mouse: bool) -> Result<Self, TerminalError> {
+    pub fn enter(mouse: bool, pixel_mouse: bool) -> Result<Self, TerminalError> {
         enable_raw_mode().map_err(TerminalError::RawMode)?;
         RAW_MODE.store(true, Ordering::SeqCst);
 
@@ -106,6 +125,12 @@ impl TerminalGuard {
                 return Err(TerminalError::Mode(e));
             }
             MOUSE.store(true, Ordering::SeqCst);
+            if pixel_mouse
+                && out.write_all(ENABLE_PIXEL_MOUSE.as_bytes()).is_ok()
+                && out.flush().is_ok()
+            {
+                PIXEL_MOUSE.store(true, Ordering::SeqCst);
+            }
         }
 
         // The probe writes a query and reads the reply; it needs raw mode.

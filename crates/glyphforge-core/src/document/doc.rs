@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::{CanvasError, Layer, Screen, Size};
 use crate::component::{Component, tree};
 use crate::id::ObjectId;
+use crate::raster::Gradient;
 use crate::theme::Theme;
 
 /// Errors from document-level operations.
@@ -44,6 +45,9 @@ pub struct Document {
     pub meta: DocumentMetadata,
     #[serde(default)]
     pub theme: Theme,
+    /// Reusable gradients for gradient fills.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gradients: Vec<Gradient>,
     screens: Vec<Screen>,
 }
 
@@ -56,6 +60,7 @@ impl Document {
         Ok(Self {
             meta: DocumentMetadata::default(),
             theme: Theme::default(),
+            gradients: Vec::new(),
             screens: vec![screen],
         })
     }
@@ -136,11 +141,16 @@ impl Document {
             .find(|l| l.components().is_some_and(|r| tree::find(r, id).is_some()))
     }
 
-    /// Whether any screen, layer or component uses `id`.
+    pub fn gradient(&self, id: &ObjectId) -> Option<&Gradient> {
+        self.gradients.iter().find(|g| &g.id == id)
+    }
+
+    /// Whether any screen, layer, component or gradient uses `id`.
     pub fn has_id(&self, id: &ObjectId) -> bool {
         self.screens.iter().any(|s| &s.id == id)
             || self.layers().any(|(_, l)| &l.id == id)
             || self.component(id).is_some()
+            || self.gradient(id).is_some()
     }
 
     /// All ids in the document, in document order.
@@ -155,6 +165,7 @@ impl Document {
                 }
             }
         }
+        out.extend(self.gradients.iter().map(|g| g.id.clone()));
         out
     }
 

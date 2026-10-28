@@ -262,15 +262,13 @@ impl Canvas {
             let Some(row) = self.row(y) else { return false };
             for (x, cell) in row.iter().enumerate() {
                 match &cell.content {
-                    CellContent::Glyph(g) if g.is_wide() => {
-                        if !row.get(x + 1).is_some_and(Cell::is_wide_tail) {
-                            return false;
-                        }
+                    CellContent::Glyph(g)
+                        if g.is_wide() && !row.get(x + 1).is_some_and(Cell::is_wide_tail) =>
+                    {
+                        return false;
                     }
-                    CellContent::WideTail => {
-                        if x == 0 || !row[x - 1].is_wide_head() {
-                            return false;
-                        }
+                    CellContent::WideTail if x == 0 || !row[x - 1].is_wide_head() => {
+                        return false;
                     }
                     _ => {}
                 }

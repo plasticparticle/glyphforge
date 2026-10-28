@@ -200,6 +200,9 @@ pub fn outline(doc: &Document) -> String {
         &doc.meta.title
     };
     let _ = writeln!(s, "document: {title} (theme: {})", doc.theme.name);
+    for g in &doc.gradients {
+        let _ = writeln!(s, "gradient {} \"{}\": {}", g.id, g.name, g.stops_text());
+    }
     for screen in doc.screens() {
         let _ = writeln!(
             s,
@@ -225,6 +228,21 @@ pub fn outline(doc: &Document) -> String {
             if let Some(cells) = layer.cells() {
                 let opaque = cells.cells().iter().filter(|c| !c.is_empty()).count();
                 let _ = writeln!(s, "    {opaque} painted cells");
+            }
+            if let Some(raster) = layer.raster() {
+                let shadow = raster
+                    .shadow
+                    .map_or_else(String::new, |sh| format!(", shadow {},{}", sh.dx, sh.dy));
+                let _ = writeln!(
+                    s,
+                    "    {} painted pixels ({} {}×{}, dither {}, {}{shadow})",
+                    raster.pixels.painted(),
+                    raster.mode.name(),
+                    raster.pixels.width(),
+                    raster.pixels.height(),
+                    raster.dither.name(),
+                    raster.palette.name()
+                );
             }
             if let Some(roots) = layer.components() {
                 for c in roots {

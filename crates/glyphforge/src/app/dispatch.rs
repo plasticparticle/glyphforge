@@ -6,7 +6,7 @@ use glyphforge_core::history::Origin;
 use glyphforge_core::patch::{CellWrite, Operation, Patch};
 use glyphforge_core::{Cell, Document, Grapheme, Layer, Position, Size};
 
-use super::{App, EditorMode, Focus, StatusKind, UiThemeOrigin};
+use super::{App, EditorMode, Focus, StatusKind};
 use crate::actions::{Action, Direction, descriptor_of};
 
 impl App {
@@ -23,6 +23,8 @@ impl App {
         // Continuous edits form one transaction; anything else closes it.
         // A mouse drag keeps its own transaction open until the button is released.
         if self.drag.is_none()
+            && self.paint.stroke.is_none()
+            && self.paint.pixel_stroke.is_none()
             && !matches!(
                 action,
                 Action::InsertText(_) | Action::Backspace | Action::DeleteForward
@@ -53,31 +55,34 @@ impl App {
             Action::EditProperty => self.open_edit_property(),
             Action::DeleteSelection => self.delete_selection(),
             Action::SaveDocumentAs => self.open_save_as(),
-            Action::PromptInput(c) => {
-                if let Some(p) = self.prompt.as_mut() {
-                    p.insert(c);
-                }
-            }
-            Action::PromptBackspace => {
-                if let Some(p) = self.prompt.as_mut() {
-                    p.backspace();
-                }
-            }
-            Action::PromptNext => {
-                if let Some(p) = self.prompt.as_mut() {
-                    p.next();
-                }
-            }
-            Action::PromptPrev => {
-                if let Some(p) = self.prompt.as_mut() {
-                    p.prev();
-                }
-            }
-            Action::PromptComplete => {
-                if let Some(p) = self.prompt.as_mut() {
-                    p.complete();
-                }
-            }
+            action @ (Action::SelectTool(_)
+            | Action::ApplyTool
+            | Action::ToolPress(_)
+            | Action::ToolDrag(_)
+            | Action::ToolRelease
+            | Action::PickAt(_)
+            | Action::SetBrushGlyph(_)
+            | Action::EditBrushGlyph
+            | Action::SetColor(..)
+            | Action::OpenColorPicker(_)
+            | Action::ColorPrompt(_)
+            | Action::SwapColors
+            | Action::ResetColors
+            | Action::PickerMove(_)
+            | Action::PickerSubmit
+            | Action::PickerSwitchTarget
+            | Action::BrushPageNext
+            | Action::BrushPagePrev
+            | Action::SetBoxStyle(_)
+            | Action::SetBrushKind(_)
+            | Action::EditStampLabel
+            | Action::CycleBoxStyle) => self.dispatch_paint(action),
+            Action::Pixel(pixel) => self.dispatch_pixel(pixel),
+            action @ (Action::PromptInput(_)
+            | Action::PromptBackspace
+            | Action::PromptNext
+            | Action::PromptPrev
+            | Action::PromptComplete) => self.edit_prompt(&action),
             Action::PromptSubmit => self.submit_prompt(),
             Action::PromptCancel => self.prompt = None,
             Action::Quit => self.quit(),
@@ -92,7 +97,8 @@ impl App {
                 );
                 self.set_status(StatusKind::Info, text);
             }
-            Action::UseOmarchyTheme => self.use_omarchy_theme(),
+            Action::UseUiThemeInDocument => self.use_ui_theme_in_document(),
+            Action::Menu(menu) => self.dispatch_menu(menu),
             Action::ToggleLeftPanel => {
                 self.ui.show_left_panel = !self.ui.show_left_panel;
                 self.refocus_if_hidden();
@@ -161,6 +167,21 @@ impl App {
                     format!("{title} is not implemented yet"),
                 );
             }
+        }
+    }
+
+    /// Input-line editing of the open prompt.
+    fn edit_prompt(&mut self, action: &Action) {
+        let Some(p) = self.prompt.as_mut() else {
+            return;
+        };
+        match action {
+            Action::PromptInput(c) => p.insert(*c),
+            Action::PromptBackspace => p.backspace(),
+            Action::PromptNext => p.next(),
+            Action::PromptPrev => p.prev(),
+            Action::PromptComplete => p.complete(),
+            _ => {}
         }
     }
 
@@ -236,19 +257,14 @@ impl App {
         }
     }
 
-    fn use_omarchy_theme(&mut self) {
-        if self.ui_theme_origin != UiThemeOrigin::Omarchy {
-            self.set_status(
-                StatusKind::Warning,
-                "No Omarchy theme is loaded (not running under Omarchy, or theme.source = builtin)",
-            );
-            return;
-        }
+    /// Copies the editor's theme into the document, as an undoable
+    /// operation, so the design uses the colours you see.
+    fn use_ui_theme_in_document(&mut self) {
         let theme = self.ui_theme.clone();
         let name = theme.name.clone();
         match self.session.apply_patch(
             Patch::single(Operation::SetTheme { theme }),
-            "Use Omarchy theme",
+            "Use editor theme",
             Origin::User,
         ) {
             Ok(()) => {
@@ -262,14 +278,22 @@ impl App {
     fn cancel(&mut self) {
         if self.prompt.is_some() {
             self.prompt = None;
+        } else if self.picker.is_some() {
+            self.picker = None;
+        } else if self.paint.anchor.take().is_some() || self.paint.pixel_anchor.take().is_some() {
+            self.paint.pixel_end = None;
+            self.set_status(StatusKind::Info, "Shape cancelled");
         } else if self.ui.help_open {
             self.ui.help_open = false;
         } else if self.editor.selection.is_some() {
             self.editor.selection = None;
         } else if self.ui.vim_navigation && self.editor.mode == EditorMode::Insert {
             self.editor.mode = EditorMode::Normal;
+        } else if self.menu.is_some() {
+            self.menu = None;
         } else {
             self.status = None;
+            self.dispatch_menu(crate::actions::MenuAction::Open);
         }
     }
 
@@ -327,6 +351,7 @@ impl App {
         let msg = format!("Layer: {} ({})", layer.name, layer.kind().name());
         self.editor.layer = layer.id.clone();
         self.editor.selection = None;
+        self.paint.anchor = None;
         self.layout_cache_clear();
         self.clamp_cursor();
         self.set_status(StatusKind::Info, msg);
@@ -374,7 +399,7 @@ impl App {
     }
 
     /// Whether the active layer accepts cell edits; reports why not.
-    fn editable_cells_layer(&mut self) -> bool {
+    pub(super) fn editable_cells_layer(&mut self) -> bool {
         match self.active_layer() {
             None => {
                 self.set_status(StatusKind::Error, "Active layer no longer exists");
@@ -676,16 +701,10 @@ mod tests {
     }
 
     #[test]
-    fn use_omarchy_theme_requires_omarchy() {
+    fn the_editor_theme_can_be_copied_into_the_document() {
         let mut app = app(5, 1);
-        app.dispatch(Action::UseOmarchyTheme);
-        assert_eq!(
-            app.status.as_ref().map(|s| s.kind),
-            Some(StatusKind::Warning)
-        );
         app.ui_theme = Theme_minimal();
-        app.ui_theme_origin = UiThemeOrigin::Omarchy;
-        app.dispatch(Action::UseOmarchyTheme);
+        app.dispatch(Action::UseUiThemeInDocument);
         assert_eq!(app.doc().theme.id.as_str(), "minimal-dark");
         app.dispatch(Action::Undo);
         assert_eq!(app.doc().theme.id.as_str(), "terminal");

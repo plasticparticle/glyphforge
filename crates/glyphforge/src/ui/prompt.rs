@@ -46,6 +46,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
         .title_style(styles::accent(app))
         .style(styles::text(app));
     frame.render_widget(Paragraph::new(lines).block(block), popup);
+    super::paint_frame(app, frame, popup, true);
     let cursor_x = popup.x + 3 + prompt.input.chars().count() as u16;
     if cursor_x < popup.right() {
         frame.set_cursor_position(ratatui::layout::Position::new(cursor_x, popup.y + 1));

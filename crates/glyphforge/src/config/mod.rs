@@ -34,7 +34,8 @@ pub struct Config {
     pub autosave: AutosaveConfig,
     /// Key chord -> action name, e.g. `"ctrl+q" = "quit"`. Overrides the
     /// built-in bindings entry by entry. Binding a chord to `"none"`
-    /// removes it.
+    /// removes it. A `paint:`, `interface:` or `global:` prefix
+    /// (`"paint:p" = "tool-brush"`) limits the chord to that context.
     pub keys: BTreeMap<String, String>,
 }
 
@@ -71,6 +72,10 @@ pub struct ThemeConfig {
     /// `auto` uses the Omarchy theme when running under Omarchy and the
     /// built-in theme otherwise; `omarchy` and `builtin` force one source.
     pub source: ThemeSource,
+    /// A built-in theme id (`cobalt`, `phosphor`, ...) or `system` to
+    /// follow `source`. Set in the Esc menu; this field wins over the
+    /// remembered choice.
+    pub ui: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -86,6 +91,19 @@ pub enum ThemeSource {
 #[serde(default, deny_unknown_fields)]
 pub struct MouseConfig {
     pub enabled: bool,
+    /// Pixel-precise mouse reports (SGR-Pixels, mode 1016) for painting
+    /// sub-cell pixels: `auto` uses them in terminals known to support them
+    /// (Ghostty, kitty, `WezTerm`, foot, herdr) when the cell size in pixels
+    /// is known.
+    pub pixel_precision: PixelPrecision,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PixelPrecision {
+    Auto,
+    On,
+    Off,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -119,13 +137,17 @@ impl Default for ThemeConfig {
     fn default() -> Self {
         Self {
             source: ThemeSource::Auto,
+            ui: None,
         }
     }
 }
 
 impl Default for MouseConfig {
     fn default() -> Self {
-        Self { enabled: true }
+        Self {
+            enabled: true,
+            pixel_precision: PixelPrecision::Auto,
+        }
     }
 }
 

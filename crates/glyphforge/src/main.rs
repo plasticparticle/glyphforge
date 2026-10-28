@@ -23,7 +23,7 @@ use tracing_subscriber::EnvFilter;
 
 use crate::app::{App, AppInit};
 use crate::cli::Cli;
-use crate::config::{AppDirs, Config};
+use crate::config::{AppDirs, Config, PixelPrecision};
 use crate::input::Keymap;
 use crate::omarchy::OmarchyPaths;
 use crate::terminal::{TerminalCapabilities, TerminalGuard};
@@ -98,7 +98,7 @@ fn main() -> ExitCode {
 
     init_logging(&dirs, &mut warnings);
 
-    match start(cli, config, omarchy_paths, warnings) {
+    match start(cli, config, omarchy_paths, warnings, dirs.state.clone()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             // The terminal guard has been dropped by now; stderr is safe.
@@ -144,6 +144,7 @@ fn start(
     config: Config,
     omarchy_paths: OmarchyPaths,
     mut warnings: Vec<String>,
+    state_dir: std::path::PathBuf,
 ) -> Result<(), StartupError> {
     let width = cli.width.unwrap_or(config.canvas.default_width);
     let height = cli.height.unwrap_or(config.canvas.default_height);
@@ -166,10 +167,29 @@ fn start(
     }
 
     terminal::install_panic_hook();
-    let mut guard = TerminalGuard::enter(config.mouse.enabled)?;
+    let pixel_cell = match config.mouse.pixel_precision {
+        PixelPrecision::Off => None,
+        PixelPrecision::On => terminal::cell_pixel_size(),
+        PixelPrecision::Auto => {
+            TerminalCapabilities::pixel_mouse_candidate(|k| std::env::var(k).ok())
+                .then(terminal::cell_pixel_size)
+                .flatten()
+        }
+    };
+    if config.mouse.enabled
+        && config.mouse.pixel_precision == PixelPrecision::On
+        && pixel_cell.is_none()
+    {
+        warnings.push(
+            "Pixel-precise mouse unavailable: the terminal does not report its size in pixels"
+                .to_owned(),
+        );
+    }
+    let mut guard = TerminalGuard::enter(config.mouse.enabled, pixel_cell.is_some())?;
     let caps = TerminalCapabilities::infer(|k| std::env::var(k).ok(), guard.keyboard_enhancement());
     tracing::info!(?caps, "terminal capabilities");
 
+    let config_mouse_enabled = config.mouse.enabled;
     let mut app = App::new(AppInit {
         session,
         config,
@@ -177,7 +197,11 @@ fn start(
         keymap,
         omarchy_paths,
         startup_warnings: warnings,
+        state_dir: Some(state_dir),
     });
+    if config_mouse_enabled {
+        app.pixel_mouse = pixel_cell;
+    }
     let result = app::run(&mut app, &mut guard);
     drop(guard);
     result?;

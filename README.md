@@ -14,15 +14,23 @@ knows nothing about either.
 > layout solver, style tokens and themes, transactional patches,
 > undo/redo, rendering pipeline, versioned diff-friendly project format,
 > validator, application API, headless CLI). The editor edits artwork
-> layers cell by cell and interface layers by selecting, nudging,
-> resizing, adding and editing components. See [ROADMAP.md](ROADMAP.md).
+> layers with a tool palette (text, brush, eraser, line, rectangle, box
+> in single/rounded/double/heavy/ASCII lines, fill, picker), semantic
+> brushes (auto-joining lines, patterns, button and UI stamps), a paged
+> glyph palette (blocks, sextants, every box-drawing glyph, shapes, arrows,
+> Braille, ...) and a 256-colour picker, and interface
+> layers by selecting, nudging, resizing, adding and editing components.
+> See [ROADMAP.md](ROADMAP.md).
 
 ## Two editing models, one document
 
 - **Interface Mode** — components with identity, properties, layout and
   responsive rules. Rendered on demand, validated, patchable, diffable.
-- **Subcell Mode** — cells and sub-cell pixels for logos, banners,
-  separators and illustrations. Cells are edited directly.
+- **Subcell Mode** — cells for logos, banners, separators and
+  illustrations. Cells are edited directly.
+- **Pixel Mode** — raster layers of real sub-cell pixels (half blocks,
+  quadrants, sextants or Braille), encoded to glyphs when rendered, with
+  dithering, drop shadows and gradient fills that stay adjustable.
 
 An `artwork` component places a region of an artwork layer by layout, so
 a logo can sit inside a sidebar and disappear with it on narrow terminals.
@@ -69,8 +77,10 @@ A patch:
 ```
 
 Operations: `move`, `resize`, `set_property`, `set_layout`,
-`create_component`, `delete_component`, `set_cells`, `create_layer`,
-`delete_layer`, `update_layer`, `reorder_layer`, `set_theme`. The same
+`create_component`, `delete_component`, `set_cells`, `set_pixels`,
+`update_raster`, `replace_raster`, `set_gradient`, `delete_gradient`,
+`create_layer`, `delete_layer`, `update_layer`, `reorder_layer`,
+`set_theme`. The same
 `Session` API drives the editor, the CLI and (later) an MCP server.
 
 ## Install
@@ -83,6 +93,42 @@ cargo install --path crates/glyphforge
 
 An Arch Linux `PKGBUILD`, a `.desktop` entry and the Omarchy installation
 guide arrive with the packaging milestone.
+
+## The menu and themes
+
+**Esc** opens a menu, the way btop does: Resume, Theme, Help, Save, Save as,
+New document and Quit. Arrows or `j`/`k` move, Enter chooses, Esc closes,
+and the mouse works too. While something is in progress — a prompt, the
+colour picker, a started shape, a selection — Esc cancels that first.
+
+The Theme page switches the editor's own colours. Moving the selection
+applies the theme straight away, so you see it on the whole UI while you
+scroll; Enter keeps it, Esc puts back the one you had. Each row previews
+the theme's accent, text and surface colours beside its name:
+
+| Theme | Look |
+|-------|------|
+| System | Follows your Omarchy theme, or your terminal's own palette |
+| Forge Dark | Warm greys with an amber accent (the designed default) |
+| Paper | Light, warm paper and ink |
+| Cobalt | Deep blue with a bright azure accent |
+| Verdant | Forest greens |
+| Lagoon | Teal and cyan |
+| Amber CRT | Retro amber monochrome, in double-line DOS frames |
+| Phosphor | Retro green phosphor, in plain single-line frames |
+| Nebula | Violet night with neon magenta, gradient frames |
+| Aurora | Northern lights: teal fading to violet frames |
+| Ember | Hot metal: amber fading to crimson, heavy frames |
+
+Nebula, Aurora and Ember draw **gradient frames**: every box border fades
+from one colour to the other across the screen, like btop's gradients, with
+the panel you are working in drawn brighter than the rest. A theme gets
+them by defining the optional `frame-from` and `frame-to` colours.
+
+The choice is remembered in `$XDG_STATE_HOME/glyphforge/ui-theme`;
+`[theme] ui = "cobalt"` in the config pins one instead. **Ctrl+Shift+O**
+(or "Use in document" in the menu) copies the editor's theme into the
+document, as an undoable change, so the design uses the colours you see.
 
 ## Editor keys
 
@@ -104,7 +150,104 @@ Interface mode:
 | Delete | Delete the selection |
 | Esc | Clear the selection |
 
-Subcell mode and global:
+Subcell mode: the left panel is the palette. Click a tool, a box style
+(`┌ ╭ ╔ ┏ +` under the tools), a glyph or a colour swatch (left click =
+foreground, right click = background, `+` opens the full 256-colour
+picker). `‹` / `›` or the mouse wheel over the Brushes block turn pages;
+clicking the page name searches every brush and glyph.
+
+The first pages hold semantic brushes; every tool uses the selected one:
+
+- **Lines** (single, rounded, heavy, double): lines join by themselves.
+  Strokes turn corners, crossing a line makes `┼`, ending on one makes `├`,
+  a double line across a single one makes `╪`. The Rect tool draws joined
+  frames, the Line tool draws an elbow, and the Eraser unjoins neighbours
+  while a line brush is selected. The Box tool joins in its box style.
+- **Patterns**: shade (each pass darkens `░ ▒ ▓ █`), checker, rows,
+  columns, dots, and a gradient from the foreground to the background
+  colour. They work with strokes, the Line and Rect tools and Fill, and use
+  the brush glyph.
+- **Buttons**: `[OK]`, `<OK>`, `«OK»`, `▕OK▏`, pill `▐OK▌`, solid, drop
+  shadow, link, and boxed buttons in single, rounded, double and heavy
+  lines. Filled buttons use the background colour as the face.
+- **UI stamps**: checkbox, radio, toggle, progress bar and scrollbar (a
+  numeric label sets the fill), key hint (`q quit`), tab, titled rule,
+  spinner.
+
+Stamps use the stamp label (`N`, default "OK"): click places one at its
+natural size, dragging with the Rect or Line tool sizes it. Stamps are
+cells, not components; they are for mock-ups on artwork layers.
+
+The remaining pages hold glyphs: blocks, quadrants, sextants, light, heavy
+and double box lines and their junctions, triangles, shapes, symbols, UI
+symbols, arrows, Braille, ASCII and math. Choosing a tool on an interface layer switches
+to an artwork layer, adding a "Paint" layer if the screen has none visible.
+
+| Key | Action |
+|-----|--------|
+| Alt+T / B / E / L / R / X / F / I | Text, Brush, Eraser, Line, Rect, Box, Fill, Picker tool |
+| T B E L R X F I | The same, without Alt, while a painting tool is active |
+| Click, drag | Apply the tool: strokes, shapes from press to release, fill, pick |
+| Space | Apply at the cursor (shapes: first Space sets the corner, second draws) |
+| Right click on the canvas | Pick glyph and colours from a cell |
+| Any other character | Becomes the brush glyph (painting tools) |
+| C / Shift+C (Alt+C / Alt+Shift+C) | Colour picker for foreground / background |
+| S / D (Alt+S / Alt+D) | Swap colours / reset to the terminal default |
+| G (Alt+G) | Search brushes and glyphs (e.g. "double", "button", "sextant") |
+| N (Alt+N) | Edit the stamp label |
+| [ / ] (Alt+, / Alt+.) | Previous / next brush page |
+| Shift+X (Alt+Shift+X) | Cycle the box style: single, rounded, double, heavy, ASCII |
+| Esc | Cancel a started shape |
+
+In the colour picker: arrows move, Enter picks, Tab switches foreground and
+background, `#` types a name, index or `#rrggbb`, `d` picks the terminal
+default. Brush strokes, shapes and fills are single undo steps.
+
+Pixel mode: a pixel layer (Alt+P, or choosing the Gradient tool) stores
+real sub-cell pixels. You paint pixels; for every cell Glyphforge picks the
+glyph and the two colours that show them best, over whatever lies beneath.
+
+| Mode | Pixels per cell | Glyphs |
+|------|-----------------|--------|
+| half | 1×2 | `▀ ▄ █`, two full colours per cell |
+| quadrant | 2×2 | `▘ ▚ ▟ …` |
+| sextant (default) | 2×3 | `🬀`–`🬻` |
+| braille | 2×4 | `⣿`, one colour per cell |
+
+- **Tools**: Brush and Eraser (brush size Alt+= / Alt+-), Line, Rect, Box
+  (filled rectangle), Fill, Pick and Gradient all work on pixels.
+- **Mouse**: in Ghostty, kitty, WezTerm, foot and inside herdr the
+  terminal reports pixel positions (mode 1016), so a click hits the exact
+  sub-cell pixel. Elsewhere a click paints the whole cell;
+  Shift+arrows move a pixel cursor and Space paints at it.
+- **Settings** (palette page "Dither", `O` for all of them as text): mode,
+  dithering (`none`, `ordered` Bayer patterns across sub-cell pixels,
+  `shade` glyphs `░▒▓`, or both), palette limit (truecolor, 256, 16 colours).
+  Changing the mode resamples the pixels and is undoable losslessly.
+- **Drop shadow** (page "Shadow", `Shift+S`): a live effect computed from
+  the painted pixels: offset, blur, opacity and colour. Its soft edges use
+  the layer's dithering: hard, ordered patterns, shade glyphs, or both.
+- **Gradients** (Gradient tool, pages "Gradient" and "Gradients"): drag
+  from start to end; the fill covers the connected area you pressed in.
+  Linear or radial; smooth, hard bands, dithered sub-cells or shade glyphs.
+  Gradients are saved in the document with their stops; `Shift+G` edits or
+  creates one (`Sunset: #ff5f6d 0, #ffc371 100`). Six presets are offered
+  and copied into the document when used.
+
+| Key (pixel layers) | Action |
+|-----|--------|
+| Alt+P | New pixel layer (choose the mode) |
+| A (Alt+A) | Gradient tool |
+| Shift+Arrows | Move the pixel cursor |
+| M (Alt+M) | Cycle the mode: half, quadrant, sextant, braille |
+| Shift+D (Alt+Shift+D) | Cycle dithering |
+| Shift+S (Alt+Shift+S) | Toggle the drop shadow |
+| O (Alt+O) | All layer settings as `key=value` |
+| Shift+G (Alt+Shift+G) | Edit or create a gradient |
+| Shift+A (Alt+Shift+A) | Cycle the gradient style |
+| Right click | Pick the pixel colour |
+
+Subcell mode (Text tool) and global:
 
 | Key | Action |
 |-----|--------|
@@ -116,9 +259,11 @@ Subcell mode and global:
 | Ctrl+S / Ctrl+Shift+S | Save / save as |
 | Ctrl+N | New document |
 | Ctrl+PgUp / Ctrl+PgDn | Switch the active layer |
-| Ctrl+Shift+O | Use the current Omarchy theme for the document |
+| Ctrl+Shift+O | Copy the editor theme into the document |
 | Ctrl+Shift+T | Reload the editor theme |
 | Ctrl+Arrows, mouse wheel | Scroll the viewport |
+| Esc | Cancel what is in progress, or open the menu |
+| F10 | Open the menu |
 | F1 | Help overlay with every binding |
 | F2 / F3 / F4 | Toggle left / right / all panels |
 | Tab / Shift+Tab | Cycle focus |
@@ -142,13 +287,18 @@ color_mode = "auto"         # auto | truecolor | ansi256 | ansi16
 
 [theme]
 source = "auto"             # auto | omarchy | builtin
+# ui = "cobalt"             # pin a theme: forge-dark paper cobalt verdant
+                            # lagoon amber-crt phosphor nebula aurora ember
+                            # minimal-dark minimal-light terminal, "system"
 
 [mouse]
 enabled = true
+pixel_precision = "auto"    # auto | on | off: pixel-precise reports for Pixel Mode
 
 [keys]
 "ctrl+q" = "quit"
 "f1" = "none"               # unbind
+"paint:p" = "tool-brush"    # paint: binds only while a painting tool is active
 ```
 
 Logs go to `$XDG_STATE_HOME/glyphforge/glyphforge.log`; set

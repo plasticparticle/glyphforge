@@ -17,6 +17,8 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
         Category::Edit,
         Category::View,
         Category::Cursor,
+        Category::Interface,
+        Category::Paint,
     ];
     for cat in categories {
         lines.push(Line::from(Span::styled(
@@ -70,4 +72,5 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
         .title_style(styles::accent(app))
         .style(styles::text(app));
     frame.render_widget(Paragraph::new(lines).block(block), popup);
+    super::paint_frame(app, frame, popup, true);
 }

@@ -8,13 +8,13 @@ device attributes) so the run matches a real terminal. Exact screen content
 is asserted by the Ratatui TestBackend unit tests; this script checks the
 terminal lifecycle, key handling, theme detection and error surfacing.
 """
-import os, pty, sys, time, select, signal, struct, fcntl, termios, subprocess, re
+import os, pty, sys, time, select, signal, struct, fcntl, termios, subprocess, re, json
 
 ESC_RE = re.compile(r"\x1b\[[0-9;?<>=]*[A-Za-z@`~]|\x1b[()][A-Za-z0-9]|\x1b[=>]")
 def plain(text):
     return ESC_RE.sub("", text)
 
-def run(binary, home, extra_env=None, keys=None, cols=100, rows=30, timeout=8, args=()):
+def run(binary, home, extra_env=None, keys=None, cols=100, rows=30, timeout=8, args=(), cell_px=None):
     env = dict(os.environ)
     env.update({"TERM": "xterm-256color", "COLORTERM": "truecolor", "HOME": home,
                 "LANG": "en_US.UTF-8", "GLYPHFORGE_LOG": "debug"})
@@ -23,7 +23,8 @@ def run(binary, home, extra_env=None, keys=None, cols=100, rows=30, timeout=8, a
     pid, fd = pty.fork()
     if pid == 0:
         os.execve(binary, [binary, *args], env)
-    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+    xpix, ypix = (cols * cell_px[0], rows * cell_px[1]) if cell_px else (0, 0)
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, xpix, ypix))
     out = b""
     def read_for(secs):
         nonlocal out
@@ -163,4 +164,106 @@ assert "Inspector" in text
 saved = open(work, encoding="utf-8").read()
 assert '"mode": "absolute"' in saved and '"x": 1' in saved, "nudged root component was saved absolutely"
 print("smoke 7 ok: interface mode select, nudge, save")
+# 8. Paint tools: Alt+B brush, '%' becomes the brush, Space and a mouse
+#    stroke paint, Shift+C opens the colour picker.
+art = os.path.join(home, "paint.glyph")
+if os.path.exists(art):
+    os.remove(art)
+click = lambda kind, col, row: f"\x1b[<{kind};{col};{row}M".encode()
+release = lambda col, row: f"\x1b[<0;{col};{row}m".encode()
+code, out = run(binary, home, keys=[
+    (b"\x1bb", 0.3), (b"%", 0.2), (b" ", 0.2),
+    (click(0, 30, 6), 0.1), (click(32, 36, 6), 0.1), (release(36, 6), 0.3),
+    (b"C", 0.3), (b"\x1b", 0.2),
+    (b"\x1bOP", 0.1), (b"\x1b", 0.1),
+    (b"\x13", 0.3), (b"\x1b[27;6;115~", 0.1),
+], args=(art,), cols=120, rows=36, timeout=4)
+text = plain(out.decode("utf-8", "replace"))
+assert "Tools" in text and "Colours" in text and "Brushes" in text, "palette rendered"
+assert "BRUSH" in text, "brush tool active in the status bar (diff-rendered)"
+assert "Choose background colour" in text, "colour picker opened"
+assert "%%%" in text, "mouse stroke painted with the typed brush glyph"
+assert code == 0 or code is None
+assert '"%%%%%%%"' in open(art, encoding="utf-8").read(), "stroke saved as one text run"
+print("smoke 8 ok: palette, brush, stroke, colour picker")
+# 9. Semantic brushes: search "double" (double line brush), draw an L, then
+#    cross it with a single line from the same page.
+lines = os.path.join(home, "lines.glyph")
+if os.path.exists(lines):
+    os.remove(lines)
+drag = lambda col, row: f"\x1b[<32;{col};{row}M".encode()
+code, out = run(binary, home, keys=[
+    (b"\x1bb", 0.3), (b"g", 0.2), (b"double", 0.2), (b"\r", 0.3),
+    (click(0, 30, 6), 0.1), (drag(40, 6), 0.1), (drag(40, 10), 0.1), (release(40, 10), 0.3),
+    (b"g", 0.2), (b"single", 0.2), (b"\r", 0.3),
+    (click(0, 35, 4), 0.1), (drag(35, 9), 0.1), (release(35, 9), 0.3),
+    (b"\x13", 0.3),
+], args=(lines,), cols=120, rows=36, timeout=3)
+saved = open(lines, encoding="utf-8").read()
+assert "═╪═" in saved and "╗" in saved, "double L joined and crossed: " + saved[-800:]
+print("smoke 9 ok: line brushes join and cross")
+# 10. Pixel Mode with pixel-precise mouse reports (as Ghostty/kitty send them):
+#     Alt+P adds a sextant layer, a press at a sub-cell pixel paints exactly it.
+pixels = os.path.join(home, "pixels.glyph")
+if os.path.exists(pixels):
+    os.remove(pixels)
+# Cells are 10x20 px. Canvas cell (0,0) is at terminal cell (23,2) with the
+# default panels (left panel 22 wide + border), i.e. pixel x 230.., y 40...
+# Sextant pixels are 5x~6.7 px: pixel (1,2) of the cell is at x+7, y+15.
+pclick = lambda col, row: f"\x1b[<0;{col + 1};{row + 1}M".encode()
+prelease = lambda col, row: f"\x1b[<0;{col + 1};{row + 1}m".encode()
+code, out = run(binary, home, extra_env={"TERM_PROGRAM": "ghostty"}, keys=[
+    (b"\x1bp", 0.3), (b"\r", 0.3), (b"\x1bb", 0.2),
+    (pclick(230 + 7, 40 + 15), 0.1), (prelease(230 + 7, 40 + 15), 0.3),
+    (b"\x13", 0.3), (b"\x11", 0.2), (b"\x11", 0.2),
+], args=(pixels,), cols=120, rows=36, timeout=4, cell_px=(10, 20))
+text = out.decode("utf-8", "replace")
+assert "\x1b[?1016h" in text and "\x1b[?1016l" in text, "pixel mouse mode enabled and restored"
+assert "PIXEL" in plain(text), "pixel mode shown"
+saved = json.load(open(pixels, encoding="utf-8"))
+raster = [l for l in saved["screens"][0]["layers"] if l["kind"] == "raster"][0]["raster"]
+assert raster["mode"] == "sextant", raster
+assert raster["rows"][2] == ".!", f"exactly pixel (1,2) painted: {raster['rows']}"
+print("smoke 10 ok: pixel layer, pixel-precise mouse")
+# 11. The Esc menu: open it, walk into the theme page, pick a theme, and
+#     quit through the menu itself. The theme is remembered for next time.
+mhome = home + "/menu"
+os.makedirs(mhome, exist_ok=True)
+theme_file = mhome + "/.local/state/glyphforge/ui-theme"
+if os.path.exists(theme_file):
+    os.remove(theme_file)
+menu_keys = [
+    (b"\x1b", 0.4),                      # Esc opens the menu
+    (b"\x1b[B", 0.2), (b"\r", 0.4),       # down to Theme, enter
+    (b"\x1b[B" * 7, 0.3), (b"\r", 0.4),   # down to Phosphor, apply
+    (b"\x1b", 0.3),                      # close the menu
+    (b"\x1b", 0.3),                      # open it again
+    (b"\x1b[B" * 6, 0.2), (b"\r", 0.5),   # down to Quit, enter
+]
+code, out = run(binary, mhome, keys=menu_keys, cols=100, rows=30, timeout=4)
+text = plain(out.decode("utf-8", "replace"))
+assert code == 0, f"menu quit exits cleanly: {code}"
+assert "Menu" in text and "Resume" in text and "Quit" in text, "menu drawn"
+assert "Phosphor" in text and "Amber CRT" in text, "theme page lists the themes"
+# Ratatui redraws only changed cells, so spaces inside the message may be
+# left standing: match the words, not the exact spacing.
+assert re.search(r"Theme:\s*Phosphor", text), "theme applied"
+assert open(theme_file, encoding="utf-8").read().strip() == "phosphor", "theme remembered"
+
+# Starting again picks the remembered theme up.
+code, out = run(binary, mhome, keys=[(b"\x11", 0.3)], cols=100, rows=30, timeout=4)
+assert re.search(r"ui:\s*Phosphor", plain(out.decode("utf-8", "replace"))), "theme restored"
+print("smoke 11 ok: Esc menu, theme switch, quit from the menu, theme remembered")
+# 12. Gradient frames: a gradient theme paints its frames in many shades,
+#     a flat one in a single border colour.
+ghome = home + "/gradient"
+os.makedirs(ghome + "/.local/state/glyphforge", exist_ok=True)
+def frame_colours(theme):
+    open(ghome + "/.local/state/glyphforge/ui-theme", "w").write(theme + "\n")
+    _, out = run(binary, ghome, keys=[(b"\x11", 0.3)], cols=100, rows=30, timeout=3)
+    raw = out.decode("utf-8", "replace")
+    return len(set(re.findall(r"\x1b\[38;2;(\d+;\d+;\d+)", raw)))
+gradient, flat = frame_colours("aurora"), frame_colours("cobalt")
+assert gradient > flat * 5, f"gradient frames vary: {gradient} vs {flat}"
+print(f"smoke 12 ok: gradient frames ({gradient} shades vs {flat} flat)")
 print("ALL SMOKE TESTS PASSED")

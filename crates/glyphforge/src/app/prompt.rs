@@ -1,8 +1,10 @@
 //! A one-line text prompt with suggestions: used for "select by id", "add
-//! component", "edit property" and "save as". The command palette builds
-//! on the same widget.
+//! component", "edit property", "save as", colours and the brush glyph.
+//! The command palette builds on the same widget.
 
 use glyphforge_core::Value;
+
+use super::ColorTarget;
 
 /// What happens when the prompt is submitted.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -11,6 +13,12 @@ pub enum PromptKind {
     AddComponent,
     EditProperty,
     SaveAs,
+    Color(ColorTarget),
+    BrushGlyph,
+    StampLabel,
+    NewPixelLayer,
+    PixelSettings,
+    Gradient,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

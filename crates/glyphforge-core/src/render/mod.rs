@@ -176,6 +176,9 @@ pub fn render_screen(
     for layer in screen.layers().iter().filter(|l| l.visible) {
         if let Some(cells) = layer.cells() {
             out.composite_over(cells);
+        } else if let Some(raster) = layer.raster() {
+            let cells = crate::raster::encode(raster, &out, size);
+            out.composite_over(&cells);
         } else if let Some(roots) = layer.components() {
             let (canvas, _) = render_components(roots, size, &ctx, registry)?;
             out.composite_over(&canvas);

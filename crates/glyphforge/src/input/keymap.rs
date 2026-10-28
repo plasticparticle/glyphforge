@@ -17,6 +17,25 @@ pub enum KeymapError {
     UnknownAction { chord: String, action: String },
 }
 
+/// Splits an optional `paint:`, `interface:` or `global:` context prefix
+/// off a binding.
+fn split_context(text: &str) -> (Option<Context>, &str) {
+    match text.split_once(':') {
+        Some((prefix, rest)) if !rest.is_empty() => match Context::parse(prefix.trim()) {
+            Some(c) => (Some(c), rest),
+            None => (None, text),
+        },
+        _ => (None, text),
+    }
+}
+
+/// Parses a binding: a chord with an optional context prefix; without a
+/// prefix the chord binds in `default`.
+pub fn parse_binding(text: &str, default: Context) -> Result<(Context, KeyChord), KeyParseError> {
+    let (context, chord) = split_context(text);
+    Ok((context.unwrap_or(default), chord.parse()?))
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Keymap {
     bindings: HashMap<(Context, KeyChord), Action>,
@@ -27,9 +46,9 @@ impl Keymap {
     pub fn defaults() -> Self {
         let mut bindings = HashMap::new();
         for d in descriptors() {
-            for chord in d.default_keys {
-                if let Ok(chord) = chord.parse::<KeyChord>() {
-                    bindings.insert((d.context, chord), d.action.clone());
+            for text in d.default_keys {
+                if let Ok((context, chord)) = parse_binding(text, d.context) {
+                    bindings.insert((context, chord), d.action.clone());
                 }
             }
         }
@@ -42,7 +61,33 @@ impl Keymap {
     pub fn apply_overrides(&mut self, overrides: &BTreeMap<String, String>) -> Vec<KeymapError> {
         let mut errors = Vec::new();
         for (chord_text, action_name) in overrides {
-            let chord = match chord_text.parse::<KeyChord>() {
+            if action_name == "none" {
+                let (context, chord) = split_context(chord_text);
+                match chord.parse::<KeyChord>() {
+                    Ok(chord) => {
+                        let contexts = context.map_or_else(
+                            || vec![Context::Global, Context::Interface, Context::Paint],
+                            |c| vec![c],
+                        );
+                        for context in contexts {
+                            self.bindings.remove(&(context, chord));
+                        }
+                    }
+                    Err(source) => errors.push(KeymapError::Chord {
+                        chord: chord_text.clone(),
+                        source,
+                    }),
+                }
+                continue;
+            }
+            let Some(descriptor) = find_descriptor(action_name) else {
+                errors.push(KeymapError::UnknownAction {
+                    chord: chord_text.clone(),
+                    action: action_name.clone(),
+                });
+                continue;
+            };
+            let (context, chord) = match parse_binding(chord_text, descriptor.context) {
                 Ok(c) => c,
                 Err(source) => {
                     errors.push(KeymapError::Chord {
@@ -52,20 +97,8 @@ impl Keymap {
                     continue;
                 }
             };
-            if action_name == "none" {
-                self.bindings.remove(&(Context::Global, chord));
-                self.bindings.remove(&(Context::Interface, chord));
-                continue;
-            }
-            match find_descriptor(action_name) {
-                Some(d) => {
-                    self.bindings.insert((d.context, chord), d.action.clone());
-                }
-                None => errors.push(KeymapError::UnknownAction {
-                    chord: chord_text.clone(),
-                    action: action_name.clone(),
-                }),
-            }
+            self.bindings
+                .insert((context, chord), descriptor.action.clone());
         }
         errors
     }
@@ -154,6 +187,46 @@ mod tests {
             km.lookup(delete, Context::Interface),
             Some(&Action::DeleteSelection)
         );
+    }
+
+    #[test]
+    fn paint_context_binds_bare_letters_and_prefixes_parse() {
+        let km = Keymap::defaults();
+        let b = KeyChord::plain(KeyCode::Char('b'));
+        let brush = Action::SelectTool(crate::app::Tool::Brush);
+        assert_eq!(km.lookup(b, Context::Paint), Some(&brush));
+        assert_eq!(
+            km.lookup(b, Context::Global),
+            None,
+            "typing b in the Text tool"
+        );
+        let alt_b = "alt+b".parse::<KeyChord>().unwrap();
+        assert_eq!(km.lookup(alt_b, Context::Global), Some(&brush));
+        assert_eq!(
+            km.lookup(KeyChord::ctrl('z'), Context::Paint),
+            Some(&Action::Undo),
+            "paint falls back to global"
+        );
+        assert_eq!(
+            parse_binding("paint:shift+c", Context::Global).unwrap().0,
+            Context::Paint
+        );
+        assert_eq!(
+            parse_binding(":", Context::Global).unwrap(),
+            (Context::Global, KeyChord::plain(KeyCode::Char(':')))
+        );
+
+        let mut km = Keymap::defaults();
+        let mut o = BTreeMap::new();
+        o.insert("paint:p".to_owned(), "tool-brush".to_owned());
+        o.insert("paint:b".to_owned(), "none".to_owned());
+        assert!(km.apply_overrides(&o).is_empty());
+        assert_eq!(
+            km.lookup(KeyChord::plain(KeyCode::Char('p')), Context::Paint),
+            Some(&brush)
+        );
+        assert_eq!(km.lookup(b, Context::Paint), None);
+        assert_eq!(km.lookup(alt_b, Context::Global), Some(&brush));
     }
 
     #[test]

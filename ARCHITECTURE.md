@@ -48,7 +48,12 @@ value.rs         Value/Properties: JSON-like, totally ordered (no floats)
 component.rs     Component tree, responsive rules, tree helpers
 layout.rs        Dimension/Placement/Container + deterministic solver
 theme.rs         Theme, style tokens, fallback chain, built-in themes
-boxdraw.rs       Border families and glyph tables (topology later)
+boxdraw.rs       Border families, glyph tables, line topology (Arms per glyph)
+paint.rs         Cell drawing: line, outline, box, flood fill, stamping,
+                 auto-joining lines, detach, pattern brushes
+stamp.rs         UI element stamps (buttons, checkbox, progress, tab, ...)
+raster/          Pixel Mode: Pixel, RasterLayer, encoder, dithering,
+                 drop shadow, gradients, pixel drawing, row-coded storage
 document/        Grapheme, Color, Cell, Canvas (+ diff-friendly repr),
                  Layer (artwork | interface), Screen, Document
 patch.rs         Operation, Patch: validated, transactional, invertible
@@ -65,12 +70,15 @@ Application module map (`crates/glyphforge/src`):
 ```
 main.rs, cli.rs  argument parsing; TUI by default, subcommands headless
 headless.rs      inspect / render / validate / apply / export / new
-app/             App state, dispatch (behaviour), run loop, viewport
+app/             App state, dispatch (behaviour), run loop, viewport,
+                 interface (selection), paint (tools, brush, colours),
+                 pixels (raster tools), menu (Esc menu, theme choice)
 actions/         Action enum + descriptors (names, keywords, default keys)
 input/           key model, key-chord parsing, keymap with config overrides
 terminal/        RAII guard, panic hook, capability detection
 render/          core Canvas -> Ratatui buffer, colour degradation
-ui/              layout, header, canvas view, panels, status bar, help
+ui/              layout, header, canvas view, panels, palette, colour
+                 picker, menu, prompt, status bar, help
 omarchy/         detection, colors.toml -> Theme
 config/          TOML config, XDG paths
 ```
@@ -97,7 +105,9 @@ Document
  └─ screens[]       Screen { id, name, size, layers[] }
       └─ layers[]   Layer { id, name, visible, locked, content }
             ├─ Interface { components[] }   semantic tree (Interface Mode)
-            └─ Artwork   { cells: Canvas }   raw cells      (Subcell Mode)
+            ├─ Artwork   { cells: Canvas }   raw cells      (Subcell Mode)
+            └─ Raster    { raster }          pixels         (Pixel Mode)
+ gradients[]        Gradient { id, name, stops[] } for gradient fills
 ```
 
 - A **screen** is one terminal-sized design surface; a project holds many
@@ -123,9 +133,46 @@ Document
 `Empty` (transparent), `Glyph(Grapheme)` or `WideTail`. `Canvas` is a dense
 grid that maintains the wide-glyph invariant in `put` and returns the cells
 it changed, and `composite_over` merges another canvas on top with a repair
-pass for half-covered wide glyphs. Sub-cell raster drawing (Braille,
-quarter blocks) is a separate module that *produces* cells; it is not part
-of the cell model.
+pass for half-covered wide glyphs. Sub-cell pixels are not part of the
+cell model: they live in raster layers (3.3) and *produce* cells.
+
+### 3.3 Pixels (Pixel Mode)
+
+A `RasterLayer` is `{ mode, dither, palette, shadow, pixels }`. The pixel
+grid has `mode.cell_px()` pixels per cell (half 1×2, quadrant 2×2, sextant
+2×3, braille 2×4). A `Pixel` is `Clear`, `Solid(Color)` or
+`Shade { fg, bg, level }` (a `░▒▓` mix; `bg: None` mixes over whatever is
+beneath, used by soft shadows). The pixels are the document; everything
+else is derived at render time, so switching mode, dithering, palette
+limit or shadow never repaints. A mode change resamples (nearest pixel
+centre) and its inverse patch restores the previous raster exactly.
+
+`raster::encode(layer, backdrop, size)` turns a layer into cells:
+
+1. per cell, gather its pixels; transparent pixels take the drop shadow's
+   pixels (`DropShadow::render`: the mask shifted by the offset,
+   box-blurred through a summed-area table, scaled by opacity, then hard,
+   Bayer-ordered, or quantised to shade levels per cell);
+2. a fully transparent cell stays transparent; a cell of one shade pixel
+   becomes that shade glyph;
+3. transparent pixels resolve to the backdrop's background (the composite
+   of the layers beneath), shade pixels in mixed cells blend;
+4. with a palette limit, colours are reduced to ANSI 16/256: nearest, with
+   Bayer offsets (`ordered`), and uniform cells may become the best
+   two-colour shade mix (`shade`);
+5. the cell glyph: Braille takes the majority colour and one dot per
+   painted pixel; block modes choose the two colours with the least
+   weighted RGB error (exhaustive over the distinct colours) and look the
+   pixel mask up in the half, quadrant or sextant table (sextant code
+   points are computed from the mask, skipping the masks that are `▌▐`).
+
+Gradients (`raster::gradient`) have sorted stops and sample in RGB. A fill
+takes a region (the flood region at the start point), a shape (linear or
+radial, measured in cell-proportional units so circles stay round) and a
+style: smooth, hard bands, ordered dither between the two stops around
+each pixel, or shade glyphs quantised per cell. Raster storage is a pixel
+palette plus one code string per row (91-symbol alphabet, wider codes for
+large palettes), trailing transparency trimmed.
 
 ### 3.2 Values and properties
 
@@ -176,6 +223,18 @@ foreground-muted primary secondary success warning error info
 selection selection-foreground focus
 ```
 
+Thirteen themes ship with the editor (`Theme::builtin`): the adaptive
+`terminal` theme, `minimal-dark`/`minimal-light`, and ten designed ones
+(`forge-dark`, `paper`, `cobalt`, `verdant`, `lagoon`, `amber-crt`,
+`phosphor`, `nebula`, `aurora`, `ember`). The optional `frame-from` and
+`frame-to` colours give a theme gradient frames: `ui::paint_frame`
+recolours the box-drawing cells of each panel and popup along the diagonal
+of the whole screen after the block is drawn, so the fade is continuous
+across panels and unfocused frames are dimmed. A test holds them to their contract: every token
+defined, unique ids, and foreground, muted, accent and selection colours
+that stand out from their background by at least 70 of 255 in perceived
+brightness.
+
 `Theme { id, name, colors, border, spacing }` maps tokens to `Color` and
 provides a fallback chain (`surface` -> `background`, status colours ->
 `primary` -> `foreground` -> terminal default) so partial themes still
@@ -196,6 +255,7 @@ operation.
 ```
 Screen ──► for each visible layer, bottom to top:
              Artwork   → composite cells
+             Raster    → raster::encode(layer, composite so far) → composite
              Interface → resolve_responsive(width)
                          layout::solve(..., RegistryMeasure)
                          for each component (parents first):
@@ -227,6 +287,8 @@ address objects by id:
 move, resize, set_property, set_layout,
 create_component, delete_component,
 set_cells,
+set_pixels, update_raster, replace_raster,
+set_gradient, delete_gradient,
 create_layer, delete_layer, update_layer, reorder_layer,
 set_theme
 ```
@@ -297,7 +359,7 @@ cheap process.
 `.glyph` files are JSON with a versioned envelope:
 
 ```json
-{ "format": "glyphforge", "schema_version": 1, "meta": {...}, "theme": {...}, "screens": [...] }
+{ "format": "glyphforge", "schema_version": 2, "meta": {...}, "theme": {...}, "gradients": [...], "screens": [...] }
 ```
 
 Design rules for diffability:
@@ -309,10 +371,13 @@ Design rules for diffability:
   is a one-line diff (asserted by a test);
 - artwork is stored as text runs and style runs per row, not one object
   per cell; wide-glyph tails are not stored and are rebuilt on load;
+- raster pixels are a palette of pixel values plus one code string per
+  pixel row, so a stroke changes only the rows it touches;
 - there is no binary blob; heavy assets would be separate files.
 
 Loading reads `schema_version`, runs the migration chain up to the current
-version (each future bump adds one step and a fixture test), rejects
+version (1 → 2 added raster layers and gradients, which v1 files cannot
+contain, so the step is the identity), rejects
 unversioned or newer files, then validates ids. Saving writes to a
 temporary sibling and renames, so a crash never leaves a half-written file.
 
@@ -365,8 +430,54 @@ Milestone 14 adds a modification-time poll and documents the
   `delete_component` operations; a mouse drag opens one transaction and
   records an operation per motion event, so undo removes the whole drag.
   The `Prompt` (input line with candidates) serves select-by-id, add
-  component, edit property and save-as, and is the base of the command
-  palette.
+  component, edit property, save-as, colours and the brush glyph, and is
+  the base of the command palette.
+- **Subcell Mode tools.** `PaintState` holds the tool, brush kind and
+  glyph, stamp label, palette page, box style, shape anchor, open stroke
+  and recent colours; the brush colours are the editor's `CellStyle`.
+  `app/brushes.rs` is the catalogue: `BrushKind` (`Glyph`, `Line`,
+  `Pattern`, `Stamp`), named presets and `BRUSH_PAGES` (semantic brushes
+  first, then glyph pages; tests require box-drawing and block coverage and
+  that every page fits the palette). Every tool dispatches on the brush
+  kind. Line topology: `boxdraw::Arms` gives each box-drawing glyph four
+  weighted arms, generated from the Unicode names; `paint::join_edges`
+  adds arms along path or rectangle edges and merges with existing glyphs,
+  counting an existing arm only if the neighbour connects back, so a
+  stroke from a loose end turns a corner instead of making a tee. Geometry lives in `glyphforge_core::paint` (pure,
+  usable headlessly); the editor only turns it into `set_cells`. A mouse
+  stroke opens one transaction and records a line segment per motion
+  event; shapes are previewed as an overlay from `shape_writes` and
+  applied as one patch on release or on the second Space; fill and picker
+  act immediately. Key lookup has three contexts: `interface` (active
+  layer holds components), `paint` (artwork layer with a tool other than
+  Text, so bare letters are commands and unbound characters set the brush)
+  and `global`. Bindings may carry a context prefix (`paint:b`), in the
+  defaults and in `[keys]`. The palette and the colour picker each expose
+  a geometry function used by both rendering and mouse hit-testing.
+- **Pixel Mode.** `app/pixels.rs` holds the pixel tools, settings,
+  gradient library and preview. Tools that need a layer kind (Text:
+  artwork, Gradient: raster) switch to one or add it. Mouse presses map
+  to pixels: with SGR-Pixels reports (mode 1016, enabled only for known
+  terminals and herdr when the cell size in pixels is known) the fraction
+  inside the cell selects the sub-cell pixel, otherwise a press covers the
+  whole cell. The keyboard has a pixel cursor (cell cursor + sub-cell
+  offset). Strokes are one transaction; shapes and gradient fills preview
+  by rendering a cloned screen and apply as one patch (a preset gradient
+  is saved by the same patch). The brushes block becomes pixel pages
+  (dither, shadow, gradient style, gradients) built at runtime as
+  `PaletteEntry`s that carry their `Action`.
+- **Menu.** Esc cancels whatever is in progress and otherwise opens the
+  menu (`app/menu.rs`). Its entries are built per page as label, hint,
+  `Action` and optional preview swatch, so keyboard and mouse share one
+  path: choosing an entry dispatches its action and closes the menu unless
+  the action belongs to the menu itself (paging, trying themes). On the
+  theme page the selection previews live: moving applies the theme without
+  remembering it, Enter keeps it (written to `<state>/ui-theme`, restored
+  at startup unless `[theme] ui` pins one) and Esc restores the choice
+  captured when the page opened.
+- **Readable chrome.** `styles::muted` uses the muted token only when it
+  provably contrasts with the background; the terminal's own palette is
+  unknown, so otherwise the normal foreground is dimmed.
 - **Terminal lifecycle.** An RAII guard enables raw mode, the alternate
   screen, mouse, bracketed paste, focus events and kitty keyboard flags
   when supported; a panic hook restores everything first.

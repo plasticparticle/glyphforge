@@ -9,7 +9,7 @@ use serde_json::Value as Json;
 use crate::document::Document;
 
 pub const FORMAT: &str = "glyphforge";
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 pub const EXTENSION: &str = "glyph";
 
 #[derive(Debug, thiserror::Error)]
@@ -97,20 +97,17 @@ pub fn from_json(text: &str) -> Result<Document, ProjectError> {
 
 /// Migrates a document JSON value from `from` to `from + 1`.
 ///
-/// Version 1 is the first version, so the chain is empty; every future
-/// bump adds one arm here and a fixture test.
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "future migrations consume and rebuild the value"
-)]
+/// Every bump adds one arm here and a fixture test.
 fn migrate_step(value: Json, from: u32) -> Result<Json, ProjectError> {
-    Err(ProjectError::Migration(
-        from,
-        format!(
-            "no migration registered for version {from} (value has {} keys)",
-            value.as_object().map_or(0, serde_json::Map::len)
-        ),
-    ))
+    match from {
+        // v2 adds raster layers and document gradients. Both are new, so a
+        // v1 document is a valid v2 document as it is.
+        1 => Ok(value),
+        _ => Err(ProjectError::Migration(
+            from,
+            format!("no migration registered for version {from}"),
+        )),
+    }
 }
 
 pub fn load(path: &Path) -> Result<Document, ProjectError> {
@@ -176,7 +173,7 @@ mod tests {
     fn round_trip() {
         let doc = sample();
         let text = to_json(&doc).unwrap();
-        assert!(text.starts_with("{\n  \"format\": \"glyphforge\",\n  \"schema_version\": 1,"));
+        assert!(text.starts_with("{\n  \"format\": \"glyphforge\",\n  \"schema_version\": 2,"));
         let back = from_json(&text).unwrap();
         assert_eq!(back, doc);
     }
@@ -241,6 +238,37 @@ mod tests {
             Some("hi")
         );
         assert!(doc.first_screen().layers()[0].visible);
+    }
+
+    #[test]
+    fn v1_files_migrate_and_rasters_round_trip() {
+        use crate::raster::{Pixel, RasterMode};
+        let text = r#"{"format":"glyphforge","schema_version":1,"screens":[{"id":"main","name":"M",
+          "size":{"width":2,"height":1},"layers":[{"id":"ui","name":"UI","kind":"interface"}]}]}"#;
+        let mut doc = from_json(text).unwrap();
+        assert!(doc.gradients.is_empty());
+        Patch::single(Operation::CreateLayer {
+            layer: crate::document::Layer::raster_layer(
+                id!("px"),
+                "Px",
+                Size::new(2, 1),
+                RasterMode::Braille,
+            ),
+            screen: None,
+            index: None,
+        })
+        .apply(&mut doc)
+        .unwrap();
+        doc.layer_mut(&id!("px"))
+            .unwrap()
+            .raster_mut()
+            .unwrap()
+            .pixels
+            .set(3, 3, Pixel::Solid(crate::document::Color::Indexed(2)));
+        let saved = to_json(&doc).unwrap();
+        assert!(saved.contains("\"schema_version\": 2"));
+        assert!(saved.contains("\"rows\""), "{saved}");
+        assert_eq!(from_json(&saved).unwrap(), doc);
     }
 
     #[test]

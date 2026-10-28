@@ -33,6 +33,8 @@ impl App {
     pub fn design_mode(&self) -> DesignMode {
         if self.on_artwork_layer() {
             DesignMode::Subcell
+        } else if self.on_raster_layer() {
+            DesignMode::Pixel
         } else {
             DesignMode::Interface
         }
@@ -150,7 +152,7 @@ impl App {
         ))
     }
 
-    fn apply(&mut self, patch: Patch, label: &str) -> bool {
+    pub(super) fn apply(&mut self, patch: Patch, label: &str) -> bool {
         match self.session.apply_patch(patch, label, Origin::User) {
             Ok(()) => {
                 self.mark_edited();
@@ -384,6 +386,12 @@ impl App {
             },
             PromptKind::AddComponent => self.add_component_from(&value),
             PromptKind::EditProperty => self.edit_property_from(&value),
+            PromptKind::Color(target) => self.submit_color_prompt(target, &value),
+            PromptKind::BrushGlyph => self.submit_glyph_prompt(&prompt),
+            PromptKind::StampLabel => self.set_stamp_label(&prompt.input),
+            PromptKind::NewPixelLayer => self.submit_new_pixel_layer(&value),
+            PromptKind::PixelSettings => self.submit_pixel_settings(&prompt.input),
+            PromptKind::Gradient => self.submit_gradient(&prompt.input),
             PromptKind::SaveAs => {
                 if value.is_empty() {
                     return;

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::{Canvas, CanvasError, Size};
 use crate::component::Component;
 use crate::id::ObjectId;
+use crate::raster::{RasterLayer, RasterMode};
 
 /// What a layer holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -12,6 +13,8 @@ pub enum LayerKind {
     Artwork,
     /// Semantic components rendered on demand (Interface Mode).
     Interface,
+    /// Sub-cell pixels encoded to cells at render time (Pixel Mode).
+    Raster,
 }
 
 impl LayerKind {
@@ -19,6 +22,7 @@ impl LayerKind {
         match self {
             Self::Artwork => "artwork",
             Self::Interface => "interface",
+            Self::Raster => "raster",
         }
     }
 }
@@ -33,6 +37,9 @@ pub enum LayerContent {
         #[serde(default)]
         components: Vec<Component>,
     },
+    Raster {
+        raster: RasterLayer,
+    },
 }
 
 impl LayerContent {
@@ -40,6 +47,7 @@ impl LayerContent {
         match self {
             Self::Artwork { .. } => LayerKind::Artwork,
             Self::Interface { .. } => LayerKind::Interface,
+            Self::Raster { .. } => LayerKind::Raster,
         }
     }
 }
@@ -74,6 +82,24 @@ impl Layer {
         })
     }
 
+    /// An empty raster layer covering `size` cells.
+    pub fn raster_layer(
+        id: ObjectId,
+        name: impl Into<String>,
+        size: Size,
+        mode: RasterMode,
+    ) -> Self {
+        Self {
+            id,
+            name: name.into(),
+            visible: true,
+            locked: false,
+            content: LayerContent::Raster {
+                raster: RasterLayer::new(size, mode),
+            },
+        }
+    }
+
     pub fn interface(id: ObjectId, name: impl Into<String>) -> Self {
         Self {
             id,
@@ -93,28 +119,42 @@ impl Layer {
     pub const fn cells(&self) -> Option<&Canvas> {
         match &self.content {
             LayerContent::Artwork { cells } => Some(cells),
-            LayerContent::Interface { .. } => None,
+            _ => None,
         }
     }
 
     pub const fn cells_mut(&mut self) -> Option<&mut Canvas> {
         match &mut self.content {
             LayerContent::Artwork { cells } => Some(cells),
-            LayerContent::Interface { .. } => None,
+            _ => None,
         }
     }
 
     pub fn components(&self) -> Option<&[Component]> {
         match &self.content {
             LayerContent::Interface { components } => Some(components),
-            LayerContent::Artwork { .. } => None,
+            _ => None,
         }
     }
 
     pub const fn components_mut(&mut self) -> Option<&mut Vec<Component>> {
         match &mut self.content {
             LayerContent::Interface { components } => Some(components),
-            LayerContent::Artwork { .. } => None,
+            _ => None,
+        }
+    }
+
+    pub const fn raster(&self) -> Option<&RasterLayer> {
+        match &self.content {
+            LayerContent::Raster { raster } => Some(raster),
+            _ => None,
+        }
+    }
+
+    pub const fn raster_mut(&mut self) -> Option<&mut RasterLayer> {
+        match &mut self.content {
+            LayerContent::Raster { raster } => Some(raster),
+            _ => None,
         }
     }
 
@@ -130,8 +170,10 @@ impl Layer {
 
     /// Resizes artwork to `size`; interface layers have no size of their own.
     pub fn resize(&mut self, size: Size) -> Result<(), CanvasError> {
-        if let LayerContent::Artwork { cells } = &mut self.content {
-            *cells = cells.resized(size)?;
+        match &mut self.content {
+            LayerContent::Artwork { cells } => *cells = cells.resized(size)?,
+            LayerContent::Raster { raster } => raster.resize_cells(size),
+            LayerContent::Interface { .. } => {}
         }
         Ok(())
     }
@@ -152,6 +194,19 @@ mod tests {
         assert!(json.contains("\"kind\":\"artwork\""));
         let back: Layer = serde_json::from_str(&json).unwrap();
         assert_eq!(back, a);
+    }
+
+    #[test]
+    fn raster_layers_serialise_and_resize() {
+        let mut r = Layer::raster_layer(id!("px"), "Pixels", Size::new(3, 2), RasterMode::Quadrant);
+        assert_eq!(r.kind(), LayerKind::Raster);
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(json.contains("\"kind\":\"raster\""), "{json}");
+        let back: Layer = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, r);
+        r.resize(Size::new(4, 4)).unwrap();
+        assert_eq!(r.raster().unwrap().cells(), Size::new(4, 4));
+        assert!(r.cells().is_none() && r.components().is_none());
     }
 
     #[test]

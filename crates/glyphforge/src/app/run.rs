@@ -5,7 +5,10 @@ use std::time::Duration;
 use crossterm::event::{self, Event, MouseButton, MouseEvent, MouseEventKind};
 
 use super::{App, EditorMode, Focus};
-use crate::actions::{Action, Context, Direction, vim_navigation};
+use crate::actions::{
+    Action, Context, Direction, MenuAction, MenuPage, PixelAction, vim_navigation,
+};
+use crate::app::ColorTarget;
 use crate::config::ThemeSource;
 use crate::input::{Key, KeyCode, key_from_crossterm};
 use crate::render::screen_to_document;
@@ -58,7 +61,15 @@ fn handle_event(app: &mut App, ev: &Event) -> bool {
             }
             true
         }
-        Event::Resize(_, _) => true,
+        Event::Resize(_, _) => {
+            // The cell size in pixels changes with the font size.
+            if app.pixel_mouse.is_some() {
+                if let Some(cell) = crate::terminal::cell_pixel_size() {
+                    app.pixel_mouse = Some(cell);
+                }
+            }
+            true
+        }
         Event::FocusGained => {
             if matches!(
                 app.config.theme.source,
@@ -92,6 +103,40 @@ pub(crate) fn handle_key(app: &mut App, key: Key) {
         app.dispatch(action);
         return;
     }
+    if app.picker.is_some() {
+        let target = app
+            .picker
+            .as_ref()
+            .map_or(ColorTarget::Foreground, |p| p.target);
+        let action = match key.code {
+            KeyCode::Esc | KeyCode::Char('q') => Action::Cancel,
+            KeyCode::Enter | KeyCode::Char(' ') => Action::PickerSubmit,
+            KeyCode::Tab | KeyCode::BackTab => Action::PickerSwitchTarget,
+            KeyCode::Up | KeyCode::Char('k') => Action::PickerMove(Direction::Up),
+            KeyCode::Down | KeyCode::Char('j') => Action::PickerMove(Direction::Down),
+            KeyCode::Left | KeyCode::Char('h') => Action::PickerMove(Direction::Left),
+            KeyCode::Right | KeyCode::Char('l') => Action::PickerMove(Direction::Right),
+            KeyCode::Char('#' | '/') => Action::ColorPrompt(target),
+            KeyCode::Char('d') => Action::SetColor(target, glyphforge_core::Color::Default),
+            _ => return,
+        };
+        app.dispatch(action);
+        return;
+    }
+    if app.menu.is_some() {
+        let action = match key.code {
+            KeyCode::Esc | KeyCode::Char('q') | KeyCode::F(10) => MenuAction::Close,
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char(' ' | 'l') => MenuAction::Select,
+            KeyCode::Up | KeyCode::Char('k') => MenuAction::Move(Direction::Up),
+            KeyCode::Down | KeyCode::Char('j') => MenuAction::Move(Direction::Down),
+            KeyCode::Left | KeyCode::Char('h') | KeyCode::Backspace => {
+                MenuAction::Page(MenuPage::Main)
+            }
+            _ => return,
+        };
+        app.dispatch(Action::Menu(action));
+        return;
+    }
     if app.ui.help_open {
         if matches!(key.code, KeyCode::Esc | KeyCode::F(1) | KeyCode::Char('q')) {
             app.ui.help_open = false;
@@ -99,16 +144,13 @@ pub(crate) fn handle_key(app: &mut App, key: Key) {
         return;
     }
     let chord = key.chord();
-    let context = if app.on_artwork_layer() {
-        Context::Global
-    } else {
-        Context::Interface
-    };
+    let context = app.key_context();
     let bound = app.keymap.lookup(chord, context).cloned();
-    // Text insertion only exists on artwork layers; interface layers treat
-    // plain keys as commands.
+    // Text insertion only exists on artwork layers with the Text tool;
+    // interface layers and painting tools treat plain keys as commands.
     let inserting = app.ui.focus == Focus::Canvas
         && app.editor.mode == EditorMode::Insert
+        && context == Context::Global
         && app.on_artwork_layer();
 
     // In insert mode plain printable keys insert text even if a binding
@@ -139,63 +181,159 @@ pub(crate) fn handle_key(app: &mut App, key: Key) {
         }
         return;
     }
-    if inserting {
-        if let Some(c) = key.text_char() {
+    if let Some(c) = key.text_char() {
+        if inserting {
             app.dispatch(Action::InsertText(c.to_string()));
+        } else if context == Context::Paint && app.ui.focus == Focus::Canvas {
+            // Any unbound character becomes the brush glyph.
+            app.dispatch(Action::SetBrushGlyph(c.to_string()));
         }
     }
+}
+
+/// With pixel-precise reports (mode 1016) the coordinates are pixels:
+/// converts them to cells and returns where inside the cell the pointer is,
+/// as fractions.
+fn to_cells(app: &App, mut m: MouseEvent) -> (MouseEvent, Option<(f32, f32)>) {
+    let Some((cw, ch)) = app.pixel_mouse else {
+        return (m, None);
+    };
+    let fraction = (
+        f32::from(m.column % cw) / f32::from(cw),
+        f32::from(m.row % ch) / f32::from(ch),
+    );
+    m.column /= cw;
+    m.row /= ch;
+    (m, Some(fraction))
+}
+
+/// The raster pixel under the pointer, and whether the position is only
+/// known per cell (then the centre pixel stands for the cell).
+fn pixel_at(
+    app: &App,
+    pos: glyphforge_core::Position,
+    sub: Option<(f32, f32)>,
+) -> (glyphforge_core::Position, bool) {
+    let (cw, ch) = app.cell_px();
+    let (fx, fy, whole) = sub.map_or((0.5, 0.5, true), |(x, y)| (x, y, false));
+    let offset = |f: f32, n: u16| ((f * f32::from(n)) as u16).min(n - 1);
+    (
+        glyphforge_core::Position::new(pos.x * cw + offset(fx, cw), pos.y * ch + offset(fy, ch)),
+        whole,
+    )
 }
 
 fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
     if !app.config.mouse.enabled {
         return false;
     }
+    let (m, sub) = to_cells(app, m);
+    let cell = (m.column, m.row);
+    if app.menu.is_some() {
+        return handle_menu_mouse(app, m);
+    }
+    if app.picker.is_some() {
+        return handle_picker_mouse(app, m);
+    }
     let layout = ui::layout::compute(app.last_frame_area(), &app.ui);
     let doc_pos = screen_to_document(
-        (m.column, m.row),
+        cell,
         layout.canvas,
         app.editor.viewport.rect(),
         glyphforge_core::Rect::from_size(app.doc_size()),
     );
+    let in_left = layout.left.is_some_and(|r| r.contains(cell.into()));
     match m.kind {
+        MouseEventKind::Down(button @ (MouseButton::Left | MouseButton::Right)) if in_left => {
+            app.ui.focus = Focus::LeftPanel;
+            let right = button == MouseButton::Right;
+            if let Some(action) = layout
+                .left
+                .and_then(|area| ui::palette::hit(app, area, cell))
+                .map(|hit| hit.action(right))
+            {
+                app.dispatch(action);
+            }
+            true
+        }
+        MouseEventKind::Down(MouseButton::Right) => match doc_pos {
+            Some(pos) if app.on_raster_layer() => {
+                app.ui.focus = Focus::Canvas;
+                let (p, _) = pixel_at(app, pos, sub);
+                app.dispatch(Action::Pixel(PixelAction::Pick(p)));
+                true
+            }
+            Some(pos) if app.on_artwork_layer() => {
+                app.ui.focus = Focus::Canvas;
+                app.dispatch(Action::PickAt(pos));
+                true
+            }
+            _ => false,
+        },
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(pos) = doc_pos {
-                if app.on_artwork_layer() {
+                if app.on_raster_layer() {
+                    let (p, whole) = pixel_at(app, pos, sub);
+                    app.dispatch(Action::Pixel(PixelAction::Press(p, whole)));
+                } else if app.on_artwork_layer() && app.paint.tool == crate::app::Tool::Text {
                     app.dispatch(Action::CursorTo(pos));
+                } else if app.on_artwork_layer() {
+                    app.dispatch(Action::ToolPress(pos));
                 } else if !app.begin_drag(pos) {
                     app.dispatch(Action::SelectAt(pos));
                     // A fresh selection can be dragged right away.
                     app.begin_drag(pos);
                 }
-            } else if layout
-                .left
-                .is_some_and(|r| r.contains((m.column, m.row).into()))
-            {
-                app.ui.focus = Focus::LeftPanel;
-            } else if layout
-                .right
-                .is_some_and(|r| r.contains((m.column, m.row).into()))
-            {
+            } else if layout.right.is_some_and(|r| r.contains(cell.into())) {
                 app.ui.focus = Focus::RightPanel;
-            } else if layout.canvas_block.contains((m.column, m.row).into()) {
+            } else if layout.canvas_block.contains(cell.into()) {
                 app.ui.focus = Focus::Canvas;
             }
             true
         }
         MouseEventKind::Drag(MouseButton::Left) => {
-            if app.drag.is_some() {
-                if let Some(pos) = doc_pos {
-                    app.drag_to(pos);
-                }
+            let Some(pos) = doc_pos else { return false };
+            if app.paint.pixel_stroke.is_some() || app.paint.pixel_anchor.is_some() {
+                let (p, _) = pixel_at(app, pos, sub);
+                app.dispatch(Action::Pixel(PixelAction::Drag(p)));
+                true
+            } else if app.drag.is_some() {
+                app.drag_to(pos);
+                true
+            } else if app.paint.stroke.is_some() || app.paint.anchor.is_some() {
+                app.dispatch(Action::ToolDrag(pos));
                 true
             } else {
                 false
             }
         }
         MouseEventKind::Up(MouseButton::Left) => {
-            let had = app.drag.is_some();
-            app.end_drag();
-            had
+            if app.paint.pixel_stroke.is_some() || app.paint.pixel_anchor.is_some() {
+                app.dispatch(Action::Pixel(PixelAction::Release));
+                return true;
+            }
+            if app.drag.is_some() {
+                app.end_drag();
+                true
+            } else if app.paint.stroke.is_some() || app.paint.anchor.is_some() {
+                app.dispatch(Action::ToolRelease);
+                true
+            } else {
+                false
+            }
+        }
+        MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+            if app.on_artwork_layer()
+                && layout.left.is_some_and(|area| {
+                    ui::palette::layout(area).brushes.contains(cell.into())
+                }) =>
+        {
+            app.dispatch(if m.kind == MouseEventKind::ScrollUp {
+                Action::BrushPagePrev
+            } else {
+                Action::BrushPageNext
+            });
+            true
         }
         MouseEventKind::ScrollUp => {
             app.dispatch(Action::ScrollView(Direction::Up));
@@ -215,6 +353,53 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
         }
         _ => false,
     }
+}
+
+/// While the menu is open it owns the mouse: a click chooses an entry, a
+/// click outside closes it, the wheel moves the selection.
+fn handle_menu_mouse(app: &mut App, m: MouseEvent) -> bool {
+    let cell = (m.column, m.row);
+    match m.kind {
+        MouseEventKind::ScrollUp => app.dispatch(Action::Menu(MenuAction::Move(Direction::Up))),
+        MouseEventKind::ScrollDown => app.dispatch(Action::Menu(MenuAction::Move(Direction::Down))),
+        MouseEventKind::Down(MouseButton::Left | MouseButton::Right) => {
+            let entries = app.menu_entries();
+            let geometry = ui::menu::geometry(app.last_frame_area(), &entries);
+            let index = ui::menu::hit(&geometry, cell).filter(|i| *i < entries.len());
+            match index {
+                Some(i) => app.dispatch(Action::Menu(MenuAction::Click(i))),
+                None => app.dispatch(Action::Menu(MenuAction::Close)),
+            }
+        }
+        _ => return false,
+    }
+    true
+}
+
+/// While the colour picker is open it owns the mouse: a left click picks for
+/// its target, a right click for the other colour, a click outside closes it.
+fn handle_picker_mouse(app: &mut App, m: MouseEvent) -> bool {
+    let MouseEventKind::Down(button @ (MouseButton::Left | MouseButton::Right)) = m.kind else {
+        return false;
+    };
+    let Some(target) = app.picker.as_ref().map(|p| p.target) else {
+        return false;
+    };
+    let rows = crate::app::picker_rows(&app.paint.recent);
+    let geometry = ui::color_picker::geometry(app.last_frame_area(), &rows);
+    let target = if button == MouseButton::Right {
+        target.other()
+    } else {
+        target
+    };
+    match ui::color_picker::hit(&geometry, &rows, (m.column, m.row)) {
+        Some((r, c)) => app.dispatch(Action::SetColor(target, rows[r][c])),
+        None if !geometry.popup.contains((m.column, m.row).into()) => {
+            app.dispatch(Action::Cancel);
+        }
+        None => return false,
+    }
+    true
 }
 
 #[cfg(test)]
@@ -297,6 +482,119 @@ mod tests {
         handle_key(&mut app, key('a'));
         assert!(app.prompt.is_some(), "'a' opens the add-component prompt");
         assert!(!app.dirty());
+    }
+
+    #[test]
+    fn painting_tools_turn_letters_into_commands() {
+        use crate::app::Tool;
+        let mut app = test_app(Size::new(10, 2));
+        app.editor.viewport.size = Size::new(10, 2);
+        handle_key(&mut app, key('b'));
+        assert!(app.dirty(), "the Text tool types 'b'");
+        app.dispatch(Action::Undo);
+        handle_key(&mut app, Key::new(KeyCode::Char('b'), Modifiers::ALT));
+        assert_eq!(app.paint.tool, Tool::Brush, "Alt+B leaves the Text tool");
+        handle_key(&mut app, key('%'));
+        assert_eq!(
+            app.paint.brush.as_str(),
+            "%",
+            "unbound characters set the brush"
+        );
+        assert!(!app.dirty());
+        app.dispatch(Action::CursorLineStart);
+        handle_key(&mut app, key(' '));
+        assert_eq!(
+            app.cell_at(Position::ORIGIN)
+                .and_then(|c| c.as_glyph())
+                .map(glyphforge_core::Grapheme::as_str),
+            Some("%"),
+            "Space paints at the cursor"
+        );
+        handle_key(&mut app, Key::new(KeyCode::Char('C'), Modifiers::NONE));
+        assert_eq!(
+            app.picker.as_ref().map(|p| p.target),
+            Some(crate::app::ColorTarget::Background)
+        );
+        handle_key(&mut app, Key::new(KeyCode::Right, Modifiers::NONE));
+        handle_key(&mut app, Key::new(KeyCode::Enter, Modifiers::NONE));
+        assert_eq!(app.editor.style.bg, glyphforge_core::Color::Indexed(0));
+        handle_key(&mut app, key('t'));
+        assert_eq!(app.paint.tool, Tool::Text);
+    }
+
+    fn mouse(kind: MouseEventKind, column: u16, row: u16) -> MouseEvent {
+        MouseEvent {
+            kind,
+            column,
+            row,
+            modifiers: crossterm::event::KeyModifiers::NONE,
+        }
+    }
+
+    #[test]
+    fn mouse_uses_the_palette_canvas_and_picker() {
+        use crate::app::Tool;
+        let mut app = test_app(Size::new(20, 6));
+        app.update_layout(ratatui::layout::Rect::new(0, 0, 100, 30));
+        let layout = ui::layout::compute(app.last_frame_area(), &app.ui);
+        let left = layout.left.unwrap();
+        let pal = ui::palette::layout(left);
+        // Brush is the second entry of the first tool row.
+        let down = MouseEventKind::Down(MouseButton::Left);
+        handle_mouse(&mut app, mouse(down, pal.tools.x + 11, pal.tools.y + 1));
+        assert_eq!(app.paint.tool, Tool::Brush);
+        // Page the glyphs with the wheel and the arrows, pick a double line
+        // glyph and the double box style.
+        let wheel = MouseEventKind::ScrollDown;
+        handle_mouse(&mut app, mouse(wheel, pal.brushes.x + 5, pal.brushes.y + 2));
+        assert_eq!(app.paint.page, 1);
+        handle_mouse(&mut app, mouse(down, pal.brushes.x + 1, pal.brushes.y + 1));
+        assert_eq!(app.paint.page, 0, "‹ goes back");
+        for _ in 0..10 {
+            handle_key(&mut app, key(']'));
+        }
+        assert_eq!(crate::app::BRUSH_PAGES[app.paint.page].name, "Double ═");
+        handle_mouse(&mut app, mouse(down, pal.brushes.x + 5, pal.brushes.y + 2));
+        assert_eq!(app.paint.brush.as_str(), "╔");
+        handle_mouse(&mut app, mouse(down, pal.tools.x + 5, pal.tools.y + 6));
+        assert_eq!(
+            app.paint.box_style,
+            glyphforge_core::boxdraw::BorderFamily::Double
+        );
+        assert_eq!(app.paint.tool, Tool::Box);
+        handle_mouse(&mut app, mouse(down, pal.tools.x + 11, pal.tools.y + 1));
+        // Red as foreground, blue (right click) as background.
+        let right = MouseEventKind::Down(MouseButton::Right);
+        handle_mouse(&mut app, mouse(down, pal.colors.x + 3, pal.colors.y + 1));
+        handle_mouse(&mut app, mouse(right, pal.colors.x + 9, pal.colors.y + 1));
+        assert_eq!(app.editor.style.fg, glyphforge_core::Color::Indexed(1));
+        assert_eq!(app.editor.style.bg, glyphforge_core::Color::Indexed(4));
+        // Paint a stroke on the canvas.
+        let (cx, cy) = (layout.canvas.x, layout.canvas.y);
+        handle_mouse(&mut app, mouse(down, cx, cy));
+        handle_mouse(
+            &mut app,
+            mouse(MouseEventKind::Drag(MouseButton::Left), cx + 3, cy),
+        );
+        handle_mouse(
+            &mut app,
+            mouse(MouseEventKind::Up(MouseButton::Left), cx + 3, cy),
+        );
+        assert_eq!(app.session.history().undo_len(), 1);
+        let painted = app.cell_at(Position::new(3, 0)).unwrap();
+        assert_eq!(painted.style.fg, glyphforge_core::Color::Indexed(1));
+        // The "+" swatch opens the picker; a click on a swatch picks.
+        handle_mouse(&mut app, mouse(down, pal.colors.x + 17, pal.colors.y + 2));
+        assert!(app.picker.is_some());
+        let rows = crate::app::picker_rows(&app.paint.recent);
+        let g = ui::color_picker::geometry(app.last_frame_area(), &rows);
+        handle_mouse(&mut app, mouse(down, g.grid_x, g.row_y[1]));
+        assert!(app.picker.is_none());
+        assert_eq!(app.editor.style.fg, glyphforge_core::Color::Indexed(16));
+        // Right click on the canvas picks the painted cell back.
+        app.dispatch(Action::ResetColors);
+        handle_mouse(&mut app, mouse(right, cx + 1, cy));
+        assert_eq!(app.editor.style.fg, glyphforge_core::Color::Indexed(1));
     }
 
     #[test]
