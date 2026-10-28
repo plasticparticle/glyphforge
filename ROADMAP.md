@@ -147,13 +147,16 @@ with stable codes.
 - [x] Attribute toggles (bold, italic, underline, strikethrough, dim,
       reverse) in the palette and as keys
 
-### E4 — Colours and palettes  `[~]`
+### E4 — Colours and palettes  `[x]`
 - [x] Foreground/background from the ANSI 16 swatches (left/right click)
 - [x] 256-colour picker popup (default, base, cube, greys, recent), mouse
       and keyboard; prompt for names, indices and `#rrggbb`
 - [x] Recent colours, swap, reset, picker tool / right-click pick
-- [ ] RGB picker (hue/lightness) beyond typing `#rrggbb`
-- [ ] Token picker for components, colour-depth preview modes
+- [x] Truecolour spectrum in the picker (hue × lightness, muted row,
+      greys); opens there for truecolour brushes
+- [x] Token picking for components: colour properties cycle through the
+      theme tokens, suggest them when edited and show a resolved swatch
+- [x] Colour-depth preview of the canvas (F6: 256, 16, terminal)
 
 ### E8 — Pixel Mode  `[~]`
 - [x] Raster layers (`LayerContent::Raster`) with half, quadrant, sextant

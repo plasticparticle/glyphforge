@@ -28,7 +28,9 @@ pub use brushes::BRUSH_PAGES;
 pub use brushes::{BOX_STYLES, BrushKind, PaletteEntry};
 pub use interface::Drag;
 pub use menu::{Menu, MenuEntry};
-pub use paint::{ColorPicker, ColorTarget, PaintState, Tool, color_label, is_light, picker_rows};
+#[cfg(test)]
+pub use paint::picker_rows;
+pub use paint::{ColorPicker, ColorTarget, PaintState, Tool, color_label, is_light};
 pub use prompt::Prompt;
 pub use run::{RunError, run};
 pub use viewport::Viewport;
@@ -159,6 +161,8 @@ pub struct App {
     pub config: Config,
     pub caps: TerminalCapabilities,
     pub color_depth: ColorDepth,
+    /// Preview the design at a lower colour depth than the terminal's.
+    pub preview_depth: Option<ColorDepth>,
     pub keymap: Keymap,
     pub status: Option<StatusMessage>,
     pub omarchy_paths: OmarchyPaths,
@@ -244,6 +248,7 @@ impl App {
             config: init.config,
             caps: init.caps,
             color_depth,
+            preview_depth: None,
             keymap: init.keymap,
             status: None,
             omarchy_paths: init.omarchy_paths,
@@ -300,6 +305,29 @@ impl App {
             .find(|l| l.visible && l.cells().is_some())
             .or_else(|| layers.iter().rev().find(|l| l.visible))
             .map(|l| l.id.clone())
+    }
+
+    /// The colour depth the canvas is drawn at: the preview depth when one
+    /// is set, never more than the terminal shows.
+    pub fn canvas_depth(&self) -> ColorDepth {
+        self.preview_depth
+            .map_or(self.color_depth, |d| d.min(self.color_depth))
+    }
+
+    /// Steps the canvas preview: terminal depth, 256, 16, back.
+    pub fn cycle_preview_depth(&mut self) {
+        self.preview_depth = match self.preview_depth {
+            None if self.color_depth > ColorDepth::Ansi256 => Some(ColorDepth::Ansi256),
+            None | Some(ColorDepth::Ansi256) if self.color_depth > ColorDepth::Ansi16 => {
+                Some(ColorDepth::Ansi16)
+            }
+            _ => None,
+        };
+        let text = match self.preview_depth {
+            Some(d) => format!("Previewing the design in {d} (F6 steps on)"),
+            None => format!("Design shown in {} (terminal)", self.color_depth),
+        };
+        self.set_status(StatusKind::Info, text);
     }
 
     pub const fn should_quit(&self) -> bool {

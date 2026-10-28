@@ -9,7 +9,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 
 use super::styles;
-use crate::app::{App, ColorTarget, color_label, is_light, picker_rows};
+use crate::app::{App, ColorTarget, color_label, is_light};
 use crate::render::to_ratatui_color;
 
 /// Where the picker and each of its swatch rows are on screen.
@@ -24,10 +24,11 @@ pub struct PickerGeometry {
     pub footer_y: u16,
 }
 
-/// Rows followed by a blank separator: the base colours, the last cube row
-/// and everything after it.
-const fn separated(row: usize) -> bool {
-    row == 0 || row >= 6
+/// Rows followed by a blank separator: the base colours, the last row of
+/// the 36-wide main block and everything after it.
+fn separated(rows: &[Vec<Color>], row: usize) -> bool {
+    const BLOCK: usize = 36;
+    row == 0 || rows[row].len() != BLOCK || rows.get(row + 1).is_none_or(|n| n.len() != BLOCK)
 }
 
 pub fn geometry(area: Rect, rows: &[Vec<Color>]) -> PickerGeometry {
@@ -39,7 +40,7 @@ pub fn geometry(area: Rect, rows: &[Vec<Color>]) -> PickerGeometry {
     let mut y = 2u16;
     for i in 0..rows.len() {
         offsets.push(y);
-        y += if separated(i) { 2 } else { 1 };
+        y += if separated(rows, i) { 2 } else { 1 };
     }
     let height = (y + 1 + 2).min(area.height);
     let popup = Rect {
@@ -74,7 +75,7 @@ pub fn hit(g: &PickerGeometry, rows: &[Vec<Color>], cell: (u16, u16)) -> Option<
 
 pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
     let Some(picker) = &app.picker else { return };
-    let rows = picker_rows(&app.paint.recent);
+    let rows = app.picker_grid();
     let g = geometry(area, &rows);
     frame.render_widget(Clear, g.popup);
 
@@ -106,7 +107,11 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(styles::border(app, true))
-        .title(format!(" Choose {} colour ", picker.target.title()))
+        .title(format!(
+            " Choose {} colour · {} ",
+            picker.target.title(),
+            if picker.spectrum { "spectrum" } else { "256" }
+        ))
         .title_style(styles::accent(app))
         .style(styles::text(app));
     frame.render_widget(Paragraph::new(Line::from(header)).block(block), g.popup);
@@ -163,7 +168,11 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
         let footer = Line::from(vec![
             Span::styled(format!("{current:<14}"), styles::accent(app)),
             Span::styled(
-                "⏎ pick  Tab fg/bg  right-click other  # hex  d default  Esc",
+                if picker.spectrum {
+                    "⏎ pick  Tab fg/bg  r 256 grid  # hex  d default  Esc"
+                } else {
+                    "⏎ pick  Tab fg/bg  r spectrum  # hex  d default  Esc"
+                },
                 styles::muted(app),
             ),
         ]);
@@ -180,6 +189,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::picker_rows;
 
     #[test]
     fn geometry_fits_and_hits_swatches() {

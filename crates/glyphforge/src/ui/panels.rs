@@ -383,21 +383,42 @@ fn render_inspector(app: &App, frame: &mut Frame<'_>, area: Rect, focused: bool)
         } else {
             (f.value.clone(), styles::text(app))
         };
-        let mut value: String = value.chars().take(value_w.saturating_sub(2)).collect();
+        let swatch_w = if f.swatch { 3 } else { 0 };
+        let mut value: String = value
+            .chars()
+            .take(value_w.saturating_sub(2 + swatch_w))
+            .collect();
         if f.cyclic && current {
             value = format!("‹{value}›");
         }
-        lines.push(Line::from(vec![
-            Span::styled(format!("{:<label_w$}", f.label), label_style),
-            Span::styled(
-                value,
-                if current {
-                    styles::selection(app)
-                } else {
-                    value_style
-                },
-            ),
-        ]));
+        let mut spans = vec![Span::styled(format!("{:<label_w$}", f.label), label_style)];
+        if f.swatch {
+            // The colour the document theme resolves the value (or the
+            // default) to.
+            let token = if f.value.is_empty() {
+                f.default.as_deref()
+            } else {
+                Some(f.value.as_str())
+            };
+            if let Some(token) = token {
+                let color = app.doc().theme.resolve(token);
+                spans.push(Span::styled(
+                    "██",
+                    ratatui::style::Style::default()
+                        .fg(crate::render::to_ratatui_color(color, app.color_depth)),
+                ));
+                spans.push(Span::raw(" "));
+            }
+        }
+        spans.push(Span::styled(
+            value,
+            if current {
+                styles::selection(app)
+            } else {
+                value_style
+            },
+        ));
+        lines.push(Line::from(spans));
     }
     let title = if focused {
         "Inspector · ⏎ edit ␣ cycle del reset"

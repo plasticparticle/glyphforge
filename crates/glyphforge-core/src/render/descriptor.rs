@@ -163,6 +163,19 @@ impl PropKind {
                 };
                 Some(Value::Str(names[next].into()))
             }
+            Self::Color => {
+                let tokens = crate::theme::COLOR_TOKENS;
+                let i = current
+                    .and_then(Value::as_str)
+                    .and_then(|s| tokens.iter().position(|t| *t == s));
+                let n = tokens.len();
+                let next = match (i, forward) {
+                    (None, _) => 0,
+                    (Some(i), true) => (i + 1) % n,
+                    (Some(i), false) => (i + n - 1) % n,
+                };
+                Some(Value::Str(tokens[next].into()))
+            }
             Self::Int { min, max } => {
                 let v = current.and_then(Value::as_int).unwrap_or(*min);
                 let v = if forward { v + 1 } else { v - 1 };
@@ -388,6 +401,11 @@ mod tests {
             Some(Value::Int(3))
         );
         assert_eq!(PropKind::Text.cycle(None, true), None);
+        assert_eq!(
+            PropKind::Color.cycle(Some(&"background".into()), true),
+            Some("surface".into()),
+            "colours cycle through the theme tokens"
+        );
     }
 
     #[test]

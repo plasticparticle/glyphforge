@@ -121,6 +121,7 @@ pub(crate) fn handle_key(app: &mut App, key: Key) {
             KeyCode::Right | KeyCode::Char('l') => Action::PickerMove(Direction::Right),
             KeyCode::Char('#' | '/') => Action::ColorPrompt(target),
             KeyCode::Char('d') => Action::SetColor(target, glyphforge_core::Color::Default),
+            KeyCode::Char('r' | 'm') => Action::PickerToggleSpectrum,
             _ => return,
         };
         app.dispatch(action);
@@ -420,7 +421,7 @@ fn handle_picker_mouse(app: &mut App, m: MouseEvent) -> bool {
     let Some(target) = app.picker.as_ref().map(|p| p.target) else {
         return false;
     };
-    let rows = crate::app::picker_rows(&app.paint.recent);
+    let rows = app.picker_grid();
     let geometry = ui::color_picker::geometry(app.last_frame_area(), &rows);
     let target = if button == MouseButton::Right {
         target.other()
@@ -621,7 +622,7 @@ mod tests {
         // The "+" swatch opens the picker; a click on a swatch picks.
         handle_mouse(&mut app, mouse(down, pal.colors.x + 17, pal.colors.y + 2));
         assert!(app.picker.is_some());
-        let rows = crate::app::picker_rows(&app.paint.recent);
+        let rows = app.picker_grid();
         let g = ui::color_picker::geometry(app.last_frame_area(), &rows);
         handle_mouse(&mut app, mouse(down, g.grid_x, g.row_y[1]));
         assert!(app.picker.is_none());

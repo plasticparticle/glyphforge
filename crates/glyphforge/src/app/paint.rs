@@ -179,12 +179,70 @@ pub fn picker_rows(recent: &[Color]) -> Vec<Vec<Color>> {
     rows
 }
 
+/// A truecolour from hue (degrees), saturation and lightness (percent).
+pub fn hsl(hue: u16, saturation: u8, lightness: u8) -> Color {
+    let hue = f32::from(hue % 360) / 360.0;
+    let sat = f32::from(saturation.min(100)) / 100.0;
+    let light = f32::from(lightness.min(100)) / 100.0;
+    let high = if light < 0.5 {
+        light * (1.0 + sat)
+    } else {
+        light + sat - light * sat
+    };
+    let low = 2.0 * light - high;
+    let channel = |offset: f32| {
+        let t = (hue + offset).rem_euclid(1.0);
+        let v = if t < 1.0 / 6.0 {
+            low + (high - low) * 6.0 * t
+        } else if t < 0.5 {
+            high
+        } else if t < 2.0 / 3.0 {
+            low + (high - low) * (2.0 / 3.0 - t) * 6.0
+        } else {
+            low
+        };
+        (v * 255.0).round().clamp(0.0, 255.0) as u8
+    };
+    Color::Rgb(channel(1.0 / 3.0), channel(0.0), channel(-1.0 / 3.0))
+}
+
+/// Lightness of the spectrum rows, light to dark, at full saturation.
+const SPECTRUM_LIGHTNESS: [u8; 9] = [88, 78, 68, 58, 50, 42, 34, 26, 18];
+
+/// The truecolour picker grid: base colours, 36 hues (every 10°) at nine
+/// lightness levels and once muted, 24 even greys, recent colours.
+pub fn spectrum_rows(recent: &[Color]) -> Vec<Vec<Color>> {
+    let mut rows = vec![
+        std::iter::once(Color::Default)
+            .chain((0..16).map(Color::Indexed))
+            .collect(),
+    ];
+    for l in SPECTRUM_LIGHTNESS {
+        rows.push((0..36).map(|i| hsl(i * 10, 100, l)).collect());
+    }
+    rows.push((0..36).map(|i| hsl(i * 10, 35, 55)).collect());
+    rows.push(
+        (0..24u16)
+            .map(|i| {
+                let v = (i * 255 / 23) as u8;
+                Color::Rgb(v, v, v)
+            })
+            .collect(),
+    );
+    if !recent.is_empty() {
+        rows.push(recent.to_vec());
+    }
+    rows
+}
+
 /// Open colour picker popup.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColorPicker {
     pub target: ColorTarget,
     pub row: usize,
     pub col: usize,
+    /// Truecolour spectrum instead of the 256-colour grid.
+    pub spectrum: bool,
 }
 
 /// Tool state that is not part of the document.
@@ -292,6 +350,7 @@ impl App {
             Action::PickerMove(dir) => self.picker_move(dir),
             Action::PickerSubmit => self.picker_submit(),
             Action::PickerSwitchTarget => self.picker_switch_target(),
+            Action::PickerToggleSpectrum => self.picker_toggle_spectrum(),
             Action::BrushPageNext => self.step_brush_page(true),
             Action::BrushPagePrev => self.step_brush_page(false),
             Action::SetBrushKind(kind) => self.set_brush_kind(kind),
@@ -552,17 +611,46 @@ impl App {
             ColorTarget::Background => self.editor.style.bg,
         };
         let rows = picker_rows(&self.paint.recent);
+        let spectrum = matches!(current, Color::Rgb(..));
+        let rows = if spectrum {
+            spectrum_rows(&self.paint.recent)
+        } else {
+            rows
+        };
         let (row, col) = rows
             .iter()
             .enumerate()
             .find_map(|(r, cols)| cols.iter().position(|c| *c == current).map(|c| (r, c)))
             .unwrap_or((0, 0));
         self.prompt = None;
-        self.picker = Some(ColorPicker { target, row, col });
+        self.picker = Some(ColorPicker {
+            target,
+            row,
+            col,
+            spectrum,
+        });
+    }
+
+    /// The swatch rows of the open picker's grid.
+    pub fn picker_grid(&self) -> Vec<Vec<Color>> {
+        if self.picker.as_ref().is_some_and(|p| p.spectrum) {
+            spectrum_rows(&self.paint.recent)
+        } else {
+            picker_rows(&self.paint.recent)
+        }
+    }
+
+    /// Switches the picker between the 256-colour grid and the spectrum.
+    pub fn picker_toggle_spectrum(&mut self) {
+        if let Some(p) = self.picker.as_mut() {
+            p.spectrum = !p.spectrum;
+            p.row = 0;
+            p.col = 0;
+        }
     }
 
     pub fn picker_move(&mut self, dir: Direction) {
-        let rows = picker_rows(&self.paint.recent);
+        let rows = self.picker_grid();
         let Some(p) = self.picker.as_mut() else {
             return;
         };
@@ -576,10 +664,10 @@ impl App {
     }
 
     pub fn picker_submit(&mut self) {
+        let rows = self.picker_grid();
         let Some(p) = self.picker.take() else {
             return;
         };
-        let rows = picker_rows(&self.paint.recent);
         if let Some(color) = rows.get(p.row).and_then(|r| r.get(p.col)).copied() {
             self.set_color(p.target, color);
         }
@@ -1480,5 +1568,41 @@ mod tests {
         app.dispatch(Action::SetBrushGlyph("x".into()));
         assert_eq!(app.paint.kind, BrushKind::Glyph);
         assert_eq!(app.paint.tool, Tool::Brush);
+    }
+
+    #[test]
+    fn spectrum_grid_and_hsl() {
+        assert_eq!(hsl(0, 100, 50), Color::Rgb(255, 0, 0));
+        assert_eq!(hsl(120, 100, 50), Color::Rgb(0, 255, 0));
+        assert_eq!(hsl(240, 100, 50), Color::Rgb(0, 0, 255));
+        assert_eq!(hsl(0, 0, 100), Color::Rgb(255, 255, 255));
+        let rows = spectrum_rows(&[]);
+        assert_eq!(rows.len(), 12);
+        assert!(rows[1..=10].iter().all(|r| r.len() == 36));
+        let mut app = app(4, 2);
+        app.dispatch(Action::OpenColorPicker(ColorTarget::Foreground));
+        app.dispatch(Action::PickerToggleSpectrum);
+        app.dispatch(Action::PickerMove(Direction::Down));
+        app.dispatch(Action::PickerSubmit);
+        assert!(matches!(app.editor.style.fg, Color::Rgb(..)));
+        // Reopening on a truecolour starts in the spectrum.
+        app.dispatch(Action::OpenColorPicker(ColorTarget::Foreground));
+        assert!(app.picker.as_ref().unwrap().spectrum);
+    }
+
+    #[test]
+    fn preview_depth_steps_down_and_back() {
+        use crate::terminal::ColorDepth;
+        let mut app = app(4, 2);
+        app.color_depth = ColorDepth::TrueColor;
+        app.dispatch(Action::CyclePreviewDepth);
+        assert_eq!(app.canvas_depth(), ColorDepth::Ansi256);
+        app.dispatch(Action::CyclePreviewDepth);
+        assert_eq!(app.canvas_depth(), ColorDepth::Ansi16);
+        app.dispatch(Action::CyclePreviewDepth);
+        assert_eq!(app.canvas_depth(), ColorDepth::TrueColor);
+        app.color_depth = ColorDepth::Ansi16;
+        app.dispatch(Action::CyclePreviewDepth);
+        assert_eq!(app.preview_depth, None, "nothing lower than 16 colours");
     }
 }

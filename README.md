@@ -233,8 +233,12 @@ the system clipboard: cells as text, components as JSON, through OSC 52
 (and `wl-copy` or `xclip` when available).
 
 In the colour picker: arrows move, Enter picks, Tab switches foreground and
-background, `#` types a name, index or `#rrggbb`, `d` picks the terminal
-default. Brush strokes, shapes and fills are single undo steps.
+background, `r` switches between the 256-colour grid and a truecolour
+spectrum (36 hues at nine lightness levels, a muted row, 24 greys), `#`
+types a name, index or `#rrggbb`, `d` picks the terminal default. F6
+previews the design at 256 and 16 colours (the editor chrome is
+unaffected); colour properties in the inspector show a swatch and cycle
+through the theme tokens with Space. Brush strokes, shapes and fills are single undo steps.
 
 Pixel mode: a pixel layer (Alt+P, or choosing the Gradient tool) stores
 real sub-cell pixels. You paint pixels; for every cell Glyphforge picks the

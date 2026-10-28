@@ -32,7 +32,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
         return;
     }
 
-    let depth = app.color_depth;
+    let depth = app.canvas_depth();
     let paper = styles::paper(app);
     let outside = styles::muted(app).add_modifier(Modifier::DIM);
 

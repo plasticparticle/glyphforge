@@ -49,6 +49,8 @@ pub struct Field {
     pub cyclic: bool,
     /// Where the row starts a new group (layout, container, properties).
     pub group: &'static str,
+    /// The value is a colour (token or literal): shown with a swatch.
+    pub swatch: bool,
 }
 
 const DIRECTIONS: [&str; 4] = ["vertical", "horizontal", "stack", "grid"];
@@ -153,6 +155,7 @@ pub fn fields(c: &Component, descriptor: Option<&Descriptor>) -> Vec<Field> {
             default: None,
             cyclic,
             group,
+            swatch: false,
         });
     };
     let (placement, col, row) = match layout.placement {
@@ -273,9 +276,10 @@ pub fn fields(c: &Component, descriptor: Option<&Descriptor>) -> Vec<Field> {
                 default: spec.default.as_ref().map(text),
                 cyclic: matches!(
                     spec.kind,
-                    PropKind::Bool | PropKind::Choice { .. } | PropKind::Border
+                    PropKind::Bool | PropKind::Choice { .. } | PropKind::Border | PropKind::Color
                 ),
                 group: "properties",
+                swatch: spec.kind == PropKind::Color,
             });
         }
     }
@@ -290,6 +294,7 @@ pub fn fields(c: &Component, descriptor: Option<&Descriptor>) -> Vec<Field> {
             default: None,
             cyclic: matches!(value, Value::Bool(_)),
             group: "properties",
+            swatch: false,
         });
     }
     out

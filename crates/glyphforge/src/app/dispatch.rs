@@ -70,6 +70,7 @@ impl App {
             | Action::PickerMove(_)
             | Action::PickerSubmit
             | Action::PickerSwitchTarget
+            | Action::PickerToggleSpectrum
             | Action::BrushPageNext
             | Action::BrushPagePrev
             | Action::SetBoxStyle(_)
@@ -113,6 +114,7 @@ impl App {
                 self.ui.show_right_panel = !any;
                 self.refocus_if_hidden();
             }
+            Action::CyclePreviewDepth => self.cycle_preview_depth(),
             Action::FocusNext => self.cycle_focus(true),
             Action::FocusPrev => self.cycle_focus(false),
             Action::ScrollView(dir) => {

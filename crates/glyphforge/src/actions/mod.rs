@@ -217,6 +217,7 @@ pub enum Action {
     PickerMove(Direction),
     PickerSubmit,
     PickerSwitchTarget,
+    PickerToggleSpectrum,
     // Prompt (internal, not bindable)
     PromptInput(char),
     PromptBackspace,
@@ -235,6 +236,8 @@ pub enum Action {
     ToggleLeftPanel,
     ToggleRightPanel,
     TogglePanels,
+    /// Steps the canvas through lower colour depths.
+    CyclePreviewDepth,
     FocusNext,
     FocusPrev,
     ScrollView(Direction),
@@ -439,6 +442,7 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("toggle-left-panel", "Toggle Left Panel", View, Action::ToggleLeftPanel, keys: ["f2"], kw: ["tools", "sidebar", "hide", "show"], aliases: [], implemented: true),
             desc!("toggle-right-panel", "Toggle Right Panel", View, Action::ToggleRightPanel, keys: ["f3"], kw: ["layers", "properties", "sidebar", "hide", "show"], aliases: [], implemented: true),
             desc!("toggle-panels", "Toggle All Panels", View, Action::TogglePanels, keys: ["f4"], kw: ["zen", "focus", "fullscreen", "hide", "show"], aliases: ["zen mode"], implemented: true),
+            desc!("preview-depth", "Preview Colour Depth", View, Action::CyclePreviewDepth, keys: ["f6"], kw: ["256", "16", "ansi", "colours", "degrade", "truecolor"], aliases: [], implemented: true),
             desc!("focus-next", "Focus Next Region", View, Action::FocusNext, keys: ["tab"], kw: ["panel", "cycle"], aliases: [], implemented: true),
             desc!("focus-prev", "Focus Previous Region", View, Action::FocusPrev, keys: ["shift+tab"], kw: ["panel", "cycle"], aliases: [], implemented: true),
             desc!("layer-next", "Next Layer", View, Action::LayerNext, keys: ["ctrl+pageup"], kw: ["layers", "up", "activate"], aliases: [], implemented: true),

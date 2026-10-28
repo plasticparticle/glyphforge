@@ -21,6 +21,12 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
         Span::styled(" │ ", styles::muted(app)),
         Span::styled(app.color_depth.to_string(), styles::muted(app)),
     ];
+    if let Some(d) = app.preview_depth {
+        spans.push(Span::styled(
+            format!(" │ preview {d}"),
+            styles::warning(app),
+        ));
+    }
     if app.is_omarchy {
         spans.push(Span::styled(" │ Omarchy", styles::muted(app)));
     }
