@@ -114,6 +114,51 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
         }
     }
 
+    // Cells being dragged by the Select tool: the source is blank, the
+    // cells are drawn at their new place.
+    let put = |buf: &mut ratatui::buffer::Buffer, pos: Position, symbol: &str, style| {
+        if viewport.contains(pos) {
+            let sx = canvas_area.x + (pos.x - viewport.x);
+            let sy = canvas_area.y + (pos.y - viewport.y);
+            if let Some(cell) = buf.cell_mut((sx, sy)) {
+                cell.set_symbol(symbol).set_style(style);
+            }
+        }
+    };
+    if let Some((from, writes)) = app.move_preview() {
+        for pos in from.positions() {
+            put(buf, pos, " ", paper);
+        }
+        for w in writes {
+            if let Some(g) = w.cell.as_glyph() {
+                put(
+                    buf,
+                    Position::new(w.x, w.y),
+                    g.as_str(),
+                    to_ratatui_style(w.cell.style, depth),
+                );
+            }
+        }
+    }
+    // The selection marquee: its edge cells keep their glyphs and take the
+    // selection colours.
+    if let Some(rect) = app.marquee_preview() {
+        let sel = styles::selection(app);
+        for pos in rect.positions() {
+            let edge = pos.x == rect.x
+                || pos.y == rect.y
+                || u32::from(pos.x) + 1 == rect.right()
+                || u32::from(pos.y) + 1 == rect.bottom();
+            if edge && viewport.contains(pos) {
+                let sx = canvas_area.x + (pos.x - viewport.x);
+                let sy = canvas_area.y + (pos.y - viewport.y);
+                if let Some(cell) = buf.cell_mut((sx, sy)) {
+                    cell.set_style(sel);
+                }
+            }
+        }
+    }
+
     // Snap guides while dragging: dotted lines in the accent colour.
     let guide_style = styles::accent(app);
     for guide in app.active_guides() {

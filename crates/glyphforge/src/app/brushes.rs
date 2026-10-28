@@ -74,7 +74,19 @@ impl BrushPage {
 }
 
 const fn line(weight: Weight, rounded: bool) -> BrushKind {
-    BrushKind::Line(LineStyle { weight, rounded })
+    BrushKind::Line(LineStyle {
+        weight,
+        rounded,
+        dashed: false,
+    })
+}
+
+const fn dashed(weight: Weight) -> BrushKind {
+    BrushKind::Line(LineStyle {
+        weight,
+        rounded: false,
+        dashed: true,
+    })
 }
 
 const fn button(style: ButtonStyle) -> BrushKind {
@@ -101,6 +113,16 @@ const LINE_PRESETS: &[Preset] = &[
         sample: "╬ double",
         name: "double line",
         kind: line(Weight::Double, false),
+    },
+    Preset {
+        sample: "┄ dashed",
+        name: "dashed line",
+        kind: dashed(Weight::Light),
+    },
+    Preset {
+        sample: "┅ dashed",
+        name: "heavy dashed line",
+        kind: dashed(Weight::Heavy),
     },
 ];
 
@@ -409,7 +431,11 @@ pub const fn line_style_of(family: BorderFamily) -> Option<LineStyle> {
         BorderFamily::Heavy => (Weight::Heavy, false),
         BorderFamily::Ascii | BorderFamily::Minimal | BorderFamily::None => return None,
     };
-    Some(LineStyle { weight, rounded })
+    Some(LineStyle {
+        weight,
+        rounded,
+        dashed: false,
+    })
 }
 
 /// Search candidates for the brush prompt, with what each selects.
@@ -678,7 +704,7 @@ mod tests {
         let kinds: Vec<BrushKind> = presets().map(|p| p.kind).collect();
         let unique: std::collections::HashSet<_> = kinds.iter().collect();
         assert_eq!(kinds.len(), unique.len());
-        assert_eq!(kinds.len(), 34);
+        assert_eq!(kinds.len(), 36);
         let double = line(Weight::Double, false);
         assert_eq!(preset_of(double).map(|p| p.name), Some("double line"));
         assert_eq!(page_of(BrushChoice::Kind(double)), Some(0));
@@ -686,7 +712,8 @@ mod tests {
             line_style_of(BorderFamily::Rounded),
             Some(LineStyle {
                 weight: Weight::Light,
-                rounded: true
+                rounded: true,
+                dashed: false,
             })
         );
         assert_eq!(line_style_of(BorderFamily::Ascii), None);

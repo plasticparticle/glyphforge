@@ -114,7 +114,7 @@ with stable codes.
 - [x] Align, distribute and equal size on the multi-selection as one
       undo step each; a single component aligns inside its parent
 
-### E3 — Subcell Mode tools  `[~]`
+### E3 — Subcell Mode tools  `[x]`
 - [x] Tool palette in the left panel (mouse and keys): text, brush, eraser,
       line, rectangle, box, fill, picker; `paint` key context so bare
       letters are tool keys while painting
@@ -137,10 +137,15 @@ with stable codes.
       placed by click or sized by the Rect/Line tools; stamp label
 - [x] Choosing a tool on an interface layer activates an artwork layer or
       adds a "Paint" layer (undoable)
-- [ ] Rectangle selection with move/copy/cut/paste
-- [ ] Dashed line brushes (dashed glyphs only exist for straight runs)
-- [ ] Brush sizes on artwork layers (pixel layers have them, see E8)
-- [ ] Attribute toggles (bold, italic, underline) in the palette
+- [x] Select tool: marquee, drag to move (one undo step, transparent
+      cells keep what is beneath), Delete clears, Ctrl+A selects all
+- [x] Clipboard: copy/cut/paste of cells and of component subtrees (fresh
+      ids), Ctrl+D duplicate; system clipboard through OSC 52 plus
+      `wl-copy`/`xclip`
+- [x] Dashed line brushes (light and heavy; corners stay solid)
+- [x] Brush sizes on artwork layers (square footprint up to 9×9)
+- [x] Attribute toggles (bold, italic, underline, strikethrough, dim,
+      reverse) in the palette and as keys
 
 ### E4 — Colours and palettes  `[~]`
 - [x] Foreground/background from the ANSI 16 swatches (left/right click)

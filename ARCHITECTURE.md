@@ -75,11 +75,13 @@ headless.rs      inspect / render / validate / apply / export / new
 app/             App state, dispatch (behaviour), run loop, viewport,
                  interface (selection), inspector (editable rows),
                  arrange (align, distribute, snapping),
+                 selection (Select tool, clipboard),
                  paint (tools, brush, colours),
                  pixels (raster tools), menu (Esc menu, theme choice)
 actions/         Action enum + descriptors (names, keywords, default keys)
 input/           key model, key-chord parsing, keymap with config overrides
-terminal/        RAII guard, panic hook, capability detection
+terminal/        RAII guard, panic hook, capability detection,
+                 clipboard (OSC 52, wl-copy, xclip)
 render/          core Canvas -> Ratatui buffer, colour degradation
 ui/              layout, header, canvas view, panels, palette, colour
                  picker, menu, prompt, status bar, help
@@ -487,6 +489,14 @@ drag opens one transaction and
   and `global`. Bindings may carry a context prefix (`paint:b`), in the
   defaults and in `[keys]`. The palette and the colour picker each expose
   a geometry function used by both rendering and mouse hit-testing.
+- **Selection and clipboard.** The Select tool's marquee is editor
+  state; a drag inside it lifts the cells into a `CellClip` and previews
+  them at the pointer, the release applies one `set_cells` patch (clears,
+  then writes; empty cells are transparent). The clipboard holds either a
+  `CellClip` or component subtrees; pasting components re-ids every node
+  against the document. Copy also queues text for the system clipboard,
+  which the run loop (the only owner of the terminal) sends as OSC 52 and
+  pipes to `wl-copy`/`xclip`.
 - **Pixel Mode.** `app/pixels.rs` holds the pixel tools, settings,
   gradient library and preview. Tools that need a layer kind (Text:
   artwork, Gradient: raster) switch to one or add it. Mouse presses map

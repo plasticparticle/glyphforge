@@ -121,6 +121,12 @@ impl App {
                     self.update_raster(None, None, None, Some(next));
                 }
             }
+            PixelAction::SizeUp if !self.on_raster_layer() => {
+                self.set_brush_size(self.paint.size.saturating_add(1));
+            }
+            PixelAction::SizeDown if !self.on_raster_layer() => {
+                self.set_brush_size(self.paint.size.saturating_sub(1));
+            }
             PixelAction::SizeUp => self.set_pixel_size(self.paint.pixel_size.saturating_add(1)),
             PixelAction::SizeDown => self.set_pixel_size(self.paint.pixel_size.saturating_sub(1)),
             PixelAction::Cursor(dir) => self.move_pixel_cursor(dir),
@@ -629,7 +635,10 @@ impl App {
             }
             Tool::Fill => self.fill_pixels(p),
             Tool::Picker => self.pick_pixel(p),
-            Tool::Text => self.set_status(StatusKind::Warning, "Text works on artwork layers"),
+            Tool::Text | Tool::Select => self.set_status(
+                StatusKind::Warning,
+                format!("{} works on artwork layers", self.paint.tool.title()),
+            ),
         }
     }
 
@@ -705,7 +714,10 @@ impl App {
             }
             Tool::Fill => self.fill_pixels(p),
             Tool::Picker => self.pick_pixel(p),
-            Tool::Text => self.set_status(StatusKind::Warning, "Text works on artwork layers"),
+            Tool::Text | Tool::Select => self.set_status(
+                StatusKind::Warning,
+                format!("{} works on artwork layers", self.paint.tool.title()),
+            ),
         }
     }
 

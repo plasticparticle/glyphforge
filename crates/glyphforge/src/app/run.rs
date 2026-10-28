@@ -36,6 +36,9 @@ pub fn run(app: &mut App, guard: &mut TerminalGuard) -> Result<(), RunError> {
             terminal.draw(|frame| ui::render(app, frame))?;
             needs_redraw = false;
         }
+        if let Some(text) = app.take_system_clipboard() {
+            crate::terminal::clipboard::copy(&text);
+        }
         if !event::poll(TICK)? {
             continue;
         }

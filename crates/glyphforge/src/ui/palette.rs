@@ -13,7 +13,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 
 use super::styles;
-use crate::actions::{Action, Context, PixelAction};
+use crate::actions::{Action, Attr, Context, PixelAction};
 use crate::app::{
     App, BOX_STYLES, BrushKind, ColorTarget, PaletteEntry, Tool, color_label, is_light,
 };
@@ -40,7 +40,7 @@ pub struct PaletteLayout {
 
 pub fn layout(area: Rect) -> PaletteLayout {
     let [tools, brush, brushes, colors, keys] = Layout::vertical([
-        Constraint::Length(8),
+        Constraint::Length(9),
         Constraint::Length(4),
         Constraint::Length(6),
         Constraint::Length(5),
@@ -63,6 +63,8 @@ pub enum PaletteHit {
     BoxStyle(BorderFamily),
     PixelMode(RasterMode),
     PixelSize,
+    Attr(Attr),
+    BrushSize,
     /// An entry of the brushes block.
     Entry(Action),
     PagePrev,
@@ -89,8 +91,9 @@ impl PaletteHit {
             Self::Tool(t) => Action::SelectTool(t),
             Self::BoxStyle(s) => Action::SetBoxStyle(s),
             Self::PixelMode(m) => Action::Pixel(PixelAction::SetMode(m)),
-            Self::PixelSize if right => Action::Pixel(PixelAction::SizeDown),
-            Self::PixelSize => Action::Pixel(PixelAction::SizeUp),
+            Self::PixelSize | Self::BrushSize if right => Action::Pixel(PixelAction::SizeDown),
+            Self::PixelSize | Self::BrushSize => Action::Pixel(PixelAction::SizeUp),
+            Self::Attr(attr) => Action::ToggleAttr(attr),
             Self::Entry(action) => action,
             Self::PagePrev => Action::BrushPagePrev,
             Self::PageNext => Action::BrushPageNext,
@@ -137,6 +140,13 @@ pub fn hit(app: &App, area: Rect, cell: (u16, u16)) -> Option<PaletteHit> {
                     .map(PaletteHit::PixelMode),
                 _ => Some(PaletteHit::PixelSize),
             };
+        }
+        if y == tool_rows + 1 && app.on_artwork_layer() {
+            return Some(
+                Attr::PALETTE
+                    .get(usize::from(x / SWATCH_WIDTH))
+                    .map_or(PaletteHit::BrushSize, |(attr, _)| PaletteHit::Attr(*attr)),
+            );
         }
         if y == tool_rows {
             return BOX_STYLES
@@ -383,6 +393,25 @@ fn render_tools(app: &App, frame: &mut Frame<'_>, area: Rect, focused: bool) {
             muted,
         ));
         tool_lines.push(Line::from(styles_line));
+        // Attributes of the brush style, then the brush size.
+        let mut attrs = app.editor.style.attrs;
+        let mut attr_line: Vec<Span<'_>> = Attr::PALETTE
+            .iter()
+            .map(|&(attr, mark)| {
+                let style = if *attr.flag(&mut attrs) {
+                    styles::selection(app)
+                } else {
+                    muted
+                };
+                Span::styled(format!("{mark} "), style)
+            })
+            .collect();
+        attr_line.push(Span::styled(" size ", muted));
+        attr_line.push(Span::styled(
+            app.paint.size.to_string(),
+            styles::accent(app),
+        ));
+        tool_lines.push(Line::from(attr_line));
     }
     let title = format!("Tools · {}", app.paint.tool.title());
     frame.render_widget(

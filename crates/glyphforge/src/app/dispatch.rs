@@ -77,6 +77,7 @@ impl App {
             | Action::EditStampLabel
             | Action::CycleBoxStyle) => self.dispatch_paint(action),
             Action::Pixel(pixel) => self.dispatch_pixel(pixel),
+            Action::ToggleAttr(attr) => self.toggle_attr(attr),
             action @ (Action::PromptInput(_)
             | Action::PromptBackspace
             | Action::PromptNext
@@ -155,11 +156,11 @@ impl App {
             Action::Redo => self.redo(),
             Action::NewDocument => self.new_document(),
             Action::SaveDocument => self.save(),
-            Action::OpenDocument
-            | Action::Copy
-            | Action::Cut
-            | Action::Paste
-            | Action::CommandPalette => {
+            Action::Copy => self.copy(),
+            Action::Cut => self.cut(),
+            Action::Paste => self.paste(),
+            Action::Duplicate => self.duplicate(),
+            Action::OpenDocument | Action::CommandPalette => {
                 let title = descriptor_of(&action).map_or("This action", |d| d.title);
                 self.set_status(
                     StatusKind::Warning,
@@ -221,6 +222,7 @@ impl App {
                 self.ui.focus = Focus::Canvas;
                 self.toggle_select_at(pos);
             }
+            Action::SelectAll if self.on_artwork_layer() => self.select_all_cells(),
             Action::SelectAll => self.select_all(),
             Action::SelectParent => self.select_parent(),
             Action::SelectFirstChild => self.select_first_child(),
@@ -351,6 +353,8 @@ impl App {
         } else if self.paint.anchor.take().is_some() || self.paint.pixel_anchor.take().is_some() {
             self.paint.pixel_end = None;
             self.set_status(StatusKind::Info, "Shape cancelled");
+        } else if self.paint.moving.take().is_some() || self.paint.marquee.take().is_some() {
+            self.set_status(StatusKind::Info, "Selection cleared");
         } else if self.ui.help_open {
             self.ui.help_open = false;
         } else if self.ui.focus == Focus::RightPanel
@@ -568,6 +572,9 @@ impl App {
     }
 
     fn delete_forward(&mut self) {
+        if self.clear_marquee() {
+            return;
+        }
         if !self.editable_cells_layer() {
             return;
         }

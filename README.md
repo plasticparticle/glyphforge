@@ -177,7 +177,9 @@ clicking the page name searches every brush and glyph.
 
 The first pages hold semantic brushes; every tool uses the selected one:
 
-- **Lines** (single, rounded, heavy, double): lines join by themselves.
+- **Lines** (single, rounded, heavy, double, dashed, heavy dashed): lines
+  join by themselves; dashed lines use `┄ ┆` on straight runs and solid
+  glyphs at corners and junctions (Unicode has no dashed corners).
   Strokes turn corners, crossing a line makes `┼`, ending on one makes `├`,
   a double line across a single one makes `╪`. The Rect tool draws joined
   frames, the Line tool draws an elbow, and the Eraser unjoins neighbours
@@ -204,8 +206,10 @@ to an artwork layer, adding a "Paint" layer if the screen has none visible.
 
 | Key | Action |
 |-----|--------|
-| Alt+T / B / E / L / R / X / F / I | Text, Brush, Eraser, Line, Rect, Box, Fill, Picker tool |
-| T B E L R X F I | The same, without Alt, while a painting tool is active |
+| Alt+T / B / E / L / R / X / F / I / V | Text, Brush, Eraser, Line, Rect, Box, Fill, Picker, Select tool |
+| T B E L R X F I V | The same, without Alt, while a painting tool is active |
+| = / - (Alt+= / Alt+-) | Brush size (a square of up to 9×9 cells for glyph, pattern and eraser strokes) |
+| Alt+Shift+B / I / U / K | Toggle bold, italic, underline, strikethrough on the brush (all six attributes are clickable under the box styles) |
 | Click, drag | Apply the tool: strokes, shapes from press to release, fill, pick |
 | Space | Apply at the cursor (shapes: first Space sets the corner, second draws) |
 | Right click on the canvas | Pick glyph and colours from a cell |
@@ -216,7 +220,17 @@ to an artwork layer, adding a "Paint" layer if the screen has none visible.
 | N (Alt+N) | Edit the stamp label |
 | [ / ] (Alt+, / Alt+.) | Previous / next brush page |
 | Shift+X (Alt+Shift+X) | Cycle the box style: single, rounded, double, heavy, ASCII |
-| Esc | Cancel a started shape |
+| Ctrl+A | Select the whole layer (Select tool) |
+| Ctrl+C / Ctrl+X / Ctrl+V | Copy, cut, paste the selected cells (paste goes to the cursor) |
+| Delete | Clear the selected cells |
+| Esc | Cancel a started shape, then clear the selection |
+
+The Select tool draws a marquee; dragging inside it moves the cells (one
+undo step), transparent cells of the moved block leave what is beneath.
+On interface layers Ctrl+C / X / V copy, cut and paste components with
+fresh ids, and Ctrl+D duplicates the selection in place. Copies also reach
+the system clipboard: cells as text, components as JSON, through OSC 52
+(and `wl-copy` or `xclip` when available).
 
 In the colour picker: arrows move, Enter picks, Tab switches foreground and
 background, `#` types a name, index or `#rrggbb`, `d` picks the terminal

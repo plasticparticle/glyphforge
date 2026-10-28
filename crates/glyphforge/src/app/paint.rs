@@ -35,10 +35,13 @@ pub enum Tool {
     Picker,
     /// Gradient fill on pixel layers: drag from start to end.
     Gradient,
+    /// Rectangle selection on artwork layers: drag to select, drag the
+    /// selection to move it.
+    Select,
 }
 
 impl Tool {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Text,
         Self::Brush,
         Self::Eraser,
@@ -48,6 +51,7 @@ impl Tool {
         Self::Fill,
         Self::Picker,
         Self::Gradient,
+        Self::Select,
     ];
 
     pub const fn title(self) -> &'static str {
@@ -61,6 +65,7 @@ impl Tool {
             Self::Fill => "Fill",
             Self::Picker => "Pick",
             Self::Gradient => "Gradient",
+            Self::Select => "Select",
         }
     }
 
@@ -71,6 +76,7 @@ impl Tool {
             Self::Brush | Self::Eraser => "click, drag or Space",
             Self::Line | Self::Rect | Self::Box | Self::Gradient => "drag, or Space twice",
             Self::Fill | Self::Picker => "click or Space",
+            Self::Select => "drag to select, drag inside to move",
         }
     }
 }
@@ -221,6 +227,12 @@ pub struct PaintState {
     pub pixel_page: usize,
     /// Line style of the Box tool.
     pub box_style: BorderFamily,
+    /// Selected cells (Select tool).
+    pub marquee: Option<glyphforge_core::Rect>,
+    /// The selected cells being dragged.
+    pub moving: Option<super::selection::CellMove>,
+    /// Brush size on artwork layers: a square of this many cells.
+    pub size: u8,
 }
 
 impl Default for PaintState {
@@ -247,6 +259,9 @@ impl Default for PaintState {
             gradient_shape: glyphforge_core::raster::GradientShape::Linear,
             pixel_page: 0,
             box_style: BorderFamily::Single,
+            marquee: None,
+            moving: None,
+            size: 1,
         }
     }
 }
@@ -293,6 +308,51 @@ impl App {
         }
     }
 
+    pub(super) fn set_brush_size(&mut self, size: u8) {
+        self.paint.size = size.clamp(1, 9);
+        let n = self.paint.size;
+        self.set_status(StatusKind::Info, format!("Brush size {n}×{n}"));
+    }
+
+    pub fn toggle_attr(&mut self, attr: crate::actions::Attr) {
+        let flag = attr.flag(&mut self.editor.style.attrs);
+        *flag = !*flag;
+        let state = if *flag { "on" } else { "off" };
+        self.set_status(
+            StatusKind::Info,
+            format!("{} {state}", capitalised(attr.name())),
+        );
+    }
+
+    /// `path` widened to the brush size: a square around each point, each
+    /// cell once, in path order.
+    fn sized(&self, path: &[Position]) -> Vec<Position> {
+        let n = u16::from(self.paint.size.max(1));
+        if n == 1 {
+            return path.to_vec();
+        }
+        let size = self.doc_size();
+        let back = (n - 1) / 2;
+        let mut seen = std::collections::HashSet::new();
+        let mut out = Vec::new();
+        for p in path {
+            for dy in 0..n {
+                for dx in 0..n {
+                    let (Some(x), Some(y)) =
+                        ((p.x + dx).checked_sub(back), (p.y + dy).checked_sub(back))
+                    else {
+                        continue;
+                    };
+                    let q = Position::new(x, y);
+                    if size.contains(q) && seen.insert(q) {
+                        out.push(q);
+                    }
+                }
+            }
+        }
+        out
+    }
+
     /// The cell the brush paints: brush glyph in the current colours.
     pub fn brush_cell(&self) -> Cell {
         Cell::glyph(self.paint.brush.clone(), self.editor.style)
@@ -301,6 +361,9 @@ impl App {
     pub fn select_tool(&mut self, tool: Tool) {
         self.paint.anchor = None;
         self.paint.pixel_anchor = None;
+        if tool != Tool::Select {
+            self.paint.marquee = None;
+        }
         if tool == Tool::Picker && self.paint.tool != Tool::Picker {
             self.paint.previous_tool = self.paint.tool;
         }
@@ -655,11 +718,15 @@ impl App {
             Tool::Gradient => {
                 self.set_status(StatusKind::Warning, "Gradients work on pixel layers");
             }
+            Tool::Select => self.select_press(pos),
         }
     }
 
     /// Mouse dragged to `pos` with the button held.
     pub fn tool_drag(&mut self, pos: Position) {
+        if self.select_drag(pos) {
+            return;
+        }
         if let Some(last) = self.paint.stroke {
             if last == pos {
                 return;
@@ -683,13 +750,20 @@ impl App {
 
     /// Mouse button released.
     pub fn tool_release(&mut self) {
+        if self.select_release() {
+            return;
+        }
         if let Some(last) = self.paint.stroke.take() {
             if self.drawing_lines() && !self.paint.stroke_moved {
                 self.record_stroke(&[last]);
             }
             self.commit_edits();
         } else if let Some(anchor) = self.paint.anchor.take() {
-            self.commit_shape(anchor, self.editor.cursor);
+            if self.paint.tool == Tool::Select {
+                self.set_marquee(anchor, self.editor.cursor);
+            } else {
+                self.commit_shape(anchor, self.editor.cursor);
+            }
         }
     }
 
@@ -752,6 +826,18 @@ impl App {
             Tool::Gradient => {
                 self.set_status(StatusKind::Warning, "Gradients work on pixel layers");
             }
+            Tool::Select => {
+                if let Some(anchor) = self.paint.anchor.take() {
+                    self.set_marquee(anchor, cursor);
+                } else {
+                    self.paint.marquee = None;
+                    self.paint.anchor = Some(cursor);
+                    self.set_status(
+                        StatusKind::Info,
+                        "Select from here: move the cursor and press Space again",
+                    );
+                }
+            }
         }
     }
 
@@ -774,17 +860,18 @@ impl App {
             }
             return;
         }
+        let wide = self.sized(path);
         let Some(canvas) = self.canvas() else { return };
         let writes = match (self.paint.tool, self.paint.kind) {
-            (Tool::Eraser, _) => paint::stamp(path, &Cell::EMPTY, size),
-            (_, BrushKind::Glyph) => paint::stamp(path, &self.brush_cell(), size),
+            (Tool::Eraser, _) => paint::stamp(&wide, &Cell::EMPTY, size),
+            (_, BrushKind::Glyph) => paint::stamp(&wide, &self.brush_cell(), size),
             (_, BrushKind::Line(line)) => {
                 let edges = paint::path_edges(path);
                 paint::join_edges(canvas, path, &edges, line, style)
             }
             (_, BrushKind::Pattern(pattern)) => paint::pattern_writes(
                 canvas,
-                path,
+                &wide,
                 pattern,
                 &self.paint.brush,
                 style,
@@ -1257,6 +1344,7 @@ mod tests {
         BrushKind::Line(paint::LineStyle {
             weight,
             rounded: false,
+            dashed: false,
         })
     }
 

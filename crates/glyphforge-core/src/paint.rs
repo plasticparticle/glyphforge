@@ -225,6 +225,32 @@ pub struct LineStyle {
     pub weight: Weight,
     /// Light corners as arcs (`╭`).
     pub rounded: bool,
+    /// Straight runs as dashes (`┄ ┆`, heavy `┅ ┇`). Unicode has no dashed
+    /// corners, junctions or double dashes: those stay solid.
+    pub dashed: bool,
+}
+
+/// The dashed glyph for a straight light or heavy run, if there is one.
+fn dashed_glyph(arms: Arms) -> Option<&'static str> {
+    let straight = |a: Side, b: Side| {
+        arms.count() == 2 && arms.get(a) != Weight::None && arms.get(a) == arms.get(b)
+    };
+    let weight = |side: Side| arms.get(side);
+    if straight(Side::Left, Side::Right) {
+        match weight(Side::Left) {
+            Weight::Light => Some("┄"),
+            Weight::Heavy => Some("┅"),
+            _ => None,
+        }
+    } else if straight(Side::Up, Side::Down) {
+        match weight(Side::Up) {
+            Weight::Light => Some("┆"),
+            Weight::Heavy => Some("┇"),
+            _ => None,
+        }
+    } else {
+        None
+    }
 }
 
 /// The side of `from` that faces the 4-neighbour `to`.
@@ -317,7 +343,11 @@ pub fn join_edges(
                     .with(Side::Left, line.weight)
                     .with(Side::Right, line.weight);
             }
-            let glyph = merged.glyph(line.rounded)?;
+            let glyph = line
+                .dashed
+                .then(|| dashed_glyph(merged))
+                .flatten()
+                .or_else(|| merged.glyph(line.rounded))?;
             let grapheme = Grapheme::new(glyph).ok()?;
             Some(CellWrite {
                 x,
@@ -575,6 +605,7 @@ mod tests {
     const LIGHT: LineStyle = LineStyle {
         weight: Weight::Light,
         rounded: false,
+        dashed: false,
     };
 
     #[test]
@@ -607,6 +638,7 @@ mod tests {
         let double = LineStyle {
             weight: Weight::Double,
             rounded: false,
+            dashed: false,
         };
         join(&mut c, &[], &path_edges(&line4(p(0, 1), p(4, 1))), double);
         assert_eq!(text_rows(&c)[1], "╞═╪═╡");
@@ -614,6 +646,7 @@ mod tests {
         let rounded = LineStyle {
             weight: Weight::Light,
             rounded: true,
+            dashed: false,
         };
         let mut r = Canvas::new(Size::new(3, 2)).unwrap();
         join(&mut r, &[], &rect_edges(Rect::new(0, 0, 3, 2)), rounded);
@@ -695,5 +728,30 @@ mod tests {
         assert_eq!(g[0].cell.style.fg, Color::Rgb(0, 0, 0));
         assert_eq!(g[1].cell.style.fg, Color::Rgb(100, 100, 100));
         assert_eq!(g[1].cell.style.bg, Color::Default);
+    }
+
+    #[test]
+    fn dashed_lines_dash_straight_runs_and_keep_corners_solid() {
+        let canvas = Canvas::new(Size::new(5, 3)).unwrap();
+        let dashed = LineStyle {
+            weight: Weight::Light,
+            rounded: false,
+            dashed: true,
+        };
+        let path = elbow(Position::new(0, 0), Position::new(3, 2));
+        let writes = join_edges(
+            &canvas,
+            &path,
+            &path_edges(&path),
+            dashed,
+            CellStyle::DEFAULT,
+        );
+        let glyphs: Vec<&str> = writes
+            .iter()
+            .filter_map(|w| w.cell.as_glyph().map(Grapheme::as_str))
+            .collect();
+        assert!(glyphs.contains(&"┄"), "{glyphs:?}");
+        assert!(glyphs.contains(&"┆"), "{glyphs:?}");
+        assert!(glyphs.contains(&"┐"), "corners stay solid: {glyphs:?}");
     }
 }

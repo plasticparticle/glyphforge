@@ -40,6 +40,52 @@ pub enum MenuAction {
     SetTheme(String),
 }
 
+/// Cell attributes the brush can carry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Attr {
+    Bold,
+    Italic,
+    Underline,
+    Strike,
+    Dim,
+    Reverse,
+}
+
+impl Attr {
+    /// The ones shown in the palette, with their marks.
+    pub const PALETTE: [(Self, &'static str); 6] = [
+        (Self::Bold, "B"),
+        (Self::Italic, "I"),
+        (Self::Underline, "U"),
+        (Self::Strike, "S"),
+        (Self::Dim, "D"),
+        (Self::Reverse, "R"),
+    ];
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Bold => "bold",
+            Self::Italic => "italic",
+            Self::Underline => "underline",
+            Self::Strike => "strikethrough",
+            Self::Dim => "dim",
+            Self::Reverse => "reverse",
+        }
+    }
+
+    /// The flag in `attrs` this attribute controls.
+    pub fn flag(self, attrs: &mut glyphforge_core::Attributes) -> &mut bool {
+        match self {
+            Self::Bold => &mut attrs.bold,
+            Self::Italic => &mut attrs.italic,
+            Self::Underline => &mut attrs.underline,
+            Self::Strike => &mut attrs.strikethrough,
+            Self::Dim => &mut attrs.dim,
+            Self::Reverse => &mut attrs.reverse,
+        }
+    }
+}
+
 /// Inspector actions (right panel in Interface Mode).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InspectorAction {
@@ -143,6 +189,8 @@ pub enum Action {
     },
     ToggleSnap,
     CycleSnapGrid,
+    /// Toggles a text attribute of the brush style.
+    ToggleAttr(Attr),
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,
@@ -216,6 +264,7 @@ pub enum Action {
     Copy,
     Cut,
     Paste,
+    Duplicate,
     DeleteSelection,
     CommandPalette,
 }
@@ -308,16 +357,17 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("save-document-as", "Save Document As", File, Action::SaveDocumentAs, keys: ["ctrl+shift+s"], kw: ["write", "file", "rename"], aliases: ["save as"], implemented: true),
             desc!("undo", "Undo", Edit, Action::Undo, keys: ["ctrl+z"], kw: ["history", "revert"], aliases: [], implemented: true),
             desc!("redo", "Redo", Edit, Action::Redo, keys: ["ctrl+y", "ctrl+shift+z"], kw: ["history", "repeat"], aliases: [], implemented: true),
-            desc!("copy", "Copy", Edit, Action::Copy, keys: ["ctrl+c"], kw: ["clipboard", "selection"], aliases: [], implemented: false),
-            desc!("cut", "Cut", Edit, Action::Cut, keys: ["ctrl+x"], kw: ["clipboard", "selection"], aliases: [], implemented: false),
-            desc!("paste", "Paste", Edit, Action::Paste, keys: ["ctrl+v"], kw: ["clipboard", "insert"], aliases: [], implemented: false),
+            desc!("copy", "Copy", Edit, Action::Copy, keys: ["ctrl+c"], kw: ["clipboard", "selection"], aliases: [], implemented: true),
+            desc!("cut", "Cut", Edit, Action::Cut, keys: ["ctrl+x"], kw: ["clipboard", "selection"], aliases: [], implemented: true),
+            desc!("paste", "Paste", Edit, Action::Paste, keys: ["ctrl+v"], kw: ["clipboard", "insert"], aliases: [], implemented: true),
+            desc!("duplicate", "Duplicate", Edit, Interface, Action::Duplicate, keys: ["ctrl+d"], kw: ["copy", "clone", "repeat"], aliases: [], implemented: true),
             desc!("delete-selection", "Delete Selection", Edit, Action::DeleteSelection, keys: ["ctrl+delete"], kw: ["clear", "remove"], aliases: [], implemented: true),
             desc!("select-next", "Select Next Component", Interface, Interface, Action::SelectNext, keys: ["]"], kw: ["component", "cycle"], aliases: [], implemented: true),
             desc!("select-prev", "Select Previous Component", Interface, Interface, Action::SelectPrev, keys: ["["], kw: ["component", "cycle"], aliases: [], implemented: true),
             desc!("select-by-id", "Select Component By Id", Interface, Global, Action::SelectById, keys: ["ctrl+f"], kw: ["find", "jump", "goto"], aliases: ["find"], implemented: true),
             desc!("add-component", "Add Component", Interface, Interface, Action::AddComponent, keys: ["a"], kw: ["create", "insert", "panel", "label", "button"], aliases: ["new component"], implemented: true),
             desc!("edit-property", "Edit Property", Interface, Interface, Action::EditProperty, keys: ["enter"], kw: ["set", "title", "text", "inspector"], aliases: [], implemented: true),
-            desc!("select-all", "Select All Components", Interface, Interface, Action::SelectAll, keys: ["ctrl+a"], kw: ["multi", "selection", "everything"], aliases: [], implemented: true),
+            desc!("select-all", "Select All", Interface, Interface, Action::SelectAll, keys: ["ctrl+a", "paint:ctrl+a"], kw: ["multi", "selection", "everything"], aliases: [], implemented: true),
             desc!("select-parent", "Select Parent", Interface, Interface, Action::SelectParent, keys: ["alt+up", "u"], kw: ["container", "up", "tree"], aliases: ["parent"], implemented: true),
             desc!("select-child", "Select First Child", Interface, Interface, Action::SelectFirstChild, keys: ["alt+down", "d"], kw: ["children", "down", "tree"], aliases: ["child"], implemented: true),
             desc!("reparent", "Move Into Container", Interface, Interface, Action::Reparent, keys: ["p"], kw: ["reparent", "parent", "nest", "group", "container", "tree"], aliases: ["move into"], implemented: true),
@@ -352,14 +402,21 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("tool-box", "Box Tool", Paint, Action::SelectTool(Tool::Box), keys: ["alt+x", "paint:x"], kw: ["draw", "frame", "border", "box drawing", "tool", "palette"], aliases: ["box"], implemented: true),
             desc!("tool-fill", "Fill Tool", Paint, Action::SelectTool(Tool::Fill), keys: ["alt+f", "paint:f"], kw: ["bucket", "flood", "tool", "palette"], aliases: ["fill"], implemented: true),
             desc!("tool-picker", "Picker Tool", Paint, Action::SelectTool(Tool::Picker), keys: ["alt+i", "paint:i"], kw: ["eyedropper", "sample", "colour", "tool", "palette"], aliases: ["pick"], implemented: true),
+            desc!("tool-select", "Select Tool", Paint, Action::SelectTool(Tool::Select), keys: ["alt+v", "paint:v"], kw: ["marquee", "rectangle", "selection", "move", "copy", "tool", "palette"], aliases: ["select"], implemented: true),
             desc!("tool-gradient", "Gradient Tool", Paint, Action::SelectTool(Tool::Gradient), keys: ["alt+a", "paint:a"], kw: ["gradient", "fill", "pixel", "tool", "palette"], aliases: ["gradient"], implemented: true),
             desc!("new-pixel-layer", "New Pixel Layer", Paint, Action::Pixel(PixelAction::NewLayer), keys: ["alt+p"], kw: ["raster", "sub-cell", "sextant", "braille", "layer"], aliases: ["pixels"], implemented: true),
             desc!("pixel-settings", "Pixel Layer Settings", Paint, Action::Pixel(PixelAction::Settings), keys: ["alt+o", "paint:o"], kw: ["raster", "mode", "dither", "palette", "shadow"], aliases: [], implemented: true),
             desc!("cycle-pixel-mode", "Cycle Pixel Mode", Paint, Action::Pixel(PixelAction::CycleMode), keys: ["alt+m", "paint:m"], kw: ["half", "quadrant", "sextant", "braille", "resolution"], aliases: [], implemented: true),
             desc!("cycle-dither", "Cycle Dithering", Paint, Action::Pixel(PixelAction::CycleDither), keys: ["alt+shift+d", "paint:shift+d"], kw: ["dither", "ordered", "shade", "bayer"], aliases: [], implemented: true),
             desc!("toggle-shadow", "Toggle Drop Shadow", Paint, Action::Pixel(PixelAction::ToggleShadow), keys: ["alt+shift+s", "paint:shift+s"], kw: ["shadow", "effect", "raster"], aliases: [], implemented: true),
-            desc!("pixel-size-up", "Larger Pixel Brush", Paint, Action::Pixel(PixelAction::SizeUp), keys: ["alt+="], kw: ["brush", "size", "pixel"], aliases: [], implemented: true),
-            desc!("pixel-size-down", "Smaller Pixel Brush", Paint, Action::Pixel(PixelAction::SizeDown), keys: ["alt+-"], kw: ["brush", "size", "pixel"], aliases: [], implemented: true),
+            desc!("pixel-size-up", "Larger Brush", Paint, Action::Pixel(PixelAction::SizeUp), keys: ["alt+=", "paint:="], kw: ["brush", "size", "pixel", "bigger"], aliases: [], implemented: true),
+            desc!("pixel-size-down", "Smaller Brush", Paint, Action::Pixel(PixelAction::SizeDown), keys: ["alt+-", "paint:-"], kw: ["brush", "size", "pixel", "smaller"], aliases: [], implemented: true),
+            desc!("toggle-bold", "Toggle Bold", Paint, Action::ToggleAttr(Attr::Bold), keys: ["alt+shift+b"], kw: ["attribute", "style", "text", "weight"], aliases: ["bold"], implemented: true),
+            desc!("toggle-italic", "Toggle Italic", Paint, Action::ToggleAttr(Attr::Italic), keys: ["alt+shift+i"], kw: ["attribute", "style", "text", "slant"], aliases: ["italic"], implemented: true),
+            desc!("toggle-underline", "Toggle Underline", Paint, Action::ToggleAttr(Attr::Underline), keys: ["alt+shift+u"], kw: ["attribute", "style", "text"], aliases: ["underline"], implemented: true),
+            desc!("toggle-strikethrough", "Toggle Strikethrough", Paint, Action::ToggleAttr(Attr::Strike), keys: ["alt+shift+k"], kw: ["attribute", "style", "text", "strike"], aliases: ["strike"], implemented: true),
+            desc!("toggle-dim", "Toggle Dim", Paint, Action::ToggleAttr(Attr::Dim), keys: [], kw: ["attribute", "style", "faint"], aliases: ["dim"], implemented: true),
+            desc!("toggle-reverse", "Toggle Reverse", Paint, Action::ToggleAttr(Attr::Reverse), keys: [], kw: ["attribute", "style", "inverse", "invert"], aliases: ["reverse"], implemented: true),
             desc!("pixel-cursor-up", "Pixel Cursor Up", Paint, Paint, Action::Pixel(PixelAction::Cursor(Direction::Up)), keys: ["shift+up"], kw: ["sub-cell", "move"], aliases: [], implemented: true),
             desc!("pixel-cursor-down", "Pixel Cursor Down", Paint, Paint, Action::Pixel(PixelAction::Cursor(Direction::Down)), keys: ["shift+down"], kw: ["sub-cell", "move"], aliases: [], implemented: true),
             desc!("pixel-cursor-left", "Pixel Cursor Left", Paint, Paint, Action::Pixel(PixelAction::Cursor(Direction::Left)), keys: ["shift+left"], kw: ["sub-cell", "move"], aliases: [], implemented: true),

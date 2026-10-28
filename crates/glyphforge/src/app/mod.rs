@@ -10,6 +10,7 @@ mod paint;
 mod pixels;
 mod prompt;
 mod run;
+mod selection;
 mod viewport;
 
 use glyphforge_core::api::Session;
@@ -170,6 +171,10 @@ pub struct App {
     pub state_dir: Option<std::path::PathBuf>,
     pub picker: Option<ColorPicker>,
     pub drag: Option<Drag>,
+    /// What Copy and Cut put aside (cells or components).
+    pub clipboard: Option<selection::Clipboard>,
+    /// Text waiting to be sent to the system clipboard.
+    system_clipboard: Option<String>,
     /// Snapping while dragging components.
     pub snap: glyphforge_core::align::Snap,
     /// Guides that explain the current snap (shown while dragging).
@@ -249,6 +254,8 @@ impl App {
             state_dir: init.state_dir,
             picker: None,
             drag: None,
+            clipboard: None,
+            system_clipboard: None,
             snap: glyphforge_core::align::Snap::default(),
             guides: Vec::new(),
             paint: PaintState::default(),
@@ -463,6 +470,8 @@ impl App {
         self.paint.stroke = None;
         self.paint.pixel_anchor = None;
         self.paint.pixel_stroke = None;
+        self.paint.marquee = None;
+        self.paint.moving = None;
         self.mark_edited();
     }
 

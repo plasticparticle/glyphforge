@@ -1,6 +1,7 @@
 //! Terminal lifecycle: enter/leave the full-screen mode safely.
 
 pub mod caps;
+pub mod clipboard;
 
 use std::io::{self, Stdout, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
