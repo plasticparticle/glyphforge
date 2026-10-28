@@ -94,17 +94,62 @@ pub fn render_left(app: &App, frame: &mut Frame<'_>, area: Rect) {
     super::paint_frame(app, frame, keys_area, focused);
 }
 
+/// The right panel's layer list and property block. In Interface Mode the
+/// inspector takes what the layer list does not need.
+pub fn right_areas(app: &App, area: Rect) -> [Rect; 2] {
+    if app.on_artwork_layer() || app.on_raster_layer() {
+        let props = if app.on_artwork_layer() { 9 } else { 10 };
+        return Layout::vertical([Constraint::Min(3), Constraint::Length(props)]).areas(area);
+    }
+    let layers = (app.screen().layers().len() as u16 + 2).clamp(4, (area.height / 3).max(4));
+    Layout::vertical([Constraint::Length(layers), Constraint::Min(3)]).areas(area)
+}
+
+/// Where the inspector's rows are: the first visible row index, the
+/// screen row of the first row and how many rows fit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InspectorGeometry {
+    pub start: usize,
+    pub top: u16,
+    pub visible: usize,
+    pub area: Rect,
+}
+
+/// Lines above the rows: kind and placement, id.
+const INSPECTOR_HEADER: u16 = 2;
+
+pub fn inspector_geometry(app: &App, props_area: Rect) -> InspectorGeometry {
+    let inner = Rect::new(
+        props_area.x + 1,
+        props_area.y + 1,
+        props_area.width.saturating_sub(2),
+        props_area.height.saturating_sub(2),
+    );
+    let visible = usize::from(inner.height.saturating_sub(INSPECTOR_HEADER)).max(1);
+    let row = app.inspector_row();
+    let start = row.saturating_sub(visible - 1);
+    InspectorGeometry {
+        start,
+        top: inner.y + INSPECTOR_HEADER,
+        visible,
+        area: inner,
+    }
+}
+
+/// The inspector row at a terminal cell, if any.
+pub fn inspector_hit(app: &App, right: Rect, cell: (u16, u16)) -> Option<usize> {
+    let [_, props] = right_areas(app, right);
+    let g = inspector_geometry(app, props);
+    if !g.area.contains(cell.into()) || cell.1 < g.top {
+        return None;
+    }
+    let row = g.start + usize::from(cell.1 - g.top);
+    (row < app.inspector_fields().len()).then_some(row)
+}
+
 pub fn render_right(app: &App, frame: &mut Frame<'_>, area: Rect) {
     let focused = app.ui.focus == Focus::RightPanel;
-    let props_height = if app.on_artwork_layer() {
-        9
-    } else if app.on_raster_layer() {
-        10
-    } else {
-        14
-    };
-    let [layers_area, props_area] =
-        Layout::vertical([Constraint::Min(3), Constraint::Length(props_height)]).areas(area);
+    let [layers_area, props_area] = right_areas(app, area);
 
     // Layers of the active screen, top-most first.
     let lines: Vec<Line<'_>> = app
@@ -265,52 +310,102 @@ fn render_pixel_info(app: &App, frame: &mut Frame<'_>, area: Rect, focused: bool
     super::paint_frame(app, frame, area, focused);
 }
 
-/// The inspector: identity, geometry and properties of the selection.
+/// The inspector: identity and an editable row per layout field and
+/// property of the selection.
 fn render_inspector(app: &App, frame: &mut Frame<'_>, area: Rect, focused: bool) {
-    let row = |k: &str, v: String| {
-        Line::from(vec![
-            Span::styled(format!("{k:<7}"), styles::muted(app)),
-            Span::styled(v, styles::text(app)),
-        ])
-    };
-    let lines: Vec<Line<'_>> = match app.selection().cloned() {
-        None => vec![
+    let Some(id) = app.selection().cloned() else {
+        let lines = vec![
             Line::from(Span::styled("nothing selected", styles::muted(app))),
             Line::from(Span::styled("] [ cycle, click, Ctrl+F", styles::muted(app))),
             Line::from(Span::styled("a adds a component", styles::muted(app))),
-        ],
-        Some(id) => {
-            let Some(c) = app.doc().component(&id) else {
-                return;
-            };
-            let rect = app.cached_layout().and_then(|l| l.rect(&id));
-            let mut lines = vec![
-                Line::from(vec![
-                    Span::styled(c.kind.clone(), styles::accent(app)),
-                    Span::styled(format!("  {}", app.placement_text(&id)), styles::muted(app)),
-                ]),
-                row("id", id.to_string()),
-            ];
-            if let Some(r) = rect {
-                lines.push(row("x y", format!("{} {}", r.x, r.y)));
-                lines.push(row("w h", format!("{} {}", r.width, r.height)));
-            }
-            lines.push(row("width", c.layout.width.to_string()));
-            lines.push(row("height", c.layout.height.to_string()));
-            if !c.children.is_empty() {
-                lines.push(row("kids", c.children.len().to_string()));
-            }
-            for (k, v) in &c.props {
-                let text = v.to_string();
-                let max = usize::from(area.width.saturating_sub(10));
-                let shown: String = text.chars().take(max).collect();
-                lines.push(row(k, shown));
-            }
-            lines
+            Line::from(Span::styled("shift+click selects more", styles::muted(app))),
+        ];
+        frame.render_widget(
+            Paragraph::new(lines).block(block(app, "Inspector", focused)),
+            area,
+        );
+        super::paint_frame(app, frame, area, focused);
+        return;
+    };
+    let Some(c) = app.doc().component(&id) else {
+        return;
+    };
+    let count = app.selected_ids().len();
+    let rect = app.cached_layout().and_then(|l| l.rect(&id));
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled(c.kind.clone(), styles::accent(app)),
+            Span::styled(
+                rect.map_or_else(String::new, |r| {
+                    format!("  {}×{} at {},{}", r.width, r.height, r.x, r.y)
+                }),
+                styles::muted(app),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(id.to_string(), styles::text(app)),
+            Span::styled(
+                if count > 1 {
+                    format!("  +{} selected", count - 1)
+                } else if c.children.is_empty() {
+                    String::new()
+                } else {
+                    format!("  {} children", c.children.len())
+                },
+                styles::muted(app),
+            ),
+        ]),
+    ];
+    let g = inspector_geometry(app, area);
+    let fields = app.inspector_fields();
+    let selected = app.inspector_row();
+    let label_w = 8;
+    let value_w = usize::from(g.area.width).saturating_sub(label_w);
+    let mut last_group = fields.get(g.start.wrapping_sub(1)).map(|f| f.group);
+    for (i, f) in fields.iter().enumerate().skip(g.start).take(g.visible) {
+        let current = i == selected && focused;
+        let new_group = last_group != Some(f.group);
+        last_group = Some(f.group);
+        let label_style = if current {
+            styles::selection(app)
+        } else if new_group {
+            styles::accent(app)
+        } else {
+            styles::muted(app)
+        };
+        let (value, value_style) = if f.value.is_empty() {
+            (
+                f.default
+                    .as_ref()
+                    .map_or_else(|| "·".to_owned(), |d| format!("· {d}")),
+                styles::muted(app),
+            )
+        } else {
+            (f.value.clone(), styles::text(app))
+        };
+        let mut value: String = value.chars().take(value_w.saturating_sub(2)).collect();
+        if f.cyclic && current {
+            value = format!("‹{value}›");
         }
+        lines.push(Line::from(vec![
+            Span::styled(format!("{:<label_w$}", f.label), label_style),
+            Span::styled(
+                value,
+                if current {
+                    styles::selection(app)
+                } else {
+                    value_style
+                },
+            ),
+        ]));
+    }
+    let title = if focused {
+        "Inspector · ⏎ edit ␣ cycle del reset"
+    } else {
+        "Inspector"
     };
     frame.render_widget(
-        Paragraph::new(lines).block(block(app, "Inspector", focused)),
+        Paragraph::new(lines).block(block(app, title, focused)),
         area,
     );
     super::paint_frame(app, frame, area, focused);

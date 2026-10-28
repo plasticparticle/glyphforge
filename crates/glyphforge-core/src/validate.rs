@@ -68,7 +68,44 @@ pub fn validate(doc: &Document, registry: &Registry) -> Vec<Diagnostic> {
         });
     }
     for screen in doc.screens() {
+        out.extend(validate_props(screen, registry));
         out.extend(validate_screen(screen, &doc.theme, registry, screen.size()));
+    }
+    out
+}
+
+/// Properties whose value does not fit the kind's descriptor (a string
+/// where a number belongs, an unknown choice). Independent of size.
+fn validate_props(screen: &Screen, registry: &Registry) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    let components = screen
+        .layers()
+        .iter()
+        .filter_map(|l| l.components())
+        .flat_map(|roots| roots.iter().flat_map(Component::iter));
+    for c in components {
+        let Some(descriptor) = registry.descriptor(&c.kind) else {
+            continue;
+        };
+        for (name, value) in &c.props {
+            let Some(spec) = descriptor.prop_spec(name) else {
+                continue;
+            };
+            if !spec.kind.accepts(value) {
+                out.push(Diagnostic {
+                    severity: Severity::Warning,
+                    code: "prop-type",
+                    screen: Some(screen.id.clone()),
+                    target: Some(c.id.clone()),
+                    message: format!(
+                        "{name} = {} does not fit {} ({})",
+                        serde_json::to_string(value).unwrap_or_default(),
+                        spec.kind.label(),
+                        spec.help
+                    ),
+                });
+            }
+        }
     }
     out
 }
@@ -323,5 +360,20 @@ mod tests {
             validate(&doc, &Registry::builtin())[0].severity,
             Severity::Error
         );
+    }
+
+    #[test]
+    fn property_of_the_wrong_type_is_flagged() {
+        let roots = vec![
+            Component::new(id!("l"), "label")
+                .with_prop("text", "Hi")
+                .with_prop("align", "middle")
+                .with_prop("bold", "yes")
+                .with_layout(Layout::absolute(0, 0, 10, 1)),
+        ];
+        let diags = validate(&doc_with(roots, 20, 5), &Registry::builtin());
+        let codes: Vec<_> = diags.iter().filter(|d| d.code == "prop-type").collect();
+        assert_eq!(codes.len(), 2, "{diags:?}");
+        assert!(codes[0].message.starts_with("align = \"middle\""));
     }
 }

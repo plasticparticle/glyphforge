@@ -39,6 +39,20 @@ pub enum MenuAction {
     SetTheme(String),
 }
 
+/// Inspector actions (right panel in Interface Mode).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum InspectorAction {
+    /// Highlights the next (`true`) or previous row.
+    Move(bool),
+    /// Toggles or advances the highlighted value (`false`: backwards).
+    Cycle(bool),
+    Edit,
+    /// Resets the highlighted value to its default.
+    Clear,
+    /// Highlights a row (mouse); a click on the highlighted row edits it.
+    Click(usize),
+}
+
 /// Pixel Mode actions (raster layers). Positions are in pixels.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PixelAction {
@@ -109,6 +123,14 @@ pub enum Action {
     ResizeSelection(Direction),
     AddComponent,
     EditProperty,
+    /// Adds the component at a position to the selection or removes it.
+    ToggleSelectAt(Position),
+    SelectAll,
+    SelectParent,
+    SelectFirstChild,
+    /// Prompt for a new parent of the selection.
+    Reparent,
+    Inspector(InspectorAction),
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,
@@ -283,6 +305,11 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("select-by-id", "Select Component By Id", Interface, Global, Action::SelectById, keys: ["ctrl+f"], kw: ["find", "jump", "goto"], aliases: ["find"], implemented: true),
             desc!("add-component", "Add Component", Interface, Interface, Action::AddComponent, keys: ["a"], kw: ["create", "insert", "panel", "label", "button"], aliases: ["new component"], implemented: true),
             desc!("edit-property", "Edit Property", Interface, Interface, Action::EditProperty, keys: ["enter"], kw: ["set", "title", "text", "inspector"], aliases: [], implemented: true),
+            desc!("select-all", "Select All Components", Interface, Interface, Action::SelectAll, keys: ["ctrl+a"], kw: ["multi", "selection", "everything"], aliases: [], implemented: true),
+            desc!("select-parent", "Select Parent", Interface, Interface, Action::SelectParent, keys: ["alt+up", "u"], kw: ["container", "up", "tree"], aliases: ["parent"], implemented: true),
+            desc!("select-child", "Select First Child", Interface, Interface, Action::SelectFirstChild, keys: ["alt+down", "d"], kw: ["children", "down", "tree"], aliases: ["child"], implemented: true),
+            desc!("reparent", "Move Into Container", Interface, Interface, Action::Reparent, keys: ["p"], kw: ["reparent", "parent", "nest", "group", "container", "tree"], aliases: ["move into"], implemented: true),
+            desc!("inspector-edit", "Edit Inspector Field", Interface, Interface, Action::Inspector(InspectorAction::Edit), keys: ["i"], kw: ["inspector", "property", "layout", "padding", "gap"], aliases: ["inspect"], implemented: true),
             desc!("delete-component", "Delete Component", Interface, Interface, Action::DeleteSelection, keys: ["delete", "backspace"], kw: ["remove"], aliases: [], implemented: true),
             desc!("move-selection-up", "Move Selection Up", Interface, Interface, Action::MoveSelection(Direction::Up), keys: ["up"], kw: ["nudge"], aliases: [], implemented: true),
             desc!("move-selection-down", "Move Selection Down", Interface, Interface, Action::MoveSelection(Direction::Down), keys: ["down"], kw: ["nudge"], aliases: [], implemented: true),

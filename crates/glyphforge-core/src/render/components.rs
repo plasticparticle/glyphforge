@@ -9,6 +9,9 @@ use crate::boxdraw::BorderFamily;
 use crate::component::Component;
 use crate::document::{Attributes, Canvas, Cell, CellStyle, Color, Rect, Size};
 use crate::layout::Edges;
+use crate::render::descriptor::{
+    Category, Descriptor, PropKind, PropSpec, align_prop, state_props, style_props,
+};
 use crate::render::{RenderContext, painter};
 use crate::theme::Theme;
 
@@ -21,15 +24,20 @@ pub trait ComponentRenderer: std::fmt::Debug + Send + Sync {
         None
     }
 
+    /// What this kind is: title, category, properties and defaults.
+    fn descriptor(&self) -> Descriptor {
+        Descriptor::new(self.kind(), self.kind(), Category::Layout)
+    }
+
     /// A sensible size for a freshly created instance placed absolutely,
     /// or `None` when the kind sizes itself to its content.
     fn default_size(&self) -> Option<Size> {
-        Some(Size::new(20, 6))
+        self.descriptor().default_size()
     }
 
     /// Properties a new instance starts with, so it is visible at once.
     fn default_props(&self) -> Vec<(&'static str, crate::value::Value)> {
-        Vec::new()
+        self.descriptor().initial_props()
     }
 
     /// Cells consumed by borders and similar chrome.
@@ -86,6 +94,18 @@ impl Registry {
 
     pub fn kinds(&self) -> impl Iterator<Item = &'static str> + '_ {
         self.renderers.keys().copied()
+    }
+
+    /// Descriptors of every registered kind, by category then title.
+    pub fn descriptors(&self) -> Vec<Descriptor> {
+        let mut all: Vec<Descriptor> = self.renderers.values().map(|r| r.descriptor()).collect();
+        all.sort_by(|a, b| a.category.cmp(&b.category).then(a.title.cmp(b.title)));
+        all
+    }
+
+    /// The descriptor of a registered kind.
+    pub fn descriptor(&self, kind: &str) -> Option<Descriptor> {
+        self.renderers.get(kind).map(|r| r.descriptor())
     }
 
     /// The renderer for `kind`, or the placeholder for unknown kinds.
@@ -150,6 +170,13 @@ impl ComponentRenderer for Group {
         "group"
     }
 
+    fn descriptor(&self) -> Descriptor {
+        Descriptor::new("group", "Group", Category::Layout)
+            .summary("Invisible container that arranges its children")
+            .keywords(&["container", "box", "row", "column", "stack", "div"])
+            .container()
+    }
+
     fn render(&self, _: &Component, _: Rect, _: Rect, _: &RenderContext<'_>, _: &mut Canvas) {}
 }
 
@@ -165,8 +192,22 @@ impl ComponentRenderer for Panel {
         "panel"
     }
 
-    fn default_props(&self) -> Vec<(&'static str, crate::value::Value)> {
-        vec![("title", "Panel".into())]
+    fn descriptor(&self) -> Descriptor {
+        Descriptor::new("panel", "Panel", Category::Layout)
+            .summary("Bordered surface with an optional title")
+            .keywords(&["frame", "box", "card", "window", "section"])
+            .container()
+            .prop(
+                PropSpec::new("title", PropKind::Text, "caption in the top border")
+                    .initial("Panel"),
+            )
+            .prop(PropSpec::new(
+                "border",
+                PropKind::Border,
+                "border family (theme default)",
+            ))
+            .prop(PropSpec::new("border_color", PropKind::Color, "border colour").default("border"))
+            .props(style_props())
     }
 
     fn chrome_inset(&self, c: &Component, ctx: &RenderContext<'_>) -> Edges {
@@ -223,12 +264,14 @@ impl ComponentRenderer for Label {
         "label"
     }
 
-    fn default_size(&self) -> Option<Size> {
-        None
-    }
-
-    fn default_props(&self) -> Vec<(&'static str, crate::value::Value)> {
-        vec![("text", "Label".into())]
+    fn descriptor(&self) -> Descriptor {
+        Descriptor::new("label", "Label", Category::Text)
+            .summary("Single line of text")
+            .keywords(&["text", "caption", "string"])
+            .size(None)
+            .prop(PropSpec::new("text", PropKind::Text, "the text").initial("Label"))
+            .prop(align_prop())
+            .props(style_props())
     }
 
     fn intrinsic_size(&self, c: &Component, _: &RenderContext<'_>) -> Option<Size> {
@@ -260,12 +303,14 @@ impl ComponentRenderer for Heading {
         "heading"
     }
 
-    fn default_size(&self) -> Option<Size> {
-        None
-    }
-
-    fn default_props(&self) -> Vec<(&'static str, crate::value::Value)> {
-        vec![("text", "Heading".into())]
+    fn descriptor(&self) -> Descriptor {
+        Descriptor::new("heading", "Heading", Category::Text)
+            .summary("Bold single-line title in the primary colour")
+            .keywords(&["title", "header", "h1"])
+            .size(None)
+            .prop(PropSpec::new("text", PropKind::Text, "the text").initial("Heading"))
+            .prop(align_prop())
+            .props(style_props())
     }
 
     fn intrinsic_size(&self, c: &Component, _: &RenderContext<'_>) -> Option<Size> {
@@ -299,12 +344,19 @@ impl ComponentRenderer for Button {
         "button"
     }
 
-    fn default_size(&self) -> Option<Size> {
-        None
-    }
-
-    fn default_props(&self) -> Vec<(&'static str, crate::value::Value)> {
-        vec![("label", "OK".into())]
+    fn descriptor(&self) -> Descriptor {
+        Descriptor::new("button", "Button", Category::Input)
+            .summary("Pressable action `[ Label ]`")
+            .keywords(&["btn", "action", "submit", "ok", "cancel"])
+            .size(None)
+            .prop(PropSpec::new("label", PropKind::Text, "caption").initial("OK"))
+            .prop(PropSpec::new(
+                "primary",
+                PropKind::Bool,
+                "emphasised default action",
+            ))
+            .prop(align_prop())
+            .props(state_props())
     }
 
     fn intrinsic_size(&self, c: &Component, _: &RenderContext<'_>) -> Option<Size> {
@@ -355,8 +407,17 @@ impl ComponentRenderer for Divider {
         "divider"
     }
 
-    fn default_size(&self) -> Option<Size> {
-        Some(Size::new(10, 1))
+    fn descriptor(&self) -> Descriptor {
+        Descriptor::new("divider", "Divider", Category::Layout)
+            .summary("Horizontal rule")
+            .keywords(&["separator", "rule", "line", "hr"])
+            .size(Some((10, 1)))
+            .prop(PropSpec::new(
+                "border",
+                PropKind::Border,
+                "line family (theme default)",
+            ))
+            .prop(PropSpec::new("color", PropKind::Color, "line colour").default("border-muted"))
     }
 
     fn intrinsic_size(&self, _: &Component, _: &RenderContext<'_>) -> Option<Size> {
@@ -410,8 +471,21 @@ impl ComponentRenderer for Artwork {
         "artwork"
     }
 
-    fn default_size(&self) -> Option<Size> {
-        None
+    fn descriptor(&self) -> Descriptor {
+        let region = |name, help| PropSpec::new(name, PropKind::int(0, i64::from(u16::MAX)), help);
+        Descriptor::new("artwork", "Artwork", Category::Media)
+            .summary("Region of an artwork or pixel layer placed by layout")
+            .keywords(&["image", "picture", "logo", "art", "raster", "pixels"])
+            .size(None)
+            .prop(PropSpec::new(
+                "layer",
+                PropKind::Reference,
+                "source layer id",
+            ))
+            .prop(region("x", "source column"))
+            .prop(region("y", "source row"))
+            .prop(region("width", "source width (whole layer)"))
+            .prop(region("height", "source height (whole layer)"))
     }
 
     fn intrinsic_size(&self, c: &Component, ctx: &RenderContext<'_>) -> Option<Size> {

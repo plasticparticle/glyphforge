@@ -36,6 +36,8 @@ pub enum HeadlessError {
     },
     #[error("unsupported export format {0:?}; supported: text")]
     Format(String),
+    #[error("unknown component kind {0:?}; `glyphforge kinds` lists them")]
+    Kind(String),
     #[error("{0} already exists")]
     Exists(String),
     #[error(transparent)]
@@ -167,6 +169,23 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
             }
             Ok(0)
         }
+        Command::Kinds { kind, json } => {
+            let registry = glyphforge_core::render::Registry::builtin();
+            let mut descriptors = registry.descriptors();
+            if let Some(kind) = &kind {
+                descriptors.retain(|d| d.kind == kind);
+                if descriptors.is_empty() {
+                    return Err(HeadlessError::Kind(kind.clone()));
+                }
+            }
+            let text = if json {
+                serde_json::to_string_pretty(&descriptors).unwrap_or_default()
+            } else {
+                kinds_text(&descriptors)
+            };
+            writeln!(out, "{text}").map_err(write_err(Path::new("stdout")))?;
+            Ok(0)
+        }
         Command::New {
             file,
             width,
@@ -189,6 +208,36 @@ fn write_err(path: &Path) -> impl Fn(std::io::Error) -> HeadlessError + '_ {
         path: path.display().to_string(),
         source,
     }
+}
+
+/// One block per kind: header line, summary, then one line per property.
+fn kinds_text(descriptors: &[glyphforge_core::render::Descriptor]) -> String {
+    let mut s = String::new();
+    for d in descriptors {
+        let _ = writeln!(
+            s,
+            "{} ({}, {}{})",
+            d.kind,
+            d.title,
+            d.category.name(),
+            if d.container { ", container" } else { "" }
+        );
+        if !d.summary.is_empty() {
+            let _ = writeln!(s, "  {}", d.summary);
+        }
+        for p in &d.props {
+            let _ = write!(s, "  {:<14} {:<18} {}", p.name, p.kind.label(), p.help);
+            if let Some(v) = &p.default {
+                let _ = write!(
+                    s,
+                    " [default {}]",
+                    serde_json::to_string(v).unwrap_or_default()
+                );
+            }
+            s.push('\n');
+        }
+    }
+    s.trim_end().to_owned()
 }
 
 /// A compact, agent-readable outline of the document.
@@ -429,5 +478,33 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn kinds_lists_descriptors_as_text_and_json() {
+        let (code, text) = run_str(Command::Kinds {
+            kind: None,
+            json: false,
+        });
+        assert_eq!(code, 0);
+        assert!(text.contains("panel (Panel, Layout, container)"), "{text}");
+        assert!(text.contains("  align          left|center|right"));
+        let (_, json) = run_str(Command::Kinds {
+            kind: Some("button".into()),
+            json: true,
+        });
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v[0]["kind"], "button");
+        assert_eq!(v[0]["props"][0]["name"], "label");
+        assert!(matches!(
+            run(
+                Command::Kinds {
+                    kind: Some("nope".into()),
+                    json: false
+                },
+                &mut Vec::new()
+            ),
+            Err(HeadlessError::Kind(_))
+        ));
     }
 }

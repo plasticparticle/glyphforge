@@ -6,7 +6,7 @@ use crossterm::event::{self, Event, MouseButton, MouseEvent, MouseEventKind};
 
 use super::{App, EditorMode, Focus};
 use crate::actions::{
-    Action, Context, Direction, MenuAction, MenuPage, PixelAction, vim_navigation,
+    Action, Context, Direction, InspectorAction, MenuAction, MenuPage, PixelAction, vim_navigation,
 };
 use crate::app::ColorTarget;
 use crate::config::ThemeSource;
@@ -143,6 +143,10 @@ pub(crate) fn handle_key(app: &mut App, key: Key) {
         }
         return;
     }
+    if let Some(action) = inspector_key(app, key) {
+        app.dispatch(Action::Inspector(action));
+        return;
+    }
     let chord = key.chord();
     let context = app.key_context();
     let bound = app.keymap.lookup(chord, context).cloned();
@@ -189,6 +193,27 @@ pub(crate) fn handle_key(app: &mut App, key: Key) {
             app.dispatch(Action::SetBrushGlyph(c.to_string()));
         }
     }
+}
+
+/// While the inspector has focus, plain navigation keys work on its rows;
+/// everything else (Tab, Ctrl+Z, ...) falls through to the keymap.
+fn inspector_key(app: &App, key: Key) -> Option<InspectorAction> {
+    if app.ui.focus != Focus::RightPanel
+        || app.design_mode() != super::DesignMode::Interface
+        || app.selection().is_none()
+        || !(key.mods.is_none() || key.mods == crate::input::Modifiers::SHIFT)
+    {
+        return None;
+    }
+    Some(match key.code {
+        KeyCode::Up | KeyCode::Char('k') => InspectorAction::Move(false),
+        KeyCode::Down | KeyCode::Char('j') => InspectorAction::Move(true),
+        KeyCode::Enter | KeyCode::Char('e') => InspectorAction::Edit,
+        KeyCode::Char(' ' | 'l') | KeyCode::Right => InspectorAction::Cycle(true),
+        KeyCode::Left | KeyCode::Char('h') => InspectorAction::Cycle(false),
+        KeyCode::Delete | KeyCode::Backspace => InspectorAction::Clear,
+        _ => return None,
+    })
 }
 
 /// With pixel-precise reports (mode 1016) the coordinates are pixels:
@@ -279,13 +304,20 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
                     app.dispatch(Action::CursorTo(pos));
                 } else if app.on_artwork_layer() {
                     app.dispatch(Action::ToolPress(pos));
+                } else if m.modifiers.contains(crossterm::event::KeyModifiers::SHIFT) {
+                    app.dispatch(Action::ToggleSelectAt(pos));
                 } else if !app.begin_drag(pos) {
                     app.dispatch(Action::SelectAt(pos));
                     // A fresh selection can be dragged right away.
                     app.begin_drag(pos);
                 }
-            } else if layout.right.is_some_and(|r| r.contains(cell.into())) {
+            } else if let Some(right) = layout.right.filter(|r| r.contains(cell.into())) {
                 app.ui.focus = Focus::RightPanel;
+                if app.design_mode() == super::DesignMode::Interface {
+                    if let Some(row) = ui::panels::inspector_hit(app, right, cell) {
+                        app.dispatch(Action::Inspector(InspectorAction::Click(row)));
+                    }
+                }
             } else if layout.canvas_block.contains(cell.into()) {
                 app.ui.focus = Focus::Canvas;
             }

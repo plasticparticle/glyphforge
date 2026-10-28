@@ -96,6 +96,14 @@ pub enum Command {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// List the component kinds with their properties.
+    Kinds {
+        /// Only this kind.
+        kind: Option<String>,
+        /// Print the descriptors as JSON.
+        #[arg(long)]
+        json: bool,
+    },
     /// Create a new empty project file.
     New {
         file: PathBuf,

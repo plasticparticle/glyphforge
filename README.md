@@ -64,6 +64,7 @@ glyphforge inspect  design.glyph --json     # the full document
 glyphforge apply    design.glyph patch.json # validated, transactional, undoable
 glyphforge render   design.glyph            # plain-text preview
 glyphforge validate design.glyph --strict   # exit 1 on problems
+glyphforge kinds    [KIND] [--json]         # component kinds, their properties and types
 ```
 
 A patch:
@@ -77,7 +78,7 @@ A patch:
 ```
 
 Operations: `move`, `resize`, `set_property`, `set_layout`,
-`create_component`, `delete_component`, `set_cells`, `set_pixels`,
+`create_component`, `delete_component`, `reparent`, `set_cells`, `set_pixels`,
 `update_raster`, `replace_raster`, `set_gradient`, `delete_gradient`,
 `create_layer`, `delete_layer`, `update_layer`, `reorder_layer`,
 `set_theme`. The same
@@ -141,14 +142,27 @@ Interface mode:
 | Key | Action |
 |-----|--------|
 | `]` / `[`, click | Select the next / previous component, or the one under the mouse |
+| Shift+click, Ctrl+A | Add to the selection / select everything on the layer; edits apply to all |
+| `u` / `d` (Alt+Up/Down) | Select the parent / first child |
+| `p` | Move the selection into another container (or to the top level) |
 | Ctrl+F | Select a component by id (jumps to its layer and screen) |
 | Arrows | Nudge the selection (or move the cursor when nothing is selected) |
 | Shift+Arrows | Resize the selection |
 | Mouse drag | Move; dragging the `◆` corner resizes |
 | `a` | Add a component at the cursor (inside the selection if any): `kind [name]` |
 | Enter | Edit a property of the selection: `key=value` (empty value removes) |
+| `i`, Tab, click | Focus the inspector |
 | Delete | Delete the selection |
 | Esc | Clear the selection |
+
+The inspector (right panel) lists every layout field (placement, size,
+limits, margin; direction, gap, columns, alignment and padding for
+containers) and every property the component's kind reads, with its
+default. Up/Down pick a row, Space and Left/Right cycle toggles, choices
+and sizes (`content` → `fill` → `fixed` → `percent` → `flex`), Enter
+edits with suggestions (border families, colour tokens, layer ids),
+Delete resets to the default, Esc returns to the canvas. A click picks a
+row, a second click edits or cycles it.
 
 Subcell mode: the left panel is the palette. Click a tool, a box style
 (`┌ ╭ ╔ ┏ +` under the tools), a glyph or a colour swatch (left click =

@@ -372,8 +372,12 @@ fn resolve_axis(dim: Dimension, available: u16, intrinsic: Option<u16>) -> u16 {
 }
 
 /// Content size including chrome and padding, if the component has one.
+/// A component without an intrinsic size of its own hugs its children: the
+/// size its container direction needs to fit their fixed and content sizes.
 fn outer_intrinsic(c: &Component, measure: &dyn Measure) -> Option<Size> {
-    let s = measure.intrinsic_size(c)?;
+    let s = measure
+        .intrinsic_size(c)
+        .or_else(|| children_extent(c, measure))?;
     let chrome = measure.chrome_inset(c);
     Some(Size::new(
         s.width
@@ -383,6 +387,89 @@ fn outer_intrinsic(c: &Component, measure: &dyn Measure) -> Option<Size> {
             .saturating_add(chrome.vertical())
             .saturating_add(c.layout.padding.vertical()),
     ))
+}
+
+/// The size a component's own sizing asks for on one axis, ignoring the
+/// space available: fixed sizes and content sizes count, the relative ones
+/// (`fill`, `flex`, `percent`) contribute nothing because they follow the
+/// container rather than size it. Margins are included.
+fn preferred(c: &Component, measure: &dyn Measure) -> (u16, u16) {
+    let intrinsic = outer_intrinsic(c, measure);
+    let axis = |dim: Dimension, natural: Option<u16>| match dim {
+        Dimension::Fixed(n) => n,
+        Dimension::Content => natural.unwrap_or(0),
+        Dimension::Fill | Dimension::Flex(_) | Dimension::Percent(_) => 0,
+    };
+    let w = c
+        .layout
+        .clamp_width(axis(c.layout.width, intrinsic.map(|s| s.width)));
+    let h = c
+        .layout
+        .clamp_height(axis(c.layout.height, intrinsic.map(|s| s.height)));
+    let m = c.layout.margin;
+    (
+        w.saturating_add(m.horizontal()),
+        h.saturating_add(m.vertical()),
+    )
+}
+
+/// The area a component's children need (hug sizing), or `None` without
+/// children. Absolute children extend it to their far corner.
+fn children_extent(c: &Component, measure: &dyn Measure) -> Option<Size> {
+    if c.children.is_empty() {
+        return None;
+    }
+    let container = c.layout.container;
+    let mut flow = Vec::new();
+    let (mut abs_w, mut abs_h) = (0u16, 0u16);
+    for child in &c.children {
+        let (w, h) = preferred(child, measure);
+        if let Placement::Absolute { x, y } = child.layout.placement {
+            abs_w = abs_w.max(x.saturating_add(w));
+            abs_h = abs_h.max(y.saturating_add(h));
+        } else {
+            flow.push((w, h));
+        }
+    }
+    let gaps = container
+        .gap
+        .saturating_mul(flow.len().saturating_sub(1) as u16);
+    let (w, h) = match container.direction {
+        Direction::Horizontal => (
+            flow.iter().fold(gaps, |a, s| a.saturating_add(s.0)),
+            flow.iter().map(|s| s.1).max().unwrap_or(0),
+        ),
+        Direction::Vertical => (
+            flow.iter().map(|s| s.0).max().unwrap_or(0),
+            flow.iter().fold(gaps, |a, s| a.saturating_add(s.1)),
+        ),
+        Direction::Stack => (
+            flow.iter().map(|s| s.0).max().unwrap_or(0),
+            flow.iter().map(|s| s.1).max().unwrap_or(0),
+        ),
+        Direction::Grid => {
+            let columns = usize::from(container.columns.max(1));
+            let col_w = flow.iter().map(|s| s.0).max().unwrap_or(0);
+            let cols = columns.min(flow.len()) as u16;
+            let rows: Vec<u16> = flow
+                .chunks(columns)
+                .map(|row| row.iter().map(|s| s.1).max().unwrap_or(0))
+                .collect();
+            let row_gaps = container
+                .gap
+                .saturating_mul(rows.len().saturating_sub(1) as u16);
+            (
+                col_w
+                    .saturating_mul(cols)
+                    .saturating_add(container.gap.saturating_mul(cols.saturating_sub(1))),
+                rows.iter().fold(row_gaps, |a, h| a.saturating_add(*h)),
+            )
+        }
+    };
+    let (w, h) = (w.max(abs_w), h.max(abs_h));
+    // Children that only follow their container give it nothing to hug;
+    // the component then falls back to filling, as without children.
+    (w > 0 || h > 0).then(|| Size::new(w, h))
 }
 
 fn absolute_rect(
@@ -395,14 +482,27 @@ fn absolute_rect(
     let intrinsic = outer_intrinsic(comp, measure);
     let avail_w = inner.width.saturating_sub(off_x);
     let avail_h = inner.height.saturating_sub(off_y);
-    let width = comp.layout.clamp_width(resolve_axis(
+    // `fill` reaches the parent's far edge minus the right/bottom margin;
+    // `percent` is a share of the whole parent, not of what is left.
+    let axis = |dim: Dimension, avail: u16, margin: u16, whole: u16, natural: Option<u16>| match dim
+    {
+        Dimension::Fill | Dimension::Flex(_) => avail.saturating_sub(margin),
+        Dimension::Percent(_) => resolve_axis(dim, whole, natural).min(avail),
+        _ => resolve_axis(dim, avail, natural),
+    };
+    let m = comp.layout.margin;
+    let width = comp.layout.clamp_width(axis(
         comp.layout.width,
         avail_w,
+        m.right,
+        inner.width,
         intrinsic.map(|s| s.width),
     ));
-    let height = comp.layout.clamp_height(resolve_axis(
+    let height = comp.layout.clamp_height(axis(
         comp.layout.height,
         avail_h,
+        m.bottom,
+        inner.height,
         intrinsic.map(|s| s.height),
     ));
     Rect::new(
@@ -851,10 +951,96 @@ mod tests {
         });
         panel.children = vec![label];
         let r = solve(&[panel], Rect::new(0, 0, 40, 20), &M);
-        // Panel has no intrinsic size itself -> content falls back to fill.
-        assert_eq!(r.rect(&id!("p")), Some(Rect::new(0, 0, 40, 20)));
-        assert_eq!(r.inner(&id!("p")), Some(Rect::new(1, 1, 38, 18)));
+        // Panel has no intrinsic size itself -> content hugs the label.
+        assert_eq!(r.rect(&id!("p")), Some(Rect::new(0, 0, 40, 3)));
+        assert_eq!(r.inner(&id!("p")), Some(Rect::new(1, 1, 38, 1)));
         assert_eq!(r.rect(&id!("l")), Some(Rect::new(1, 1, 10, 1)));
+    }
+
+    #[test]
+    fn content_container_hugs_children() {
+        let fixed = |id: &str, w: u16, h: u16| {
+            comp(
+                id,
+                Layout {
+                    width: Dimension::Fixed(w),
+                    height: Dimension::Fixed(h),
+                    ..Layout::default()
+                },
+            )
+        };
+        let hug = |id: &str, direction: Direction| {
+            let mut c = comp(
+                id,
+                Layout {
+                    width: Dimension::Content,
+                    height: Dimension::Content,
+                    padding: Edges::all(1),
+                    ..Layout::default()
+                }
+                .with_direction(direction),
+            );
+            c.layout.container.gap = 1;
+            c
+        };
+        let mut row = hug("row", Direction::Horizontal);
+        row.children = vec![fixed("a", 4, 2), fixed("b", 6, 3)];
+        let mut col = hug("col", Direction::Vertical);
+        col.children = vec![fixed("c", 4, 2), fixed("d", 6, 3)];
+        let mut grid = hug("grid", Direction::Grid);
+        grid.layout.container.columns = 2;
+        grid.children = (0..3).map(|i| fixed(&format!("g{i}"), 5, 2)).collect();
+        let mut root = comp("root", Layout::default());
+        root.layout.container.align = Align::Start;
+        root.children = vec![row, col, grid];
+        let r = solve(&[root], Rect::new(0, 0, 80, 40), &NoMeasure);
+        // 4 + gap + 6 plus padding; tallest child plus padding.
+        assert_eq!(r.rect(&id!("row")), Some(Rect::new(0, 0, 13, 5)));
+        assert_eq!(r.rect(&id!("col")), Some(Rect::new(0, 5, 8, 8)));
+        // Two columns of 5 with a gap, two rows of 2 with a gap.
+        assert_eq!(r.rect(&id!("grid")), Some(Rect::new(0, 13, 13, 7)));
+    }
+
+    #[test]
+    fn content_container_of_fill_children_still_fills() {
+        let mut root = comp(
+            "root",
+            Layout {
+                height: Dimension::Content,
+                ..Layout::default()
+            },
+        );
+        root.children = vec![comp("a", Layout::default())];
+        let r = solve(&[root], Rect::new(0, 0, 20, 10), &NoMeasure);
+        assert_eq!(r.rect(&id!("root")), Some(Rect::new(0, 0, 20, 10)));
+    }
+
+    #[test]
+    fn absolute_fill_respects_margin_and_percent_uses_parent() {
+        let mut parent = comp("parent", Layout::absolute(0, 0, 40, 20));
+        parent.children = vec![
+            comp(
+                "fill",
+                Layout {
+                    placement: Placement::Absolute { x: 4, y: 2 },
+                    margin: Edges::symmetric(1, 3),
+                    ..Layout::default()
+                },
+            ),
+            comp(
+                "half",
+                Layout {
+                    placement: Placement::Absolute { x: 30, y: 0 },
+                    width: Dimension::Percent(50),
+                    height: Dimension::Percent(50),
+                    ..Layout::default()
+                },
+            ),
+        ];
+        let r = solve(&[parent], Rect::new(0, 0, 80, 24), &NoMeasure);
+        assert_eq!(r.rect(&id!("fill")), Some(Rect::new(4, 2, 33, 17)));
+        // 50 % of 40 is 20, clipped to the 10 columns right of x = 30.
+        assert_eq!(r.rect(&id!("half")), Some(Rect::new(30, 0, 10, 10)));
     }
 
     #[test]

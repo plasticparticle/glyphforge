@@ -33,27 +33,21 @@ impl App {
             self.commit_edits();
         }
         match action {
-            Action::SelectNext => self.select_step(true),
-            Action::SelectPrev => self.select_step(false),
-            Action::SelectById => self.open_select_by_id(),
-            Action::SelectAt(pos) => {
-                self.ui.focus = Focus::Canvas;
-                self.set_cursor(pos, None);
-                self.select_at(pos);
-            }
-            Action::MoveSelection(dir) => {
-                if !self.move_selection(dir) {
-                    self.move_cursor(dir);
-                }
-            }
-            Action::ResizeSelection(dir) => {
-                if !self.resize_selection(dir) {
-                    self.set_status(StatusKind::Info, "Select a component to resize it");
-                }
-            }
-            Action::AddComponent => self.open_add_component(),
-            Action::EditProperty => self.open_edit_property(),
-            Action::DeleteSelection => self.delete_selection(),
+            action @ (Action::SelectNext
+            | Action::SelectPrev
+            | Action::SelectById
+            | Action::SelectAt(_)
+            | Action::ToggleSelectAt(_)
+            | Action::SelectAll
+            | Action::SelectParent
+            | Action::SelectFirstChild
+            | Action::Reparent
+            | Action::Inspector(_)
+            | Action::MoveSelection(_)
+            | Action::ResizeSelection(_)
+            | Action::AddComponent
+            | Action::EditProperty
+            | Action::DeleteSelection) => self.dispatch_interface(&action),
             Action::SaveDocumentAs => self.open_save_as(),
             action @ (Action::SelectTool(_)
             | Action::ApplyTool
@@ -167,6 +161,70 @@ impl App {
                     format!("{title} is not implemented yet"),
                 );
             }
+        }
+    }
+
+    fn dispatch_inspector(&mut self, action: crate::actions::InspectorAction) {
+        use crate::actions::InspectorAction;
+        if self.selection().is_none() {
+            self.set_status(StatusKind::Info, "Select a component to inspect it");
+            return;
+        }
+        match action {
+            InspectorAction::Move(down) => self.inspector_move(down),
+            InspectorAction::Cycle(forward) => self.inspector_cycle(forward),
+            InspectorAction::Edit => self.inspector_edit(),
+            InspectorAction::Clear => self.inspector_clear(),
+            InspectorAction::Click(row) => {
+                let again = self.ui.focus == Focus::RightPanel && self.inspector_row() == row;
+                self.ui.focus = Focus::RightPanel;
+                self.ui.inspector_row = row;
+                if again {
+                    let cyclic = self.inspector_fields().get(row).is_some_and(|f| f.cyclic);
+                    if cyclic {
+                        self.inspector_cycle(true);
+                    } else {
+                        self.inspector_edit();
+                    }
+                }
+            }
+        }
+    }
+
+    /// Interface Mode: selection, geometry, structure and the inspector.
+    fn dispatch_interface(&mut self, action: &Action) {
+        match *action {
+            Action::SelectNext => self.select_step(true),
+            Action::SelectPrev => self.select_step(false),
+            Action::SelectById => self.open_select_by_id(),
+            Action::SelectAt(pos) => {
+                self.ui.focus = Focus::Canvas;
+                self.set_cursor(pos, None);
+                self.select_at(pos);
+            }
+            Action::MoveSelection(dir) => {
+                if !self.move_selection(dir) {
+                    self.move_cursor(dir);
+                }
+            }
+            Action::ResizeSelection(dir) => {
+                if !self.resize_selection(dir) {
+                    self.set_status(StatusKind::Info, "Select a component to resize it");
+                }
+            }
+            Action::ToggleSelectAt(pos) => {
+                self.ui.focus = Focus::Canvas;
+                self.toggle_select_at(pos);
+            }
+            Action::SelectAll => self.select_all(),
+            Action::SelectParent => self.select_parent(),
+            Action::SelectFirstChild => self.select_first_child(),
+            Action::Reparent => self.open_reparent(),
+            Action::Inspector(a) => self.dispatch_inspector(a),
+            Action::AddComponent => self.open_add_component(),
+            Action::EditProperty => self.open_edit_property(),
+            Action::DeleteSelection => self.delete_selection(),
+            _ => {}
         }
     }
 
@@ -285,8 +343,12 @@ impl App {
             self.set_status(StatusKind::Info, "Shape cancelled");
         } else if self.ui.help_open {
             self.ui.help_open = false;
+        } else if self.ui.focus == Focus::RightPanel
+            && self.design_mode() == super::DesignMode::Interface
+        {
+            self.ui.focus = Focus::Canvas;
         } else if self.editor.selection.is_some() {
-            self.editor.selection = None;
+            self.select(None);
         } else if self.ui.vim_navigation && self.editor.mode == EditorMode::Insert {
             self.editor.mode = EditorMode::Normal;
         } else if self.menu.is_some() {
@@ -350,7 +412,7 @@ impl App {
         let layer = &layers[next];
         let msg = format!("Layer: {} ({})", layer.name, layer.kind().name());
         self.editor.layer = layer.id.clone();
-        self.editor.selection = None;
+        self.select(None);
         self.paint.anchor = None;
         self.layout_cache_clear();
         self.clamp_cursor();

@@ -98,6 +98,18 @@ pub enum Operation {
     DeleteComponent {
         target: ObjectId,
     },
+    /// Moves a component (with its children) under another parent, or to
+    /// the roots of `layer` (default: the layer it is on), at `index`
+    /// (default: last). Its layout is kept.
+    Reparent {
+        target: ObjectId,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent: Option<ObjectId>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        layer: Option<ObjectId>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        index: Option<usize>,
+    },
     /// Writes cells on an artwork layer.
     SetCells {
         layer: ObjectId,
@@ -173,6 +185,7 @@ impl Operation {
             | Self::SetProperty { target, .. }
             | Self::SetLayout { target, .. }
             | Self::DeleteComponent { target }
+            | Self::Reparent { target, .. }
             | Self::DeleteLayer { target }
             | Self::UpdateLayer { target, .. }
             | Self::ReorderLayer { target, .. }
@@ -195,6 +208,7 @@ impl Operation {
             Self::SetLayout { .. } => "set_layout",
             Self::CreateComponent { .. } => "create_component",
             Self::DeleteComponent { .. } => "delete_component",
+            Self::Reparent { .. } => "reparent",
             Self::SetCells { .. } => "set_cells",
             Self::SetPixels { .. } => "set_pixels",
             Self::UpdateRaster { .. } => "update_raster",
@@ -290,6 +304,8 @@ pub enum OperationError {
     PixelOutOfBounds { layer: ObjectId, x: u16, y: u16 },
     #[error("{0} is not a gradient")]
     NotAGradient(ObjectId),
+    #[error("cannot move {target} into {parent}: it is inside {target}")]
+    Cycle { target: ObjectId, parent: ObjectId },
 }
 
 fn component_mut<'a>(
@@ -314,6 +330,12 @@ fn apply_one(doc: &mut Document, op: &Operation) -> Result<Operation, OperationE
         | Operation::SetProperty { .. }
         | Operation::CreateComponent { .. }
         | Operation::DeleteComponent { .. } => apply_component_op(doc, op),
+        Operation::Reparent {
+            target,
+            parent,
+            layer,
+            index,
+        } => apply_reparent(doc, target, parent.as_ref(), layer.as_ref(), *index),
         Operation::SetCells { layer, cells } => apply_set_cells(doc, layer, cells),
         Operation::SetPixels { .. }
         | Operation::UpdateRaster { .. }
@@ -460,6 +482,77 @@ fn apply_component_op(doc: &mut Document, op: &Operation) -> Result<Operation, O
         }
         _ => unreachable!("dispatched by apply_one"),
     }
+}
+
+fn interface_roots<'a>(
+    doc: &'a mut Document,
+    layer: &ObjectId,
+) -> Result<&'a mut Vec<crate::component::Component>, OperationError> {
+    let l = doc
+        .layer_mut(layer)
+        .ok_or_else(|| OperationError::NotALayer(layer.clone()))?;
+    if l.locked {
+        return Err(DocumentError::LayerLocked(layer.clone()).into());
+    }
+    let kind = l.kind();
+    l.components_mut().ok_or_else(|| {
+        DocumentError::WrongLayerKind {
+            expected: "interface",
+            actual: kind.name(),
+        }
+        .into()
+    })
+}
+
+fn apply_reparent(
+    doc: &mut Document,
+    target: &ObjectId,
+    parent: Option<&ObjectId>,
+    layer: Option<&ObjectId>,
+    index: Option<usize>,
+) -> Result<Operation, OperationError> {
+    let from_layer = doc
+        .layer_of_component(target)
+        .map(|l| l.id.clone())
+        .ok_or_else(|| OperationError::NotAComponent(target.clone()))?;
+    let to_layer = match (parent, layer) {
+        (Some(p), _) => doc
+            .layer_of_component(p)
+            .map(|l| l.id.clone())
+            .ok_or_else(|| OperationError::NotAComponent(p.clone()))?,
+        (None, Some(l)) => l.clone(),
+        (None, None) => from_layer.clone(),
+    };
+    if let Some(p) = parent {
+        let inside = doc
+            .component(target)
+            .is_some_and(|c| c.iter().any(|d| &d.id == p));
+        if inside {
+            return Err(OperationError::Cycle {
+                target: target.clone(),
+                parent: p.clone(),
+            });
+        }
+    }
+    // Check the destination before removing anything.
+    interface_roots(doc, &to_layer)?;
+    let roots = interface_roots(doc, &from_layer)?;
+    let (old_parent, old_index) =
+        tree::locate(roots, target).ok_or_else(|| OperationError::NotAComponent(target.clone()))?;
+    let removed =
+        tree::remove(roots, target).ok_or_else(|| OperationError::NotAComponent(target.clone()))?;
+    let roots = interface_roots(doc, &to_layer)?;
+    if !tree::insert(roots, parent, index.unwrap_or(usize::MAX), removed) {
+        return Err(OperationError::NotAComponent(
+            parent.cloned().unwrap_or(to_layer),
+        ));
+    }
+    Ok(Operation::Reparent {
+        target: target.clone(),
+        parent: old_parent,
+        layer: Some(from_layer),
+        index: Some(old_index),
+    })
 }
 
 fn apply_set_cells(
@@ -1137,5 +1230,52 @@ mod tests {
         );
         undo.apply(&mut doc).unwrap();
         assert!(doc.gradient(&id!("sunset")).is_none());
+    }
+
+    #[test]
+    fn reparent_moves_subtree_and_inverts() {
+        let mut doc = Document::new(Size::new(40, 10)).unwrap();
+        let root = |id: &str| Component::new(ObjectId::new(id).unwrap(), "group");
+        let setup = Patch::new(vec![
+            Operation::CreateComponent {
+                component: root("a").with_children(vec![root("a1")]),
+                parent: None,
+                layer: Some(id!("main-ui")),
+                index: None,
+            },
+            Operation::CreateComponent {
+                component: root("b"),
+                parent: None,
+                layer: Some(id!("main-ui")),
+                index: None,
+            },
+        ]);
+        setup.apply(&mut doc).unwrap();
+        let before = doc.clone();
+        let inverse = Patch::single(Operation::Reparent {
+            target: id!("a"),
+            parent: Some(id!("b")),
+            layer: None,
+            index: None,
+        })
+        .apply(&mut doc)
+        .unwrap();
+        let roots = doc.layer(&id!("main-ui")).unwrap().components().unwrap();
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].children[0].id, id!("a"));
+        assert_eq!(roots[0].children[0].children[0].id, id!("a1"));
+        inverse.apply(&mut doc).unwrap();
+        assert_eq!(doc, before, "inverse restores order and parent");
+        // A component cannot move into its own subtree.
+        let err = Patch::single(Operation::Reparent {
+            target: id!("a"),
+            parent: Some(id!("a1")),
+            layer: None,
+            index: None,
+        })
+        .apply(&mut doc)
+        .unwrap_err();
+        assert!(err.to_string().contains("inside"), "{err}");
+        assert_eq!(doc, before);
     }
 }

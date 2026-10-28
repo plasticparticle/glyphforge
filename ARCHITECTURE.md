@@ -58,8 +58,9 @@ document/        Grapheme, Color, Cell, Canvas (+ diff-friendly repr),
                  Layer (artwork | interface), Screen, Document
 patch.rs         Operation, Patch: validated, transactional, invertible
 history.rs       Transaction, Origin, History (undo/redo, open strokes)
-render/          RenderContext, Registry, ComponentRenderer, painter,
-                 render_components, render_screen, to_text_lines
+render/          RenderContext, Registry, ComponentRenderer, descriptors
+                 (typed property specs), painter, render_components,
+                 render_screen, to_text_lines
 validate.rs      deterministic diagnostics with stable codes
 project.rs       .glyph envelope, schema_version, migration chain, atomic save
 api.rs           Session: the application API
@@ -71,7 +72,8 @@ Application module map (`crates/glyphforge/src`):
 main.rs, cli.rs  argument parsing; TUI by default, subcommands headless
 headless.rs      inspect / render / validate / apply / export / new
 app/             App state, dispatch (behaviour), run loop, viewport,
-                 interface (selection), paint (tools, brush, colours),
+                 interface (selection), inspector (editable rows),
+                 paint (tools, brush, colours),
                  pixels (raster tools), menu (Esc menu, theme choice)
 actions/         Action enum + descriptors (names, keywords, default keys)
 input/           key model, key-chord parsing, keymap with config overrides
@@ -200,6 +202,13 @@ component (outer and inner). Rules, in order: absolute children are placed
 first and never affect flow; fixed, percent and content sizes are resolved;
 `fill`/`flex` share the remainder by weight with largest-remainder rounding
 in document order; clamps apply; cross-axis alignment stretches by default.
+A `content`-sized component without an intrinsic size of its own hugs its
+children: the sum along its direction (plus gaps), the maximum across,
+grid cells times columns and rows, and absolute children's far corners;
+children that only follow their container (`fill`, `flex`, `percent`)
+contribute nothing, and if nothing contributes the component fills. For
+absolute children `fill` stops at the right/bottom margin and `percent`
+is a share of the whole parent.
 Grid uses equal columns and per-row heights. The solver is a pure function
 and has no notion of glyphs: renderers implement `Measure` to provide
 intrinsic sizes (a label's text width) and chrome insets (a panel's
@@ -266,7 +275,15 @@ Screen ──► for each visible layer, bottom to top:
 
 `RenderContext` carries the theme and the screen (for artwork references).
 `Registry` maps kinds to `ComponentRenderer`s; adding a kind is one struct
-and one registration line. Renderers only paint through `painter`
+and one registration line. Each renderer returns a `Descriptor`: title,
+category, summary, keywords, whether it is a container, default size, and
+one `PropSpec` per property it reads (`PropKind`: text, bool, int range,
+colour, choice, border, reference, list, map; the default the renderer
+assumes and the initial value a new instance gets). Descriptors are data:
+the inspector picks an editor per `PropKind` (cycle, parse, suggestions),
+the add prompt and command palette match titles and keywords, the
+validator reports `prop-type` for values that do not fit, and `glyphforge
+kinds --json` gives agents the same table. Renderers only paint through `painter`
 (`draw_text` with clipping and wide-glyph safety, `fill`, `draw_border`,
 `truncate` with ellipsis). Current kinds: `group`, `panel`, `label`,
 `heading`, `button`, `divider`, `artwork`, plus the placeholder.
@@ -285,7 +302,7 @@ address objects by id:
 
 ```
 move, resize, set_property, set_layout,
-create_component, delete_component,
+create_component, delete_component, reparent,
 set_cells,
 set_pixels, update_raster, replace_raster,
 set_gradient, delete_gradient,
@@ -387,7 +404,8 @@ temporary sibling and renames, so a crash never leaves a half-written file.
 
 `validate::validate(doc)` returns `Diagnostic { severity, code, screen,
 target, message }` with stable codes (`duplicate-id`, `no-space`,
-`clipped`, `truncated`, `overlap`, `unknown-kind`, `theme-tokens`).
+`clipped`, `truncated`, `overlap`, `unknown-kind`, `theme-tokens`,
+`prop-type`).
 Messages name components, not coordinates ("`metrics-table`: "Request
 latency percentile" will be truncated at 80×24"). `validate_at(screen,
 size)` checks responsiveness. Deterministic layout validation is kept
@@ -427,7 +445,13 @@ Milestone 14 adds a modification-time poll and documents the
   testing and nudging use the solved `LayoutResult` of the active layer,
   cached per frame like the composite. Nudge, resize, add, edit and delete
   are `move`, `resize`, `create_component`, `set_property` and
-  `delete_component` operations; a mouse drag opens one transaction and
+  `delete_component` operations, `p` is `reparent`; with several components
+selected (Shift+click, Ctrl+A) every operation is issued per component in
+one patch. The inspector (`app/inspector.rs`) lists the primary
+selection's layout fields and descriptor properties as rows (`FieldKey`)
+and edits them as `set_layout` and `set_property` patches over the whole
+selection; its geometry function serves drawing and mouse hits. A mouse
+drag opens one transaction and
   records an operation per motion event, so undo removes the whole drag.
   The `Prompt` (input line with candidates) serves select-by-id, add
   component, edit property, save-as, colours and the brush glyph, and is

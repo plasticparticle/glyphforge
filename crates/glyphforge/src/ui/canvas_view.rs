@@ -77,13 +77,19 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
         }
     }
 
-    // Selection overlay: highlight the selected component's outline and
-    // mark the bottom-right resize handle.
-    if let Some(rect) = app
-        .selection()
-        .and_then(|id| app.cached_layout().and_then(|l| l.rect(id)))
-    {
-        let sel = styles::selection(app);
+    // Selection overlay: highlight each selected component's outline and
+    // mark the primary selection's bottom-right resize handle.
+    let primary = app.selection().cloned();
+    for id in app.selected_ids() {
+        let Some(rect) = app.cached_layout().and_then(|l| l.rect(&id)) else {
+            continue;
+        };
+        let is_primary = primary.as_ref() == Some(&id);
+        let sel = if is_primary {
+            styles::selection(app)
+        } else {
+            styles::accent(app)
+        };
         for pos in rect.positions() {
             let on_edge = pos.x == rect.x
                 || pos.y == rect.y
@@ -98,7 +104,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
                 cell.set_style(sel);
                 let is_corner =
                     u32::from(pos.x) + 1 == rect.right() && u32::from(pos.y) + 1 == rect.bottom();
-                if is_corner && rect.width > 1 && rect.height > 1 {
+                if is_primary && is_corner && rect.width > 1 && rect.height > 1 {
                     cell.set_symbol("◆");
                 }
             }

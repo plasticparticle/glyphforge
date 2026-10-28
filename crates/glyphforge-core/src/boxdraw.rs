@@ -18,6 +18,11 @@ pub enum BorderFamily {
 }
 
 impl BorderFamily {
+    /// Every family name, in the order the inspector cycles through them.
+    pub const NAMES: [&'static str; 7] = [
+        "rounded", "single", "double", "heavy", "ascii", "minimal", "none",
+    ];
+
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "ascii" => Some(Self::Ascii),

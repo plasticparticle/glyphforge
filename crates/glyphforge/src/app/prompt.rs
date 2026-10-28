@@ -5,6 +5,7 @@
 use glyphforge_core::Value;
 
 use super::ColorTarget;
+use super::inspector::FieldKey;
 
 /// What happens when the prompt is submitted.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,6 +20,10 @@ pub enum PromptKind {
     NewPixelLayer,
     PixelSettings,
     Gradient,
+    /// The new parent of the selection.
+    Reparent,
+    /// An inspector row of the selection.
+    Inspector(FieldKey),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

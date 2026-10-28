@@ -11,6 +11,17 @@ use super::prompt::{Prompt, PromptKind, parse_property};
 use super::{App, DesignMode, StatusKind};
 use crate::actions::Direction;
 
+/// Reparent prompt entry for "no parent".
+const ROOT: &str = "(top level)";
+
+/// `id` for one component, `N components` for more.
+fn describe(ids: &[ObjectId]) -> String {
+    match ids {
+        [one] => one.to_string(),
+        many => format!("{} components", many.len()),
+    }
+}
+
 /// An in-progress mouse drag on a component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DragMode {
@@ -70,6 +81,7 @@ impl App {
     }
 
     pub fn select(&mut self, id: Option<ObjectId>) {
+        self.editor.also_selected.clear();
         self.editor.selection = id;
         if let Some(id) = self.editor.selection.clone() {
             if let Some(rect) = self.layout().rect(&id) {
@@ -140,7 +152,7 @@ impl App {
     }
 
     /// Current offset of `id` inside its parent and its size.
-    fn geometry(&mut self, id: &ObjectId) -> Option<((u16, u16), (u16, u16))> {
+    pub(super) fn geometry(&mut self, id: &ObjectId) -> Option<((u16, u16), (u16, u16))> {
         let rect = self.layout().rect(id)?;
         let inner = self.parent_inner(id);
         Some((
@@ -166,68 +178,241 @@ impl App {
     }
 
     pub fn move_selection(&mut self, dir: Direction) -> bool {
-        let Some(id) = self.selection().cloned() else {
+        let ids = self.selected_ids();
+        if ids.is_empty() {
             return false;
-        };
-        let Some(((x, y), _)) = self.geometry(&id) else {
-            return false;
-        };
-        let (nx, ny) = match dir {
-            Direction::Up => (x, y.saturating_sub(1)),
-            Direction::Down => (x, y.saturating_add(1)),
-            Direction::Left => (x.saturating_sub(1), y),
-            Direction::Right => (x.saturating_add(1), y),
-        };
-        if (nx, ny) == (x, y) {
-            return true;
         }
-        self.apply(
-            Patch::single(Operation::Move {
-                target: id,
-                x: nx,
-                y: ny,
-            }),
-            "Move component",
-        )
+        let mut ops = Vec::new();
+        for id in ids {
+            let Some(((x, y), _)) = self.geometry(&id) else {
+                continue;
+            };
+            let (nx, ny) = match dir {
+                Direction::Up => (x, y.saturating_sub(1)),
+                Direction::Down => (x, y.saturating_add(1)),
+                Direction::Left => (x.saturating_sub(1), y),
+                Direction::Right => (x.saturating_add(1), y),
+            };
+            if (nx, ny) != (x, y) {
+                ops.push(Operation::Move {
+                    target: id,
+                    x: nx,
+                    y: ny,
+                });
+            }
+        }
+        ops.is_empty() || self.apply(Patch::new(ops), "Move component")
     }
 
     pub fn resize_selection(&mut self, dir: Direction) -> bool {
-        let Some(id) = self.selection().cloned() else {
+        let ids = self.selected_ids();
+        if ids.is_empty() {
             return false;
-        };
-        let Some((_, (w, h))) = self.geometry(&id) else {
-            return false;
-        };
-        let (nw, nh) = match dir {
-            Direction::Up => (w, h.saturating_sub(1).max(1)),
-            Direction::Down => (w, h.saturating_add(1)),
-            Direction::Left => (w.saturating_sub(1).max(1), h),
-            Direction::Right => (w.saturating_add(1), h),
-        };
-        if (nw, nh) == (w, h) {
-            return true;
         }
-        self.apply(
-            Patch::single(Operation::Resize {
-                target: id,
-                width: nw,
-                height: nh,
-            }),
-            "Resize component",
-        )
+        let mut ops = Vec::new();
+        for id in ids {
+            let Some((_, (w, h))) = self.geometry(&id) else {
+                continue;
+            };
+            let (nw, nh) = match dir {
+                Direction::Up => (w, h.saturating_sub(1).max(1)),
+                Direction::Down => (w, h.saturating_add(1)),
+                Direction::Left => (w.saturating_sub(1).max(1), h),
+                Direction::Right => (w.saturating_add(1), h),
+            };
+            if (nw, nh) != (w, h) {
+                ops.push(Operation::Resize {
+                    target: id,
+                    width: nw,
+                    height: nh,
+                });
+            }
+        }
+        ops.is_empty() || self.apply(Patch::new(ops), "Resize component")
     }
 
     pub fn delete_selection(&mut self) {
-        let Some(id) = self.selection().cloned() else {
+        let ids = self.selected_ids();
+        if ids.is_empty() {
             self.set_status(StatusKind::Info, "Nothing selected");
             return;
+        }
+        // Children go with their parent: skip ids inside another target.
+        let doc = self.doc();
+        let ops: Vec<Operation> = ids
+            .iter()
+            .filter(|id| {
+                !ids.iter().any(|other| {
+                    other != *id
+                        && doc
+                            .component(other)
+                            .is_some_and(|c| c.iter().any(|d| &d.id == *id))
+                })
+            })
+            .map(|id| Operation::DeleteComponent { target: id.clone() })
+            .collect();
+        let count = ops.len();
+        if self.apply(Patch::new(ops), "Delete component") {
+            self.select(None);
+            let text = match ids.last() {
+                Some(id) if count == 1 => format!("Deleted {id}"),
+                _ => format!("Deleted {count} components"),
+            };
+            self.set_status(StatusKind::Info, text);
+        }
+    }
+
+    /// Shift+click: adds the component under `pos` to the selection, or
+    /// removes it when it is already selected.
+    pub fn toggle_select_at(&mut self, pos: Position) {
+        let Some(id) = self.component_at(pos) else {
+            return;
         };
-        if self.apply(
-            Patch::single(Operation::DeleteComponent { target: id.clone() }),
-            "Delete component",
-        ) {
-            self.editor.selection = None;
-            self.set_status(StatusKind::Info, format!("Deleted {id}"));
+        let primary = self.editor.selection.clone();
+        if primary.as_ref() == Some(&id) {
+            self.editor.selection = self.editor.also_selected.pop();
+        } else if let Some(i) = self.editor.also_selected.iter().position(|a| *a == id) {
+            self.editor.also_selected.remove(i);
+        } else {
+            if let Some(p) = primary.filter(|p| self.doc().component(p).is_some()) {
+                self.editor.also_selected.push(p);
+            }
+            self.editor.selection = Some(id);
+        }
+        let n = self.selected_ids().len();
+        self.set_status(StatusKind::Info, format!("{n} selected"));
+    }
+
+    pub fn select_all(&mut self) {
+        let mut ids = self.layer_components();
+        let Some(last) = ids.pop() else {
+            self.set_status(StatusKind::Info, "No components on this layer");
+            return;
+        };
+        self.editor.selection = Some(last);
+        self.editor.also_selected = ids;
+        let n = self.selected_ids().len();
+        self.set_status(StatusKind::Info, format!("{n} selected"));
+    }
+
+    fn parent_of(&self, id: &ObjectId) -> Option<ObjectId> {
+        self.active_layer()
+            .and_then(|l| l.components())
+            .and_then(|roots| tree::locate(roots, id))
+            .and_then(|(parent, _)| parent)
+    }
+
+    pub fn select_parent(&mut self) {
+        match self.selection().and_then(|id| self.parent_of(id)) {
+            Some(p) => {
+                self.select(Some(p.clone()));
+                self.set_status(StatusKind::Info, format!("Selected {p}"));
+            }
+            None => self.set_status(StatusKind::Info, "Top level: no parent"),
+        }
+    }
+
+    pub fn select_first_child(&mut self) {
+        let child = self
+            .selection()
+            .and_then(|id| self.doc().component(id))
+            .and_then(|c| c.children.first())
+            .map(|c| c.id.clone());
+        match child {
+            Some(c) => {
+                self.select(Some(c.clone()));
+                self.set_status(StatusKind::Info, format!("Selected {c}"));
+            }
+            None => self.set_status(StatusKind::Info, "No children"),
+        }
+    }
+
+    /// Prompt for the container the selection moves into.
+    pub fn open_reparent(&mut self) {
+        let ids = self.selected_ids();
+        if ids.is_empty() {
+            self.set_status(StatusKind::Info, "Select a component to move it");
+            return;
+        }
+        let doc = self.doc();
+        let inside_selection = |c: &ObjectId| {
+            ids.iter().any(|id| {
+                doc.component(id)
+                    .is_some_and(|s| s.iter().any(|d| &d.id == c))
+            })
+        };
+        let registry = self.session.registry();
+        let mut candidates = vec![ROOT.to_owned()];
+        candidates.extend(
+            self.layer_components()
+                .into_iter()
+                .filter(|c| !inside_selection(c))
+                .filter(|c| {
+                    doc.component(c).is_some_and(|c| {
+                        !c.children.is_empty()
+                            || registry.descriptor(&c.kind).is_some_and(|d| d.container)
+                    })
+                })
+                .map(|c| c.to_string()),
+        );
+        self.prompt = Some(Prompt::new(
+            PromptKind::Reparent,
+            format!("Move {} into", describe(&ids)),
+            candidates,
+        ));
+    }
+
+    /// Moves the selection under `value` (a container id or `(top level)`),
+    /// keeping absolutely placed components where they are on screen.
+    pub(super) fn reparent_into(&mut self, value: &str) {
+        let parent = if value == ROOT || value.is_empty() {
+            None
+        } else {
+            match ObjectId::new(value) {
+                Ok(id) if self.doc().component(&id).is_some() => Some(id),
+                _ => {
+                    self.set_status(StatusKind::Warning, format!("No component {value:?}"));
+                    return;
+                }
+            }
+        };
+        let screen = Rect::from_size(self.doc_size());
+        let target_inner = match &parent {
+            Some(p) => self.layout().inner(p).unwrap_or(screen),
+            None => screen,
+        };
+        let ids = self.selected_ids();
+        let mut ops = Vec::new();
+        for id in &ids {
+            ops.push(Operation::Reparent {
+                target: id.clone(),
+                parent: parent.clone(),
+                layer: Some(self.editor.layer.clone()),
+                index: None,
+            });
+            let rect = self.layout().rect(id);
+            if let (Some(c), Some(rect)) = (self.doc().component(id), rect) {
+                if matches!(c.layout.placement, Placement::Absolute { .. }) {
+                    let mut layout = c.layout;
+                    layout.placement = Placement::Absolute {
+                        x: rect.x.saturating_sub(target_inner.x),
+                        y: rect.y.saturating_sub(target_inner.y),
+                    };
+                    ops.push(Operation::SetLayout {
+                        target: id.clone(),
+                        layout,
+                    });
+                }
+            }
+        }
+        let into = parent
+            .as_ref()
+            .map_or("the top level".to_owned(), ToString::to_string);
+        if self.apply(Patch::new(ops), "Move into container") {
+            self.set_status(
+                StatusKind::Info,
+                format!("Moved {} into {into}", describe(&ids)),
+            );
         }
     }
 
@@ -392,6 +577,8 @@ impl App {
             PromptKind::NewPixelLayer => self.submit_new_pixel_layer(&value),
             PromptKind::PixelSettings => self.submit_pixel_settings(&prompt.input),
             PromptKind::Gradient => self.submit_gradient(&prompt.input),
+            PromptKind::Reparent => self.reparent_into(&value),
+            PromptKind::Inspector(key) => self.submit_inspector(&key, &prompt.input),
             PromptKind::SaveAs => {
                 if value.is_empty() {
                     return;
@@ -484,15 +671,6 @@ impl App {
             &label,
         ) {
             self.set_status(StatusKind::Info, label);
-        }
-    }
-
-    /// Placement summary for the inspector.
-    pub fn placement_text(&self, id: &ObjectId) -> String {
-        match self.doc().component(id).map(|c| c.layout.placement) {
-            Some(Placement::Absolute { x, y }) => format!("absolute {x},{y}"),
-            Some(Placement::Flow) => "flow".to_owned(),
-            None => String::new(),
         }
     }
 }

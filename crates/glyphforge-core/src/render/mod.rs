@@ -1,6 +1,7 @@
 //! Rendering: semantic components and artwork layers to a cell canvas.
 
 pub mod components;
+pub mod descriptor;
 pub mod painter;
 
 use crate::component::Component;
@@ -9,6 +10,7 @@ use crate::layout::{self, LayoutResult, Measure};
 use crate::theme::Theme;
 
 pub use components::{ComponentRenderer, Registry};
+pub use descriptor::{Category, Descriptor, PropKind, PropSpec};
 
 #[cfg(test)]
 mod artwork_tests {

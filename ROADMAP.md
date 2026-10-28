@@ -41,8 +41,10 @@ interface/artwork layers, document-wide id uniqueness.
 `Dimension` (content/fill/fixed/percent/flex), placement, containers
 (horizontal, vertical, stack, grid), padding, margin, gap, alignment,
 min/max clamps, deterministic solver with `Measure` for intrinsic sizes.
-- [ ] `hug`-style content sizing for containers (size to children)
-- [ ] `fill` in cross axis for absolute children
+- [x] Hug sizing: `content` on a container without an intrinsic size fits
+      its children (per direction, grid and absolute children included)
+- [x] Absolute children: `fill` stops at the right/bottom margin,
+      `percent` is a share of the whole parent
 
 ### F4 — Style tokens and themes  `[x]`
 Token set, `Theme` with fallback chain, built-in `terminal`,
@@ -63,11 +65,13 @@ Transactions with origin, stroke grouping, undo/redo, limit, saved
 marker; editor typing and agent patches both go through it.
 - [ ] Review UI for agent transactions (list, inspect diff, accept, reject)
 
-### F8 — Component abstraction  `[~]`
+### F8 — Component abstraction  `[x]`
 - [x] Renderer registry, placeholder for unknown kinds
 - [x] `group`, `panel`, `label`, `heading`, `button`, `divider`, `artwork`
-- [ ] Component descriptors (property schema, defaults, palette metadata)
-      so the inspector and the command palette can offer them
+- [x] Component descriptors: title, category, keywords, container flag,
+      default size, typed property specs (text, bool, int range, colour,
+      choice, border, reference, list, map) with defaults and initial
+      values; `prop-type` validation; `glyphforge kinds [--json]`
 
 ### F9 — Agent-readable serialisation and API  `[x]`
 `.glyph` envelope with `schema_version`, migration chain, one-line diffs
@@ -82,7 +86,7 @@ with stable codes.
 
 ## Editor milestones
 
-### E1 — Interface Mode editing  `[~]`
+### E1 — Interface Mode editing  `[x]`
 - [x] Mode follows the active layer (interface -> INTERFACE, artwork -> SUBCELL)
 - [x] Selection by click, by `]`/`[` cycling and by id prompt (Ctrl+F, jumps
       across layers and screens); selection outline with resize handle
@@ -94,10 +98,12 @@ with stable codes.
 - [x] Edit properties by prompt (`Enter`, `key=value`), delete (`Delete`)
 - [x] Inspector panel (kind, id, geometry, layout dimensions, properties)
 - [x] Save As prompt (Ctrl+Shift+S)
-- [ ] Reparent (move a component into another container)
-- [ ] Multi-selection
-- [ ] Editing layout fields (direction, gap, padding) from the inspector
-      without typing `set_layout` JSON
+- [x] Reparent: `reparent` operation (subtree, cross-layer, cycle check),
+      `p` prompt that keeps absolutely placed components in place
+- [x] Multi-selection: Shift+click, Ctrl+A; nudge, resize, delete and
+      inspector edits apply to all as one undo step; parent/child stepping
+- [x] Interactive inspector: every layout field and descriptor property
+      as a row; cycle, edit with suggestions, reset; keyboard and mouse
 
 ### E2 — Alignment and geometry  `[ ]`
 Snap to grid and neighbours, alignment guides while dragging, align and

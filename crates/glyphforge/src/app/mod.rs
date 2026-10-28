@@ -2,6 +2,7 @@
 
 mod brushes;
 mod dispatch;
+mod inspector;
 mod interface;
 mod menu;
 mod paint;
@@ -103,6 +104,8 @@ pub struct UiState {
     pub help_open: bool,
     pub focus: Focus,
     pub vim_navigation: bool,
+    /// Highlighted inspector row (Interface Mode, right panel).
+    pub inspector_row: usize,
 }
 
 /// Editing state that is not part of the document.
@@ -117,8 +120,11 @@ pub struct EditorState {
     pub line_start_x: u16,
     pub style: CellStyle,
     pub mode: EditorMode,
-    /// Selected component (Interface Mode).
+    /// Selected component (Interface Mode): the primary selection that
+    /// the inspector shows.
     pub selection: Option<ObjectId>,
+    /// Further selected components (Shift+click); edits apply to all.
+    pub also_selected: Vec<ObjectId>,
 }
 
 /// Where the UI chrome theme came from.
@@ -212,6 +218,7 @@ impl App {
                     EditorMode::Insert
                 },
                 selection: None,
+                also_selected: Vec::new(),
             },
             session: init.session,
             ui: UiState {
@@ -220,6 +227,7 @@ impl App {
                 help_open: false,
                 focus: Focus::Canvas,
                 vim_navigation: vim,
+                inspector_row: 0,
             },
             ui_theme: Theme::terminal(),
             ui_theme_origin: UiThemeOrigin::Builtin,
@@ -441,6 +449,7 @@ impl App {
         self.editor.line_start_x = 0;
         self.editor.viewport.offset = Position::ORIGIN;
         self.editor.selection = None;
+        self.editor.also_selected.clear();
         self.paint.anchor = None;
         self.paint.stroke = None;
         self.paint.pixel_anchor = None;
