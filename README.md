@@ -133,6 +133,14 @@ document, as an undoable change, so the design uses the colours you see.
 
 ## Editor keys
 
+**Ctrl+Space** (or Ctrl+P) opens the command palette: every action by
+name, fuzzy matched over titles, keywords and aliases ("togall" finds
+Toggle All Panels), recently used commands first. It also lists what the
+moment offers: component kinds to add on interface layers, layers to
+switch to, editor themes, and for a cell selection Flip Horizontally /
+Vertically, Swap Colours and Make Component From Selection (an `artwork`
+component showing those cells, placed where they are).
+
 All bindings are configurable. The mode follows the active layer: an
 interface layer puts the editor in INTERFACE mode, an artwork layer in
 SUBCELL mode (Ctrl+PgUp/PgDn switch layers).

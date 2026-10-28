@@ -19,7 +19,8 @@ pub struct CellClip {
 }
 
 impl CellClip {
-    /// The clip as plain text, one line per row, trailing blanks trimmed.
+    /// The clip as plain text, one line per row, trailing blanks and
+    /// trailing empty lines trimmed.
     pub fn text(&self) -> String {
         let mut rows =
             vec![vec![" ".to_owned(); usize::from(self.width)]; usize::from(self.height)];
@@ -32,10 +33,14 @@ impl CellClip {
                 }
             }
         }
-        rows.iter()
+        let mut lines: Vec<String> = rows
+            .iter()
             .map(|r| r.concat().trim_end().to_owned())
-            .collect::<Vec<_>>()
-            .join("\n")
+            .collect();
+        while lines.last().is_some_and(String::is_empty) {
+            lines.pop();
+        }
+        lines.join("\n")
     }
 }
 

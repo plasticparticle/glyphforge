@@ -191,6 +191,15 @@ pub enum Action {
     CycleSnapGrid,
     /// Toggles a text attribute of the brush style.
     ToggleAttr(Attr),
+    /// Adds a component of this kind (command palette).
+    AddKind(String),
+    ActivateLayer(ObjectId),
+    /// Mirrors the selected cells.
+    FlipSelection(Axis),
+    /// Swaps foreground and background of the selected cells.
+    InvertSelection,
+    /// Places an artwork component showing the selected cells.
+    SelectionToComponent,
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,
@@ -305,15 +314,7 @@ pub struct ActionDescriptor {
     pub title: &'static str,
     pub category: Category,
     pub context: Context,
-    #[allow(
-        dead_code,
-        reason = "consumed by the command palette fuzzy matcher (Milestone 9)"
-    )]
     pub keywords: &'static [&'static str],
-    #[allow(
-        dead_code,
-        reason = "consumed by the command palette fuzzy matcher (Milestone 9)"
-    )]
     pub aliases: &'static [&'static str],
     /// Key chords; a `paint:`/`interface:`/`global:` prefix binds the chord
     /// in that context instead of the descriptor's own.
@@ -353,7 +354,7 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("reload-theme", "Reload UI Theme", Application, Action::ReloadTheme, keys: ["ctrl+shift+t"], kw: ["omarchy", "colors", "palette"], aliases: [], implemented: true),
             desc!("use-ui-theme", "Use The Editor Theme In The Document", Application, Action::UseUiThemeInDocument, keys: ["ctrl+shift+o"], kw: ["omarchy", "theme", "colors", "document", "design"], aliases: [], implemented: true),
             desc!("menu", "Menu", Application, Action::Menu(MenuAction::Open), keys: ["f10"], kw: ["esc", "options", "theme", "quit"], aliases: ["options"], implemented: true),
-            desc!("command-palette", "Command Palette", Application, Action::CommandPalette, keys: ["ctrl+space", "ctrl+p"], kw: ["search", "actions", "run"], aliases: ["palette"], implemented: false),
+            desc!("command-palette", "Command Palette", Application, Action::CommandPalette, keys: ["ctrl+space", "ctrl+p"], kw: ["search", "actions", "run"], aliases: ["palette"], implemented: true),
             desc!("new-document", "New Document", File, Action::NewDocument, keys: ["ctrl+n"], kw: ["create", "canvas"], aliases: ["new"], implemented: true),
             desc!("open-document", "Open Document", File, Action::OpenDocument, keys: ["ctrl+o"], kw: ["load", "file"], aliases: ["open"], implemented: false),
             desc!("save-document", "Save Document", File, Action::SaveDocument, keys: ["ctrl+s"], kw: ["write", "file"], aliases: ["save"], implemented: true),
@@ -370,7 +371,7 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("select-by-id", "Select Component By Id", Interface, Global, Action::SelectById, keys: ["ctrl+f"], kw: ["find", "jump", "goto"], aliases: ["find"], implemented: true),
             desc!("add-component", "Add Component", Interface, Interface, Action::AddComponent, keys: ["a"], kw: ["create", "insert", "panel", "label", "button"], aliases: ["new component"], implemented: true),
             desc!("edit-property", "Edit Property", Interface, Interface, Action::EditProperty, keys: ["enter"], kw: ["set", "title", "text", "inspector"], aliases: [], implemented: true),
-            desc!("select-all", "Select All", Interface, Interface, Action::SelectAll, keys: ["ctrl+a", "paint:ctrl+a"], kw: ["multi", "selection", "everything"], aliases: [], implemented: true),
+            desc!("select-all", "Select All", Interface, Interface, Action::SelectAll, keys: ["ctrl+a", "paint:ctrl+a", "global:ctrl+a"], kw: ["multi", "selection", "everything"], aliases: [], implemented: true),
             desc!("select-parent", "Select Parent", Interface, Interface, Action::SelectParent, keys: ["alt+up", "u"], kw: ["container", "up", "tree"], aliases: ["parent"], implemented: true),
             desc!("select-child", "Select First Child", Interface, Interface, Action::SelectFirstChild, keys: ["alt+down", "d"], kw: ["children", "down", "tree"], aliases: ["child"], implemented: true),
             desc!("reparent", "Move Into Container", Interface, Interface, Action::Reparent, keys: ["p"], kw: ["reparent", "parent", "nest", "group", "container", "tree"], aliases: ["move into"], implemented: true),

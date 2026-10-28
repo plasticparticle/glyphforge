@@ -90,6 +90,27 @@ fn handle_event(app: &mut App, ev: &Event) -> bool {
 /// Routes a key: help overlay first, then the keymap, then Vim navigation,
 /// then text insertion.
 pub(crate) fn handle_key(app: &mut App, key: Key) {
+    if app.palette.is_some() {
+        match key.code {
+            KeyCode::Esc => app.dispatch(Action::Cancel),
+            KeyCode::Enter => app.palette_run(None),
+            KeyCode::Backspace => app.palette_backspace(),
+            KeyCode::Down | KeyCode::Tab => app.palette_move(true),
+            KeyCode::Up | KeyCode::BackTab => app.palette_move(false),
+            _ if key.mods.ctrl && matches!(key.code, KeyCode::Char('n' | 'j')) => {
+                app.palette_move(true);
+            }
+            _ if key.mods.ctrl && matches!(key.code, KeyCode::Char('p' | 'k')) => {
+                app.palette_move(false);
+            }
+            _ => {
+                if let Some(c) = key.text_char() {
+                    app.palette_input(c);
+                }
+            }
+        }
+        return;
+    }
     if app.prompt.is_some() {
         let action = match key.code {
             KeyCode::Esc => Action::PromptCancel,
@@ -258,6 +279,9 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
     }
     let (m, sub) = to_cells(app, m);
     let cell = (m.column, m.row);
+    if app.palette.is_some() {
+        return handle_palette_mouse(app, m);
+    }
     if app.menu.is_some() {
         return handle_menu_mouse(app, m);
     }
@@ -389,6 +413,30 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
         }
         _ => false,
     }
+}
+
+/// While the command palette is open it owns the mouse: a click runs an
+/// entry, a click outside closes it, the wheel moves the selection.
+fn handle_palette_mouse(app: &mut App, m: MouseEvent) -> bool {
+    let area = app.last_frame_area();
+    match m.kind {
+        MouseEventKind::ScrollUp => app.palette_move(false),
+        MouseEventKind::ScrollDown => app.palette_move(true),
+        MouseEventKind::Down(MouseButton::Left) => {
+            match ui::commands::hit(app, area, (m.column, m.row)) {
+                Some(i) => app.palette_run(Some(i)),
+                None if !ui::commands::geometry(app, area)
+                    .popup
+                    .contains((m.column, m.row).into()) =>
+                {
+                    app.palette = None;
+                }
+                None => return false,
+            }
+        }
+        _ => return false,
+    }
+    true
 }
 
 /// While the menu is open it owns the mouse: a click chooses an entry, a

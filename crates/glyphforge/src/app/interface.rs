@@ -642,7 +642,7 @@ impl App {
         self.set_status(StatusKind::Info, format!("Selected {id} ({kind})"));
     }
 
-    fn add_component_from(&mut self, value: &str) {
+    pub(super) fn add_component_from(&mut self, value: &str) {
         let mut words = value.split_whitespace();
         let Some(kind) = words.next() else { return };
         let name = words.collect::<Vec<_>>().join(" ");

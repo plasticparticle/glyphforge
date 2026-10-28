@@ -471,6 +471,164 @@ fn bounding_box(positions: &[Position]) -> Rect {
     Rect::new(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
 }
 
+/// Glyph pairs that are each other's mirror image left to right.
+const MIRROR_H: &[(&str, &str)] = &[
+    ("←", "→"),
+    ("◀", "▶"),
+    ("◁", "▷"),
+    ("◂", "▸"),
+    ("◃", "▹"),
+    ("«", "»"),
+    ("‹", "›"),
+    ("⇐", "⇒"),
+    ("↖", "↗"),
+    ("↙", "↘"),
+    ("⇠", "⇢"),
+    ("▌", "▐"),
+    ("▖", "▗"),
+    ("▘", "▝"),
+    ("▛", "▜"),
+    ("▙", "▟"),
+    ("▚", "▞"),
+    ("▏", "▕"),
+    ("◢", "◣"),
+    ("◥", "◤"),
+    ("◸", "◹"),
+    ("◺", "◿"),
+    ("/", "\\"),
+    ("╱", "╲"),
+    ("(", ")"),
+    ("[", "]"),
+    ("{", "}"),
+    ("<", ">"),
+    ("⟨", "⟩"),
+    ("⌈", "⌉"),
+    ("⌊", "⌋"),
+    ("◐", "◑"),
+    ("◖", "◗"),
+];
+
+/// Glyph pairs that are each other's mirror image top to bottom.
+const MIRROR_V: &[(&str, &str)] = &[
+    ("↑", "↓"),
+    ("▲", "▼"),
+    ("△", "▽"),
+    ("▴", "▾"),
+    ("▵", "▿"),
+    ("⇑", "⇓"),
+    ("↖", "↙"),
+    ("↗", "↘"),
+    ("▀", "▄"),
+    ("▘", "▖"),
+    ("▝", "▗"),
+    ("▛", "▙"),
+    ("▜", "▟"),
+    ("▚", "▞"),
+    ("▔", "▁"),
+    ("◢", "◥"),
+    ("◣", "◤"),
+    ("◸", "◺"),
+    ("◹", "◿"),
+    ("/", "\\"),
+    ("╱", "╲"),
+    ("^", "v"),
+    ("⌈", "⌊"),
+    ("⌉", "⌋"),
+    ("◓", "◒"),
+    ("◠", "◡"),
+    ("'", ","),
+];
+
+/// The mirror image of a glyph: box-drawing glyphs through their arms (so
+/// every weight mixture works), others through a pair table; glyphs that
+/// are symmetric or unknown stay as they are.
+pub fn mirror_glyph(glyph: &str, horizontal: bool) -> &str {
+    if let Some(arms) = Arms::of(glyph) {
+        let (a, b) = if horizontal {
+            (Side::Left, Side::Right)
+        } else {
+            (Side::Up, Side::Down)
+        };
+        let mirrored = arms.with(a, arms.get(b)).with(b, arms.get(a));
+        if mirrored == arms {
+            return glyph;
+        }
+        let rounded = arms.glyph(true) == Some(glyph) && arms.glyph(false) != Some(glyph);
+        return mirrored.glyph(rounded).unwrap_or(glyph);
+    }
+    let table = if horizontal { MIRROR_H } else { MIRROR_V };
+    table
+        .iter()
+        .find_map(|(a, b)| {
+            if *a == glyph {
+                Some(*b)
+            } else if *b == glyph {
+                Some(*a)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(glyph)
+}
+
+/// Writes that mirror the cells of `rect` left to right (or top to
+/// bottom), glyphs included. Wide glyphs keep their two cells together.
+pub fn flip_region(canvas: &Canvas, rect: Rect, horizontal: bool) -> Vec<CellWrite> {
+    let rect = rect.intersection(canvas.bounds());
+    let mut cells = Vec::new();
+    for p in rect.positions() {
+        let Some(cell) = canvas.get(p) else { continue };
+        if cell.is_wide_tail() {
+            continue;
+        }
+        let w = u16::from(cell.width().max(1));
+        let target = if horizontal {
+            let from_left = p.x - rect.x;
+            Position::new(rect.x + rect.width - from_left - w, p.y)
+        } else {
+            Position::new(p.x, rect.y + rect.height - 1 - (p.y - rect.y))
+        };
+        let mut cell = cell.clone();
+        if let Some(g) = cell.as_glyph() {
+            let mirrored = mirror_glyph(g.as_str(), horizontal);
+            if mirrored != g.as_str() {
+                if let Ok(m) = Grapheme::new(mirrored) {
+                    cell = Cell::glyph(m, cell.style);
+                }
+            }
+        }
+        cells.push((target, cell));
+    }
+    // Clear first so wide glyphs moved onto new cells do not leave tails.
+    let mut out = stamp(
+        &rect.positions().collect::<Vec<_>>(),
+        &Cell::EMPTY,
+        canvas.size(),
+    );
+    out.extend(stamp_each(cells, canvas.size()));
+    out
+}
+
+/// Writes that swap foreground and background of every cell in `rect`.
+pub fn invert_region(canvas: &Canvas, rect: Rect) -> Vec<CellWrite> {
+    rect.intersection(canvas.bounds())
+        .positions()
+        .filter_map(|p| {
+            let cell = canvas.get(p)?;
+            if cell.is_empty() || cell.is_wide_tail() {
+                return None;
+            }
+            let mut cell = cell.clone();
+            std::mem::swap(&mut cell.style.fg, &mut cell.style.bg);
+            Some(CellWrite {
+                x: p.x,
+                y: p.y,
+                cell,
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -753,5 +911,32 @@ mod tests {
         assert!(glyphs.contains(&"┄"), "{glyphs:?}");
         assert!(glyphs.contains(&"┆"), "{glyphs:?}");
         assert!(glyphs.contains(&"┐"), "corners stay solid: {glyphs:?}");
+    }
+
+    #[test]
+    fn mirroring_glyphs_and_regions() {
+        assert_eq!(mirror_glyph("┌", true), "┐");
+        assert_eq!(mirror_glyph("╭", true), "╮");
+        assert_eq!(mirror_glyph("┝", true), "┥");
+        assert_eq!(mirror_glyph("├", false), "├");
+        assert_eq!(mirror_glyph("┬", false), "┴");
+        assert_eq!(mirror_glyph("┄", true), "┄");
+        assert_eq!(mirror_glyph("→", true), "←");
+        assert_eq!(mirror_glyph("▀", false), "▄");
+        assert_eq!(mirror_glyph("x", true), "x");
+        let mut canvas = Canvas::new(Size::new(5, 2)).unwrap();
+        for (x, g) in [(0, "┌"), (1, "漢"), (4, "→")] {
+            canvas
+                .put(
+                    Position::new(x, 0),
+                    Cell::glyph(Grapheme::new(g).unwrap(), CellStyle::DEFAULT),
+                )
+                .unwrap();
+        }
+        for w in flip_region(&canvas, Rect::new(0, 0, 5, 1), true) {
+            canvas.put(Position::new(w.x, w.y), w.cell).unwrap();
+        }
+        // text_rows shows the wide glyph's tail as a dot.
+        assert_eq!(text_rows(&canvas)[0], "←.漢.┐");
     }
 }

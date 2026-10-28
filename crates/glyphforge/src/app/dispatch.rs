@@ -100,30 +100,15 @@ impl App {
             }
             Action::UseUiThemeInDocument => self.use_ui_theme_in_document(),
             Action::Menu(menu) => self.dispatch_menu(menu),
-            Action::ToggleLeftPanel => {
-                self.ui.show_left_panel = !self.ui.show_left_panel;
-                self.refocus_if_hidden();
-            }
-            Action::ToggleRightPanel => {
-                self.ui.show_right_panel = !self.ui.show_right_panel;
-                self.refocus_if_hidden();
-            }
-            Action::TogglePanels => {
-                let any = self.ui.show_left_panel || self.ui.show_right_panel;
-                self.ui.show_left_panel = !any;
-                self.ui.show_right_panel = !any;
-                self.refocus_if_hidden();
-            }
-            Action::CyclePreviewDepth => self.cycle_preview_depth(),
-            Action::FocusNext => self.cycle_focus(true),
-            Action::FocusPrev => self.cycle_focus(false),
-            Action::ScrollView(dir) => {
-                let (dx, dy) = delta(dir);
-                let size = self.doc_size();
-                self.editor.viewport.scroll_by(dx, dy, size);
-            }
-            Action::LayerNext => self.cycle_layer(true),
-            Action::LayerPrev => self.cycle_layer(false),
+            action @ (Action::ToggleLeftPanel
+            | Action::ToggleRightPanel
+            | Action::TogglePanels
+            | Action::CyclePreviewDepth
+            | Action::FocusNext
+            | Action::FocusPrev
+            | Action::ScrollView(_)
+            | Action::LayerNext
+            | Action::LayerPrev) => self.dispatch_view(&action),
             Action::CursorMove(dir) => self.move_cursor(dir),
             Action::CursorLineStart => {
                 self.set_cursor(Position::new(0, self.editor.cursor.y), None);
@@ -158,11 +143,17 @@ impl App {
             Action::Redo => self.redo(),
             Action::NewDocument => self.new_document(),
             Action::SaveDocument => self.save(),
-            Action::Copy => self.copy(),
-            Action::Cut => self.cut(),
-            Action::Paste => self.paste(),
-            Action::Duplicate => self.duplicate(),
-            Action::OpenDocument | Action::CommandPalette => {
+            action @ (Action::Copy
+            | Action::Cut
+            | Action::Paste
+            | Action::Duplicate
+            | Action::CommandPalette
+            | Action::AddKind(_)
+            | Action::ActivateLayer(_)
+            | Action::FlipSelection(_)
+            | Action::InvertSelection
+            | Action::SelectionToComponent) => self.dispatch_edit(action),
+            Action::OpenDocument => {
                 let title = descriptor_of(&action).map_or("This action", |d| d.title);
                 self.set_status(
                     StatusKind::Warning,
@@ -196,6 +187,54 @@ impl App {
                     }
                 }
             }
+        }
+    }
+
+    /// Panels, focus, scrolling, layers and the colour preview.
+    fn dispatch_view(&mut self, action: &Action) {
+        match *action {
+            Action::ToggleLeftPanel => {
+                self.ui.show_left_panel = !self.ui.show_left_panel;
+                self.refocus_if_hidden();
+            }
+            Action::ToggleRightPanel => {
+                self.ui.show_right_panel = !self.ui.show_right_panel;
+                self.refocus_if_hidden();
+            }
+            Action::TogglePanels => {
+                let any = self.ui.show_left_panel || self.ui.show_right_panel;
+                self.ui.show_left_panel = !any;
+                self.ui.show_right_panel = !any;
+                self.refocus_if_hidden();
+            }
+            Action::CyclePreviewDepth => self.cycle_preview_depth(),
+            Action::FocusNext => self.cycle_focus(true),
+            Action::FocusPrev => self.cycle_focus(false),
+            Action::ScrollView(dir) => {
+                let (dx, dy) = delta(dir);
+                let size = self.doc_size();
+                self.editor.viewport.scroll_by(dx, dy, size);
+            }
+            Action::LayerNext => self.cycle_layer(true),
+            Action::LayerPrev => self.cycle_layer(false),
+            _ => {}
+        }
+    }
+
+    /// Clipboard, the command palette and what it offers.
+    fn dispatch_edit(&mut self, action: Action) {
+        match action {
+            Action::Copy => self.copy(),
+            Action::Cut => self.cut(),
+            Action::Paste => self.paste(),
+            Action::Duplicate => self.duplicate(),
+            Action::CommandPalette => self.open_command_palette(),
+            Action::AddKind(kind) => self.add_component_from(&kind),
+            Action::ActivateLayer(layer) => self.activate_layer(&layer),
+            Action::FlipSelection(axis) => self.flip_selection(axis),
+            Action::InvertSelection => self.invert_selection(),
+            Action::SelectionToComponent => self.selection_to_component(),
+            _ => {}
         }
     }
 
@@ -348,7 +387,9 @@ impl App {
     }
 
     fn cancel(&mut self) {
-        if self.prompt.is_some() {
+        if self.palette.is_some() {
+            self.palette = None;
+        } else if self.prompt.is_some() {
             self.prompt = None;
         } else if self.picker.is_some() {
             self.picker = None;

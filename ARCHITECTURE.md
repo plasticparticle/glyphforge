@@ -76,6 +76,7 @@ app/             App state, dispatch (behaviour), run loop, viewport,
                  interface (selection), inspector (editable rows),
                  arrange (align, distribute, snapping),
                  selection (Select tool, clipboard),
+                 commands (command palette, context actions),
                  paint (tools, brush, colours),
                  pixels (raster tools), menu (Esc menu, theme choice)
 actions/         Action enum + descriptors (names, keywords, default keys)
@@ -497,6 +498,16 @@ drag opens one transaction and
   against the document. Copy also queues text for the system clipboard,
   which the run loop (the only owner of the terminal) sends as OSC 52 and
   pipes to `wl-copy`/`xclip`.
+- **Command palette.** `app/commands.rs` builds the entries when the
+  palette opens: implemented action descriptors that apply in the current
+  key context (cursor steps excluded), then context entries (component
+  kinds from the registry's descriptors, layers, themes, and cell
+  selection actions first). Matching is a subsequence score over the
+  title (keywords and aliases at half weight) plus a bonus for recently
+  run commands; running an entry dispatches its `Action`, so the palette
+  adds no behaviour of its own. Mirroring lives in `paint::mirror_glyph`
+  and `flip_region` (core): box-drawing glyphs swap their arms, other
+  glyphs use pair tables.
 - **Pixel Mode.** `app/pixels.rs` holds the pixel tools, settings,
   gradient library and preview. Tools that need a layer kind (Text:
   artwork, Gradient: raster) switch to one or add it. Mouse presses map

@@ -19,6 +19,8 @@ def run(binary, home, extra_env=None, keys=None, cols=100, rows=30, timeout=8, a
     env.update({"TERM": "xterm-256color", "COLORTERM": "truecolor", "HOME": home,
                 "LANG": "en_US.UTF-8", "GLYPHFORGE_LOG": "debug"})
     env.pop("XDG_CONFIG_HOME", None); env.pop("XDG_STATE_HOME", None)
+    # Never touch the real clipboard: copies only go out as OSC 52.
+    env.pop("WAYLAND_DISPLAY", None); env.pop("DISPLAY", None)
     if extra_env: env.update(extra_env)
     pid, fd = pty.fork()
     if pid == 0:
@@ -266,4 +268,22 @@ def frame_colours(theme):
 gradient, flat = frame_colours("aurora"), frame_colours("cobalt")
 assert gradient > flat * 5, f"gradient frames vary: {gradient} vs {flat}"
 print(f"smoke 12 ok: gradient frames ({gradient} shades vs {flat} flat)")
+# 13. Command palette: Ctrl+P, fuzzy query, Enter runs the command.
+#     Copying cells sends them to the system clipboard through OSC 52.
+phome = home + "/palette"
+os.makedirs(phome, exist_ok=True)
+keys = [
+    (b"\x10", 0.4),                       # Ctrl+P
+    (b"togall", 0.3), (b"\r", 0.4),        # Toggle All Panels
+    (b"ab", 0.2),                         # type on the artwork layer
+    (b"\x01", 0.2), (b"\x03", 0.4),        # Ctrl+A, Ctrl+C
+    (b"\x11", 0.3), (b"\x11", 0.3),        # quit, confirm
+]
+code, out = run(binary, phome, keys=keys, cols=100, rows=30, timeout=4)
+raw = out.decode("utf-8", "replace")
+assert code == 0, f"exit {code}"
+assert "Commands" in plain(raw), "palette drawn"
+assert "Toggle All Panels" in plain(raw), "fuzzy match shown"
+assert "\x1b]52;c;YWI=" in raw, "OSC 52 carries the copied cells"
+print("smoke 13 ok: command palette and OSC 52 copy")
 print("ALL SMOKE TESTS PASSED")

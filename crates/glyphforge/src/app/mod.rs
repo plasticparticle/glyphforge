@@ -2,6 +2,7 @@
 
 mod arrange;
 mod brushes;
+mod commands;
 mod dispatch;
 mod inspector;
 mod interface;
@@ -169,6 +170,10 @@ pub struct App {
     pub is_omarchy: bool,
     pub prompt: Option<Prompt>,
     pub menu: Option<Menu>,
+    /// The open command palette.
+    pub palette: Option<commands::CommandPalette>,
+    /// Titles of recently run palette commands, newest first.
+    pub recent_commands: Vec<String>,
     /// The chosen built-in theme id; `None` follows Omarchy or the terminal.
     pub ui_theme_choice: Option<String>,
     /// Where the chosen theme is remembered.
@@ -255,6 +260,8 @@ impl App {
             is_omarchy,
             prompt: None,
             menu: None,
+            palette: None,
+            recent_commands: Vec::new(),
             ui_theme_choice: None,
             state_dir: init.state_dir,
             picker: None,

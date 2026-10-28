@@ -197,11 +197,15 @@ with stable codes.
 - [ ] Theme editor (edit tokens in the app, save as a theme file)
 - [ ] Per-document theme picker in the same menu
 
-### E5 — Command palette and context actions  `[ ]`
-Ctrl+Space (and the Ctrl+P fallback), fuzzy matching over titles,
-keywords and aliases with recency weighting, contextual actions from the
-selection (table selected -> column actions, artwork selected -> mirror/
-invert/convert).
+### E5 — Command palette and context actions  `[x]`
+- [x] Ctrl+Space / Ctrl+P, fuzzy subsequence scoring (word starts, runs,
+      gaps) over titles, keywords and aliases, recency weighting
+- [x] Context entries: add any component kind, go to layer, editor themes
+- [x] Cell selection: flip horizontally/vertically (box glyphs mirrored
+      through their arms, arrows and blocks through pair tables), swap
+      colours, make an `artwork` component from the selection
+- [ ] Component-specific actions (table columns, tab pages) arrive with
+      those kinds in P1
 
 ### E6 — Layers and screens UI  `[ ]`
 Interactive layer list (create, rename, duplicate, reorder, lock, hide,
