@@ -2,3 +2,5 @@
 *.glyphforge.autosave
 *.glyphforge.recovery
 .direnv
+*.glyph.proposals/
+.*.autosave

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Omarchy hook: tells running Glyphforge editors that the theme changed, so
+# they switch at once instead of at their next check. Install as
+# ~/.config/omarchy/hooks/theme-set (or call it from your existing hook).
+state="${XDG_STATE_HOME:-$HOME/.local/state}/glyphforge"
+mkdir -p "$state" && touch "$state/reload-theme"

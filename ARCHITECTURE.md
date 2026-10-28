@@ -525,9 +525,11 @@ from `alacritty.toml` when a theme lacks it). `OmarchyColors::to_theme`
 derives every token from the theme's own colours (`primary` = accent,
 status colours = ANSI 1..4, muted = colour 8, surfaces mixed from
 background toward foreground). No Omarchy theme is hard-coded; no Omarchy
-file is written. The chrome theme reloads on focus gain and on demand;
-Milestone 14 adds a modification-time poll and documents the
-`~/.config/omarchy/hooks/theme-set.d/` hook for instant refresh.
+file is written. The chrome theme reloads on focus gain, on demand, and by a
+modification-time poll (every 0.8 s, only while the theme follows the
+system) of `theme.name`, `colors.toml` and `<state>/reload-theme`; the
+shipped `packaging/omarchy/theme-set` hook touches the latter for an
+instant switch.
 
 ---
 

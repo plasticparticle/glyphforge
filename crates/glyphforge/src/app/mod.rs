@@ -214,6 +214,9 @@ pub struct App {
     pub pending_proposals: usize,
     /// When the document was last autosaved.
     last_autosave: Option<std::time::Instant>,
+    /// Newest modification time of the Omarchy theme files seen so far.
+    theme_stamp: Option<std::time::SystemTime>,
+    last_theme_poll: Option<std::time::Instant>,
     last_proposal_poll: Option<std::time::Instant>,
     /// The open command palette.
     pub palette: Option<commands::CommandPalette>,
@@ -327,6 +330,8 @@ impl App {
             review: None,
             pending_proposals: 0,
             last_autosave: None,
+            theme_stamp: None,
+            last_theme_poll: None,
             last_proposal_poll: None,
             palette: None,
             recent_commands: Vec::new(),

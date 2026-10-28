@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="console-application">
+  <id>io.github.plasticparticle.glyphforge</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Glyphforge</name>
+  <summary>Design terminal user interfaces in the terminal</summary>
+  <description>
+    <p>
+      Glyphforge is a visual design environment for terminal user interfaces
+      that runs in the terminal. Interfaces are semantic components (panels,
+      tables, inputs, charts) with layout and themes; artwork is drawn in
+      cells and sub-cell pixels. Designs export to ANSI art, a YAML hand-off
+      and starter code for Ratatui, Textual, Bubble Tea and Ink.
+    </p>
+    <p>
+      Coding agents use the same model through a command line and an MCP
+      server; their changes can be reviewed and accepted in the editor.
+    </p>
+  </description>
+  <url type="homepage">https://github.com/plasticparticle/glyphforge</url>
+  <url type="bugtracker">https://github.com/plasticparticle/glyphforge/issues</url>
+  <developer id="io.github.plasticparticle">
+    <name>Glyphforge contributors</name>
+  </developer>
+  <launchable type="desktop-id">glyphforge.desktop</launchable>
+  <provides>
+    <binary>glyphforge</binary>
+    <binary>glyphforge-mcp</binary>
+  </provides>
+  <categories>
+    <category>Development</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-10-28">
+      <description>
+        <p>First release: interface, cell and pixel editing, 47 components,
+        symbols, prototypes, export and the MCP server.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -33,7 +33,47 @@ pub fn is_newer(autosave: &Path, original: &Path) -> bool {
 const RESTORE: &str = "Restore the autosaved changes";
 const DISCARD: &str = "Discard them and open the saved file";
 
+/// How often Omarchy's theme files are checked for changes.
+const THEME_POLL: Duration = Duration::from_millis(800);
+
 impl App {
+    /// The file the Omarchy `theme-set` hook touches to ask for a reload.
+    pub fn theme_trigger_file(&self) -> Option<PathBuf> {
+        self.state_dir.as_ref().map(|d| d.join("reload-theme"))
+    }
+
+    /// Called from the run loop: reloads the chrome theme when Omarchy's
+    /// theme changed (its files, or the hook's trigger file, are newer).
+    /// Only while the theme follows the system. Returns whether to redraw.
+    pub fn poll_omarchy_theme(&mut self) -> bool {
+        use crate::config::ThemeSource;
+        let follows = self.ui_theme_choice.is_none()
+            && self.is_omarchy
+            && matches!(self.config.theme.source, ThemeSource::Auto | ThemeSource::Omarchy);
+        if !follows || self.last_theme_poll.is_some_and(|t| t.elapsed() < THEME_POLL) {
+            return false;
+        }
+        self.last_theme_poll = Some(Instant::now());
+        let modified = |p: &Path| std::fs::metadata(p).and_then(|m| m.modified()).ok();
+        let stamp = [
+            Some(self.omarchy_paths.theme_name_file()),
+            Some(self.omarchy_paths.theme_colors_file()),
+            self.theme_trigger_file(),
+        ]
+        .into_iter()
+        .flatten()
+        .filter_map(|p| modified(&p))
+        .max();
+        let changed = self.theme_stamp.is_some() && stamp != self.theme_stamp;
+        self.theme_stamp = stamp;
+        if changed {
+            self.load_ui_theme();
+            let name = self.ui_theme.name.clone();
+            self.set_status(StatusKind::Info, format!("Omarchy theme changed: {name}"));
+        }
+        changed
+    }
+
     /// Where the current document autosaves to.
     pub fn autosave_file(&self) -> Option<PathBuf> {
         match self.session.path() {
@@ -186,6 +226,38 @@ mod tests {
         // Saving removes the autosave.
         next.dispatch(Action::SaveDocument);
         assert!(!autosave.exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn omarchy_theme_changes_are_picked_up() {
+        let dir = std::env::temp_dir().join(format!("glyphforge-omarchy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let theme_dir = dir.join("config/current/theme");
+        std::fs::create_dir_all(&theme_dir).unwrap();
+        std::fs::write(dir.join("config/current/theme.name"), "test-theme\n").unwrap();
+        let colors = |accent: &str| {
+            format!(
+                "accent = \"{accent}\"\nforeground = \"#cccccc\"\nbackground = \"#111111\"\n{}",
+                (0..16).map(|i| format!("color{i} = \"#{:02x}{:02x}{:02x}\"\n", i * 10, i * 9, i * 8)).collect::<String>()
+            )
+        };
+        std::fs::write(theme_dir.join("colors.toml"), colors("#ff0000")).unwrap();
+        let mut app = test_app(Size::new(4, 2));
+        app.omarchy_paths = crate::omarchy::OmarchyPaths {
+            install_dir: dir.join("install"),
+            config_dir: dir.join("config"),
+        };
+        app.is_omarchy = true;
+        app.config.theme.source = crate::config::ThemeSource::Omarchy;
+        app.state_dir = Some(dir.join("state"));
+        app.load_ui_theme();
+        assert!(!app.poll_omarchy_theme(), "first poll only records the stamp");
+        std::thread::sleep(Duration::from_millis(30));
+        std::fs::write(theme_dir.join("colors.toml"), colors("#00ff00")).unwrap();
+        app.last_theme_poll = None;
+        assert!(app.poll_omarchy_theme(), "a change reloads");
+        assert_eq!(app.ui_theme.color("primary"), glyphforge_core::Color::Rgb(0, 255, 0));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

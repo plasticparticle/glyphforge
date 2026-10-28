@@ -39,7 +39,7 @@ pub fn run(app: &mut App, guard: &mut TerminalGuard) -> Result<(), RunError> {
         if let Some(text) = app.take_system_clipboard() {
             crate::terminal::clipboard::copy(&text);
         }
-        if app.poll_proposals() || app.maybe_autosave() {
+        if app.poll_proposals() | app.maybe_autosave() | app.poll_omarchy_theme() {
             needs_redraw = true;
         }
         if !event::poll(TICK)? {

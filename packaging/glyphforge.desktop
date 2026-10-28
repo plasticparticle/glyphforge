@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Glyphforge
+GenericName=Terminal UI Designer
+Comment=Design terminal user interfaces as semantic components, in the terminal
+Exec=glyphforge %f
+Icon=utilities-terminal
+Terminal=true
+Categories=Development;GUIDesigner;ConsoleOnly;
+Keywords=tui;terminal;design;mockup;ascii;ansi;ratatui;
+StartupNotify=false

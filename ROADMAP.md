@@ -315,10 +315,12 @@ settings application), each with a distinct aesthetic; the shipped
 - [x] Edits are agent transactions saved to the file, or proposals for
       review with `propose`
 
-### P9 — Omarchy integration and packaging  `[ ]`
-Theme change polling and `theme-set.d` hook, checks in the four Omarchy
-terminals, `.desktop` entry, AppStream metadata, PKGBUILD, install script,
-installation guide.
+### P9 — Omarchy integration and packaging  `[x]`
+- [x] Theme change polling (theme name, colours, hook trigger file)
+      while the editor follows the system theme; `theme-set` hook script
+- [x] Detection of the four Omarchy terminals (tested)
+- [x] `.desktop` entry (validated), AppStream metainfo (validated),
+      Arch `PKGBUILD`, `scripts/install.sh` with uninstall, `INSTALL.md`
 
 ### P10 — Autosave and recovery  `[x]`
 - [x] Autosave of unsaved work to a hidden sibling on a timer (atomic

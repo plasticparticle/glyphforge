@@ -1,0 +1,46 @@
+# Maintainer: Glyphforge contributors
+pkgname=glyphforge
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Design terminal user interfaces in the terminal (TUI editor, CLI and MCP server)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/plasticparticle/glyphforge"
+license=('MIT')
+depends=('gcc-libs')
+makedepends=('cargo')
+optdepends=('wl-clipboard: copy to the Wayland clipboard'
+            'xclip: copy to the X11 clipboard')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release --workspace
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen --workspace
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 target/release/glyphforge "$pkgdir/usr/bin/glyphforge"
+  install -Dm755 target/release/glyphforge-mcp "$pkgdir/usr/bin/glyphforge-mcp"
+  install -Dm644 packaging/glyphforge.desktop "$pkgdir/usr/share/applications/glyphforge.desktop"
+  install -Dm644 packaging/io.github.plasticparticle.glyphforge.metainfo.xml \
+    "$pkgdir/usr/share/metainfo/io.github.plasticparticle.glyphforge.metainfo.xml"
+  install -Dm755 packaging/omarchy/theme-set "$pkgdir/usr/share/glyphforge/omarchy/theme-set"
+  install -Dm644 examples/*.glyph -t "$pkgdir/usr/share/glyphforge/examples/"
+  install -Dm644 README.md -t "$pkgdir/usr/share/doc/$pkgname/"
+  install -Dm644 INSTALL.md -t "$pkgdir/usr/share/doc/$pkgname/"
+}

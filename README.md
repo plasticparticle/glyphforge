@@ -190,11 +190,12 @@ Operations: `move`, `resize`, `set_property`, `set_layout`,
 Requires a stable Rust toolchain (1.85 or newer).
 
 ```sh
-cargo install --path crates/glyphforge
+scripts/install.sh          # both binaries, desktop entry, Omarchy theme hook
 ```
 
-An Arch Linux `PKGBUILD`, a `.desktop` entry and the Omarchy installation
-guide arrive with the packaging milestone.
+`INSTALL.md` covers the Arch Linux `PKGBUILD` (`packaging/arch`), Omarchy
+(the editor follows theme changes by itself; the hook makes it instant),
+terminals and registering the MCP server with an agent.
 
 ## The menu and themes
 
