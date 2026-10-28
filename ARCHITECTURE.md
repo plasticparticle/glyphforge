@@ -60,8 +60,10 @@ document/        Grapheme, Color, Cell, Canvas (+ diff-friendly repr),
 patch.rs         Operation, Patch: validated, transactional, invertible
 history.rs       Transaction, Origin, History (undo/redo, open strokes)
 render/          RenderContext, Registry, ComponentRenderer, descriptors
-                 (typed property specs), painter, render_components,
-                 render_screen, to_text_lines
+                 (typed property specs), kit (states, bindings, styles),
+                 kinds/ (inputs, navigation, data, viewers, feedback,
+                 charts), painter, render_components, render_screen,
+                 to_text_lines
 validate.rs      deterministic diagnostics with stable codes
 project.rs       .glyph envelope, schema_version, migration chain, atomic save
 proposal.rs      agent proposals stored beside a file for review
@@ -120,7 +122,8 @@ Document
             ├─ Interface { components[] }   semantic tree (Interface Mode)
             ├─ Artwork   { cells: Canvas }   raw cells      (Subcell Mode)
             └─ Raster    { raster }          pixels         (Pixel Mode)
- gradients[]        Gradient { id, name, stops[] } for gradient fills
+ gradients[]        Gradient { id, name, stops[], space } for gradient fills
+ data{}             fixtures: key -> Value (rows, items, series)
 ```
 
 - A **screen** is one terminal-sized design surface; a project holds many
@@ -310,8 +313,17 @@ the add prompt and command palette match titles and keywords, the
 validator reports `prop-type` for values that do not fit, and `glyphforge
 kinds --json` gives agents the same table. Renderers only paint through `painter`
 (`draw_text` with clipping and wide-glyph safety, `fill`, `draw_border`,
-`truncate` with ellipsis). Current kinds: `group`, `panel`, `label`,
-`heading`, `button`, `divider`, `artwork`, plus the placeholder.
+`truncate` with ellipsis). The basic kinds (`group`, `panel`,
+`label`, `heading`, `button`, `divider`, `artwork`) live in
+`components.rs`; the library (`render/kinds/`, 40 more) registers itself
+through `kinds::register`. Library renderers go through `render::kit`:
+`state(c)` reads the `state` preview property (or the older booleans),
+`value(c, ctx, key)` resolves a property or, with `bind`, the document
+fixture (a map fixture provides several fields), and `strings`, `rows`,
+`numbers` read lists from either. `RenderContext` carries the fixtures
+(`data`), so the editor, the CLI and previews render bound components
+identically. Charts share a `style` property (block, half, braille,
+ascii) that picks the glyph strategy.
 
 The editor shows the rendered canvas through a scrolling viewport and
 degrades colours to the detected depth. Previews at other terminal sizes
@@ -333,7 +345,7 @@ set_pixels, update_raster, replace_raster,
 set_gradient, delete_gradient,
 create_layer, delete_layer, update_layer, reorder_layer,
 create_screen, delete_screen, update_screen, replace_screen,
-set_theme
+set_data, set_theme
 ```
 
 `Patch::apply(&mut Document) -> Result<Patch>`:
@@ -414,7 +426,7 @@ cheap process.
 `.glyph` files are JSON with a versioned envelope:
 
 ```json
-{ "format": "glyphforge", "schema_version": 2, "meta": {...}, "theme": {...}, "gradients": [...], "screens": [...] }
+{ "format": "glyphforge", "schema_version": 3, "meta": {...}, "theme": {...}, "gradients": [...], "data": {...}, "screens": [...] }
 ```
 
 Design rules for diffability:
@@ -431,8 +443,8 @@ Design rules for diffability:
 - there is no binary blob; heavy assets would be separate files.
 
 Loading reads `schema_version`, runs the migration chain up to the current
-version (1 → 2 added raster layers and gradients, which v1 files cannot
-contain, so the step is the identity), rejects
+version (1 → 2 added raster layers and gradients, 2 → 3 data fixtures;
+older files cannot contain either, so both steps are the identity), rejects
 unversioned or newer files, then validates ids. Saving writes to a
 temporary sibling and renames, so a crash never leaves a half-written file.
 

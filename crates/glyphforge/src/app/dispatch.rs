@@ -162,7 +162,8 @@ impl App {
             | Action::ZOrder(_)
             | Action::Review
             | Action::EditTheme(_)
-            | Action::SetDocTheme(_)) => self.dispatch_edit(action),
+            | Action::SetDocTheme(_)
+            | Action::EditData) => self.dispatch_edit(action),
             Action::OpenDocument => {
                 let title = descriptor_of(&action).map_or("This action", |d| d.title);
                 self.set_status(
@@ -254,6 +255,7 @@ impl App {
             Action::ZOrder(order) => self.z_order(order),
             Action::Review => self.open_review(),
             Action::EditTheme(target) => self.open_theme_editor(target),
+            Action::EditData => self.open_edit_data(),
             Action::SetDocTheme(id) => {
                 self.menu = None;
                 self.set_document_theme(&id);

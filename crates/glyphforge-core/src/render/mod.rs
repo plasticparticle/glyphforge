@@ -2,6 +2,8 @@
 
 pub mod components;
 pub mod descriptor;
+pub mod kinds;
+pub mod kit;
 pub mod painter;
 
 use crate::component::Component;
@@ -70,6 +72,8 @@ mod artwork_tests {
 pub struct RenderContext<'a> {
     pub theme: &'a Theme,
     pub screen: Option<&'a Screen>,
+    /// The document's fixtures, for components with a `bind` property.
+    pub data: Option<&'a std::collections::BTreeMap<String, crate::value::Value>>,
 }
 
 impl<'a> RenderContext<'a> {
@@ -77,6 +81,7 @@ impl<'a> RenderContext<'a> {
         Self {
             theme,
             screen: None,
+            data: None,
         }
     }
 
@@ -177,10 +182,22 @@ pub fn render_screen(
     registry: &Registry,
     size: Option<Size>,
 ) -> Result<Canvas, CanvasError> {
+    render_screen_with(screen, theme, None, registry, size)
+}
+
+/// [`render_screen`] with the document's fixtures for bound components.
+pub fn render_screen_with(
+    screen: &Screen,
+    theme: &Theme,
+    data: Option<&std::collections::BTreeMap<String, crate::value::Value>>,
+    registry: &Registry,
+    size: Option<Size>,
+) -> Result<Canvas, CanvasError> {
     let size = size.unwrap_or(screen.size());
     let ctx = RenderContext {
         theme,
         screen: Some(screen),
+        data,
     };
     let mut out = Canvas::new(size)?;
     for layer in screen.layers().iter().filter(|l| l.visible) {

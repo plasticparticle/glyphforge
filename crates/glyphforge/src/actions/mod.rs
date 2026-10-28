@@ -213,6 +213,8 @@ pub enum Action {
     EditTheme(ThemeTarget),
     /// Sets the document's theme to a built-in or custom theme.
     SetDocTheme(String),
+    /// Prompt for a data fixture.
+    EditData,
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,
@@ -376,6 +378,7 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("command-palette", "Command Palette", Application, Action::CommandPalette, keys: ["ctrl+space", "ctrl+p"], kw: ["search", "actions", "run"], aliases: ["palette"], implemented: true),
             desc!("edit-theme", "Edit Editor Theme", Application, Action::EditTheme(ThemeTarget::Ui), keys: [], kw: ["theme", "colours", "tokens", "customise", "chrome"], aliases: [], implemented: true),
             desc!("edit-document-theme", "Edit Document Theme", Application, Action::EditTheme(ThemeTarget::Document), keys: [], kw: ["theme", "colours", "tokens", "design", "palette"], aliases: [], implemented: true),
+            desc!("edit-data", "Edit Data Fixture", Application, Action::EditData, keys: [], kw: ["data", "fixture", "rows", "sample", "mock", "bind", "series"], aliases: ["data"], implemented: true),
             desc!("review", "Review Agent Changes", Application, Action::Review, keys: ["f9"], kw: ["agent", "proposal", "accept", "reject", "revert", "ai", "patch"], aliases: ["proposals"], implemented: true),
             desc!("new-document", "New Document", File, Action::NewDocument, keys: ["ctrl+n"], kw: ["create", "canvas"], aliases: ["new"], implemented: true),
             desc!("open-document", "Open Document", File, Action::OpenDocument, keys: ["ctrl+o"], kw: ["load", "file"], aliases: ["open"], implemented: false),

@@ -125,6 +125,7 @@ pub fn validate_screen(
         ctx: RenderContext {
             theme,
             screen: Some(screen),
+            data: None,
         },
     };
     for layer in screen.layers().iter().filter(|l| l.visible) {
@@ -318,7 +319,7 @@ mod tests {
             vec![
                 Component::new(id!("a"), "panel").with_layout(Layout::absolute(0, 0, 10, 5)),
                 Component::new(id!("b"), "panel").with_layout(Layout::absolute(5, 2, 30, 5)),
-                Component::new(id!("t"), "table").with_layout(Layout::absolute(0, 8, 5, 2)),
+                Component::new(id!("t"), "wobbler").with_layout(Layout::absolute(0, 8, 5, 2)),
             ],
             20,
             10,

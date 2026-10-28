@@ -243,21 +243,26 @@ with stable codes.
 
 ## Product milestones
 
-### P1 — Component library  `[ ]`
-The brief's list, in slices ordered by usefulness: inputs and controls
-(input, password, search, textarea, checkbox, radio, toggle, select),
-navigation (tabs, breadcrumbs, menu, toolbar, status bar), data (list,
-tree, table, data grid, property grid, key-value list), viewers (log,
-code, markdown, diff), feedback (modal, dialog, notification, toast,
-tooltip, empty state, badge, tag, key hint, spinner), charts (sparkline,
-bar, histogram, line, gauge, heatmap, progress) with block, half-block,
-Braille and ASCII strategies. Each component gets a descriptor, renderer,
-intrinsic size and tests.
+### P1 — Component library  `[x]`
+- [x] Inputs: input, password, search, textarea, checkbox, radio,
+      toggle, select
+- [x] Navigation: tabs, breadcrumbs, menu, toolbar, status bar
+- [x] Data: list, tree, table, data grid, property grid, key/value list
+- [x] Viewers: log, code, markdown, diff
+- [x] Feedback: modal, dialog, notification, toast, tooltip, empty
+      state, badge, tag, key hint, spinner
+- [x] Charts: sparkline, bar, histogram, line, gauge, heatmap, progress
+      with block, half-block, Braille and ASCII strategies
+- [x] Each with a descriptor, renderer, intrinsic size; a test renders
+      every kind at four sizes and checks its descriptor
 
-### P2 — Preview states and data fixtures  `[ ]`
-Component state props (focused, hovered, selected, disabled, loading,
-error, empty), document-level `data` fixtures and `data` bindings on
-components, sample rows and mock series.
+### P2 — Preview states and data fixtures  `[x]`
+- [x] `state` property (normal, focused, hovered, selected, disabled,
+      loading, error, empty) honoured by every interactive kind
+- [x] Document `data` fixtures (schema v3), `bind` on components (a list,
+      or a map with fields such as `columns`/`rows`), `set_data`
+      operation, editor prompt, `inspect` lists them, the inspector
+      suggests fixture keys
 
 ### P3 — Symbols and libraries  `[ ]`
 Symbol definitions with instances and property overrides, propagation of

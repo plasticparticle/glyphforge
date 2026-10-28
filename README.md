@@ -22,6 +22,34 @@ knows nothing about either.
 > layers by selecting, nudging, resizing, adding and editing components.
 > See [ROADMAP.md](ROADMAP.md).
 
+## Components
+
+47 component kinds, each with a typed property schema (`glyphforge kinds`
+lists them, the inspector edits them):
+
+- **Layout and text**: group, panel, divider, label, heading, artwork
+- **Inputs**: button, input, password, search, textarea, checkbox, radio,
+  toggle, select (open or closed)
+- **Navigation**: tabs (line, boxed, pills), breadcrumbs, menu with key
+  hints, toolbar, status bar
+- **Data**: list, tree, table, data grid, property grid, key/value list
+- **Viewers**: log (levels coloured), code (highlighted, line numbers),
+  Markdown, diff
+- **Feedback**: modal, dialog, notification, toast, tooltip, empty state,
+  badge, tag, key hints, spinner
+- **Charts**: sparkline, bar chart, histogram, line chart, gauge,
+  heatmap, progress; each drawn with eighth blocks, half blocks, Braille
+  or ASCII (`style`), so you see what each terminal will show
+
+Every interactive kind has a `state` (normal, focused, hovered,
+selected, disabled, loading, error, empty) to preview its states side by
+side. Lists, tables and charts read their content from properties or
+from **data fixtures** stored in the document: "Edit Data Fixture" in the
+command palette (or the `set_data` operation) stores sample rows, items
+or series under a key, and a component's `bind` property points at it.
+A fixture can be a list, or a map with several fields (`columns` and
+`rows` for a table).
+
 ## Two editing models, one document
 
 - **Interface Mode** — components with identity, properties, layout and
@@ -87,7 +115,8 @@ A patch:
 
 Operations: `move`, `resize`, `set_property`, `set_layout`,
 `create_component`, `delete_component`, `reparent`, `set_cells`,
-`create_screen`, `delete_screen`, `update_screen`, `replace_screen`, `set_pixels`,
+`create_screen`, `delete_screen`, `update_screen`, `replace_screen`,
+`set_data`, `set_pixels`,
 `update_raster`, `replace_raster`, `set_gradient`, `delete_gradient`,
 `create_layer`, `delete_layer`, `update_layer`, `reorder_layer`,
 `set_theme`. The same

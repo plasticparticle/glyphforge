@@ -492,6 +492,7 @@ impl App {
             }
             FieldKey::Direction => DIRECTIONS.map(String::from).to_vec(),
             FieldKey::Align => ALIGNS.map(String::from).to_vec(),
+            FieldKey::Prop(name) if name == "bind" => self.doc().data.keys().cloned().collect(),
             FieldKey::Prop(name) => self
                 .primary_component()
                 .and_then(|c| self.descriptor_of(c))

@@ -134,9 +134,10 @@ impl App {
                     let screen = doc
                         .screen(&self.editor.screen)
                         .unwrap_or_else(|| doc.first_screen());
-                    render::render_screen(
+                    render::render_screen_with(
                         screen,
                         &doc.theme,
+                        Some(&doc.data),
                         self.session.registry(),
                         self.editor.preview_size,
                     )

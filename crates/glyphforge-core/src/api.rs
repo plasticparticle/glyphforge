@@ -257,9 +257,10 @@ impl Session {
             .doc
             .screen(screen)
             .ok_or_else(|| ApiError::NoSuchScreen(screen.clone()))?;
-        Ok(render::render_screen(
+        Ok(render::render_screen_with(
             s,
             &self.doc.theme,
+            Some(&self.doc.data),
             &self.registry,
             size,
         )?)
@@ -283,6 +284,7 @@ impl Session {
         let ctx = RenderContext {
             theme: &self.doc.theme,
             screen: Some(s),
+            data: Some(&self.doc.data),
         };
         Ok(render::solve_components(
             roots,

@@ -50,6 +50,10 @@ pub struct Document {
     /// Reusable gradients for gradient fills.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub gradients: Vec<Gradient>,
+    /// Sample data (fixtures) components bind to with their `bind`
+    /// property: rows for tables, series for charts, items for lists.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub data: std::collections::BTreeMap<String, crate::value::Value>,
     screens: Vec<Screen>,
 }
 
@@ -63,6 +67,7 @@ impl Document {
             meta: DocumentMetadata::default(),
             theme: Theme::default(),
             gradients: Vec::new(),
+            data: std::collections::BTreeMap::new(),
             screens: vec![screen],
         })
     }

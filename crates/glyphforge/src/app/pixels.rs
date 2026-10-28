@@ -9,7 +9,6 @@ use glyphforge_core::raster::{
     Dither, DropShadow, Gradient, GradientShape, GradientStop, GradientStyle, PaletteLimit, Pixel,
     RasterLayer, RasterMode, gradient,
 };
-use glyphforge_core::render::render_screen;
 use glyphforge_core::{Canvas, Color, Layer, LayerKind, ObjectId, Position};
 
 use super::prompt::{Prompt, PromptKind};
@@ -920,7 +919,14 @@ impl App {
         for w in writes {
             raster.pixels.set(w.x, w.y, w.pixel);
         }
-        render_screen(&screen, &self.doc().theme, self.session.registry(), None).ok()
+        glyphforge_core::render::render_screen_with(
+            &screen,
+            &self.doc().theme,
+            Some(&self.doc().data),
+            self.session.registry(),
+            self.editor.preview_size,
+        )
+        .ok()
     }
 }
 

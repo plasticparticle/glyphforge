@@ -202,6 +202,11 @@ pub enum Operation {
     ReplaceScreen {
         screen: Screen,
     },
+    /// Sets a data fixture (`Null` removes it).
+    SetData {
+        key: String,
+        value: Value,
+    },
 }
 
 impl Operation {
@@ -226,7 +231,7 @@ impl Operation {
             Self::CreateComponent { component, .. } => Some(&component.id),
             Self::SetCells { layer, .. } | Self::SetPixels { layer, .. } => Some(layer),
             Self::CreateLayer { layer, .. } => Some(&layer.id),
-            Self::SetTheme { .. } => None,
+            Self::SetTheme { .. } | Self::SetData { .. } => None,
             Self::CreateScreen { screen, .. } | Self::ReplaceScreen { screen } => Some(&screen.id),
         }
     }
@@ -327,6 +332,8 @@ impl Operation {
                 format!("screen {target}: {}", parts.join(", "))
             }
             Self::ReplaceScreen { screen } => format!("replace screen {}", screen.id),
+            Self::SetData { key, value } if value.is_null() => format!("remove data {key}"),
+            Self::SetData { key, .. } => format!("set data {key}"),
         }
     }
 
@@ -343,6 +350,7 @@ impl Operation {
             Self::DeleteScreen { .. } => "delete_screen",
             Self::UpdateScreen { .. } => "update_screen",
             Self::ReplaceScreen { .. } => "replace_screen",
+            Self::SetData { .. } => "set_data",
             Self::SetCells { .. } => "set_cells",
             Self::SetPixels { .. } => "set_pixels",
             Self::UpdateRaster { .. } => "update_raster",
@@ -483,6 +491,17 @@ fn apply_one(doc: &mut Document, op: &Operation) -> Result<Operation, OperationE
         Operation::SetTheme { theme } => {
             let before = std::mem::replace(&mut doc.theme, theme.clone());
             Ok(Operation::SetTheme { theme: before })
+        }
+        Operation::SetData { key, value } => {
+            let before = if value.is_null() {
+                doc.data.remove(key)
+            } else {
+                doc.data.insert(key.clone(), value.clone())
+            };
+            Ok(Operation::SetData {
+                key: key.clone(),
+                value: before.unwrap_or(Value::Null),
+            })
         }
         Operation::CreateScreen { .. }
         | Operation::DeleteScreen { .. }
@@ -1577,5 +1596,19 @@ mod tests {
             .summary(),
             "set a.title = \"Hi\""
         );
+    }
+
+    #[test]
+    fn data_fixtures_set_and_restore() {
+        let mut doc = Document::new(Size::new(4, 2)).unwrap();
+        let inverse = Patch::single(Operation::SetData {
+            key: "rows".into(),
+            value: Value::List(vec![Value::Int(1)]),
+        })
+        .apply(&mut doc)
+        .unwrap();
+        assert_eq!(doc.data["rows"], Value::List(vec![Value::Int(1)]));
+        inverse.apply(&mut doc).unwrap();
+        assert!(doc.data.is_empty());
     }
 }

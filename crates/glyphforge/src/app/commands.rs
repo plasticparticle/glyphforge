@@ -8,6 +8,7 @@ use glyphforge_core::align::Axis;
 use glyphforge_core::patch::{Operation, Patch};
 use glyphforge_core::{Component, ObjectId, Theme, Value, paint};
 
+use super::prompt::{Prompt, PromptKind};
 use super::{App, DesignMode, StatusKind};
 use crate::actions::{Action, Category, Context, MenuAction, descriptors};
 
@@ -393,6 +394,39 @@ impl App {
             )
     }
 
+    /// Prompt for a data fixture: `key = JSON` (an empty value removes it).
+    pub fn open_edit_data(&mut self) {
+        let candidates = self
+            .doc()
+            .data
+            .iter()
+            .map(|(k, v)| format!("{k} = {}", serde_json::to_string(v).unwrap_or_default()))
+            .collect();
+        self.prompt = Some(Prompt::new(
+            PromptKind::EditData,
+            "Data fixture: key = JSON (rows, items, series; empty value removes)",
+            candidates,
+        ));
+    }
+
+    pub(super) fn submit_edit_data(&mut self, value: &str) {
+        let Some((key, json)) = value.split_once('=') else {
+            return self.set_status(StatusKind::Warning, "Expected key = JSON");
+        };
+        let key = key.trim().to_owned();
+        let json = json.trim();
+        // Plain text that is not JSON becomes a string fixture.
+        let value = if json.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_str::<Value>(json).unwrap_or_else(|_| Value::Str(json.to_owned()))
+        };
+        let label = format!("Set data {key}");
+        if self.apply(Patch::single(Operation::SetData { key, value }), &label) {
+            self.set_status(StatusKind::Info, label);
+        }
+    }
+
     /// Makes `layer` (on the active screen) the active layer.
     pub fn activate_layer(&mut self, layer: &ObjectId) {
         let Some(l) = self.screen().layer(layer) else {
@@ -473,5 +507,26 @@ mod tests {
         assert_eq!(app.design_mode(), DesignMode::Interface);
         app.dispatch(Action::CommandPalette);
         assert!(app.palette_matches().iter().any(|c| c.title == "Add Panel"));
+    }
+
+    #[test]
+    fn fixtures_are_edited_by_prompt_and_bound_components_render_them() {
+        let mut app = test_app(Size::new(30, 6));
+        app.dispatch(Action::EditData);
+        app.prompt.as_mut().unwrap().input = "cpu = [1, 5, 9, 3]".into();
+        app.dispatch(Action::PromptSubmit);
+        assert_eq!(app.doc().data.len(), 1);
+        app.dispatch(Action::LayerNext);
+        let layer = app.editor.layer.clone();
+        let id = app
+            .session
+            .add_component("sparkline", Some("load"), 0, 0, None, Some(layer))
+            .unwrap();
+        app.session
+            .update_component(&id, vec![("bind".into(), "cpu".into())])
+            .unwrap();
+        app.mark_edited();
+        let rendered = app.session.render_text(&app.editor.screen, None).unwrap();
+        assert!(rendered.starts_with("▁▄█▃"), "{rendered:?}");
     }
 }

@@ -65,6 +65,8 @@ pub enum PropKind {
     Reference,
     /// A list of values (rows, items, series).
     List,
+    /// A position in a list: a number, or the item's text.
+    Index,
     /// Free-form structured data.
     Map,
 }
@@ -89,6 +91,7 @@ impl PropKind {
             Self::Border => "border".into(),
             Self::Reference => "id".into(),
             Self::List => "list".into(),
+            Self::Index => "index|item".into(),
             Self::Map => "map".into(),
         }
     }
@@ -100,6 +103,7 @@ impl PropKind {
             | (Self::Text | Self::Color | Self::Reference, Value::Str(_))
             | (Self::Bool, Value::Bool(_))
             | (Self::List, Value::List(_))
+            | (Self::Index, Value::Int(_) | Value::Str(_))
             | (Self::Map, Value::Map(_)) => true,
             (Self::Int { min, max }, Value::Int(n)) => (min..=max).contains(&n),
             (Self::Choice { options }, Value::Str(s)) => options.contains(&s.as_str()),
@@ -121,6 +125,9 @@ impl PropKind {
                 text.parse()
                     .map_err(|_| format!("expected a whole number, got {text:?}"))?,
             ),
+            Self::Index => text
+                .parse::<i64>()
+                .map_or_else(|_| Value::Str(text.to_owned()), Value::Int),
             Self::List | Self::Map => serde_json::from_str(text)
                 .map_err(|e| format!("expected JSON ({e}), got {text:?}"))?,
             _ => Value::Str(text.to_owned()),
@@ -175,6 +182,10 @@ impl PropKind {
                     (Some(i), false) => (i + n - 1) % n,
                 };
                 Some(Value::Str(tokens[next].into()))
+            }
+            Self::Index => {
+                let v = current.and_then(Value::as_int).unwrap_or(0);
+                Some(Value::Int(if forward { v + 1 } else { (v - 1).max(0) }))
             }
             Self::Int { min, max } => {
                 let v = current.and_then(Value::as_int).unwrap_or(*min);

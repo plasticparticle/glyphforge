@@ -9,7 +9,7 @@ use serde_json::Value as Json;
 use crate::document::Document;
 
 pub const FORMAT: &str = "glyphforge";
-pub const SCHEMA_VERSION: u32 = 2;
+pub const SCHEMA_VERSION: u32 = 3;
 pub const EXTENSION: &str = "glyph";
 
 #[derive(Debug, thiserror::Error)]
@@ -100,9 +100,10 @@ pub fn from_json(text: &str) -> Result<Document, ProjectError> {
 /// Every bump adds one arm here and a fixture test.
 fn migrate_step(value: Json, from: u32) -> Result<Json, ProjectError> {
     match from {
-        // v2 adds raster layers and document gradients. Both are new, so a
-        // v1 document is a valid v2 document as it is.
-        1 => Ok(value),
+        // v2 adds raster layers and document gradients; v3 adds document
+        // `data` (fixtures) and component `state`/`bind` properties. All
+        // are new and optional, so older documents are valid as they are.
+        1 | 2 => Ok(value),
         _ => Err(ProjectError::Migration(
             from,
             format!("no migration registered for version {from}"),
@@ -173,7 +174,7 @@ mod tests {
     fn round_trip() {
         let doc = sample();
         let text = to_json(&doc).unwrap();
-        assert!(text.starts_with("{\n  \"format\": \"glyphforge\",\n  \"schema_version\": 2,"));
+        assert!(text.starts_with("{\n  \"format\": \"glyphforge\",\n  \"schema_version\": 3,"));
         let back = from_json(&text).unwrap();
         assert_eq!(back, doc);
     }
@@ -266,7 +267,7 @@ mod tests {
             .pixels
             .set(3, 3, Pixel::Solid(crate::document::Color::Indexed(2)));
         let saved = to_json(&doc).unwrap();
-        assert!(saved.contains("\"schema_version\": 2"));
+        assert!(saved.contains("\"schema_version\": 3"));
         assert!(saved.contains("\"rows\""), "{saved}");
         assert_eq!(from_json(&saved).unwrap(), doc);
     }

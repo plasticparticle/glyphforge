@@ -376,6 +376,19 @@ pub fn outline(doc: &Document) -> String {
     for g in &doc.gradients {
         let _ = writeln!(s, "gradient {} \"{}\": {}", g.id, g.name, g.stops_text());
     }
+    for (key, value) in &doc.data {
+        let shape = match value {
+            glyphforge_core::Value::List(items) => format!("{} items", items.len()),
+            glyphforge_core::Value::Map(m) => {
+                format!(
+                    "fields {}",
+                    m.keys().cloned().collect::<Vec<_>>().join(", ")
+                )
+            }
+            other => other.to_string(),
+        };
+        let _ = writeln!(s, "data {key}: {shape}");
+    }
     for screen in doc.screens() {
         let _ = writeln!(
             s,

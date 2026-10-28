@@ -53,9 +53,10 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
     // Compositing happens once per edit; the cache is filled by `App::composite`.
     // Rendering takes `&App`, so we recompute here only if the cache is cold.
     let themed = app.document_theme_preview().and_then(|theme| {
-        glyphforge_core::render::render_screen(
+        glyphforge_core::render::render_screen_with(
             app.screen(),
             theme,
+            Some(&app.doc().data),
             app.session.registry(),
             app.editor.preview_size,
         )

@@ -565,7 +565,14 @@ impl App {
             );
             return;
         }
-        let kinds: Vec<String> = self.session.registry().kinds().map(str::to_owned).collect();
+        // By category: layout and text kinds first, then the library.
+        let kinds: Vec<String> = self
+            .session
+            .registry()
+            .descriptors()
+            .into_iter()
+            .map(|d| d.kind.to_owned())
+            .collect();
         let hint = match self.selection() {
             Some(id) => format!("Add component inside {id}: kind [name]"),
             None => "Add component: kind [name]".to_owned(),
@@ -639,6 +646,7 @@ impl App {
             PromptKind::Find => self.submit_find(&prompt),
             PromptKind::GradientStopColor => self.submit_gradient_stop_color(&value),
             PromptKind::ImportImage => self.submit_import_image(&prompt.input),
+            PromptKind::EditData => self.submit_edit_data(&prompt.input),
             PromptKind::ThemeToken => self.submit_theme_token(&prompt.input),
             PromptKind::ThemeName => self.submit_theme_name(&prompt.input),
             PromptKind::Inspector(key) => self.submit_inspector(&key, &prompt.input),

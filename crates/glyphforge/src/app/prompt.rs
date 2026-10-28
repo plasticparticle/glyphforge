@@ -32,6 +32,8 @@ pub enum PromptKind {
     GradientStopColor,
     /// A PNG file to import as a pixel layer.
     ImportImage,
+    /// A document data fixture (`key = JSON`).
+    EditData,
     /// The colour of the theme editor's highlighted token.
     ThemeToken,
     ThemeName,

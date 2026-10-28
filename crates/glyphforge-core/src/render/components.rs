@@ -81,6 +81,7 @@ impl Registry {
         r.register(Box::new(Button));
         r.register(Box::new(Divider));
         r.register(Box::new(Artwork));
+        super::kinds::register(&mut r);
         r
     }
 
@@ -629,9 +630,9 @@ mod tests {
     #[test]
     fn unknown_kind_gets_a_placeholder() {
         let roots =
-            vec![Component::new(id!("t"), "table").with_layout(Layout::absolute(0, 0, 8, 3))];
+            vec![Component::new(id!("t"), "gizmo").with_layout(Layout::absolute(0, 0, 8, 3))];
         let lines = render(&roots, 8, 3);
-        assert_eq!(lines[0], "+?table+");
+        assert_eq!(lines[0], "+?gizmo+");
         assert_eq!(lines[2], "+------+");
     }
 
@@ -669,6 +670,7 @@ mod tests {
         let ctx = RenderContext {
             theme: &theme,
             screen: Some(&screen),
+            data: None,
         };
         let art = Component::new(id!("logo"), "artwork")
             .with_prop("layer", "px")
