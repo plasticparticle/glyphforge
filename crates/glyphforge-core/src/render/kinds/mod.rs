@@ -261,4 +261,64 @@ mod tests {
         let empty = render_at(sample("empty"), 30, 5);
         assert!(empty[2].contains("No results"), "{empty:?}");
     }
+
+    /// Distinct foreground colours on row `y` of a rendered component.
+    fn row_colors(c: Component, w: u16, h: u16, y: u16) -> std::collections::BTreeSet<String> {
+        let theme = crate::theme::Theme::minimal_dark();
+        let ctx = RenderContext::new(&theme);
+        let c = c.with_layout(Layout::absolute(0, 0, w, h));
+        let (canvas, _) =
+            render_components(&[c], Size::new(w, h), &ctx, &Registry::builtin()).unwrap();
+        (0..w)
+            .filter_map(|x| canvas.get(crate::document::Position::new(x, y)))
+            .filter(|cell| {
+                cell.as_glyph()
+                    .is_some_and(|g| !g.as_str().trim().is_empty())
+            })
+            .map(|cell| format!("{:?}", cell.style.fg))
+            .collect()
+    }
+
+    fn ramp() -> Value {
+        Value::List(vec!["#00ff00".into(), "#ffff00".into(), "#ff0000".into()])
+    }
+
+    #[test]
+    fn gradients_colour_meters_bars_and_frames_along_their_ramp() {
+        let flat = Component::new(id!("g"), "gauge").with_prop("value", Value::Int(100));
+        assert_eq!(
+            row_colors(flat.clone(), 30, 1, 0).len(),
+            2,
+            "bar and muted suffix"
+        );
+        let graded = flat.with_prop("gradient", ramp());
+        assert!(row_colors(graded, 30, 1, 0).len() > 8, "a colour per cell");
+
+        let bars = Component::new(id!("b"), "barchart")
+            .with_prop("values", Value::List(vec![Value::Int(8), Value::Int(8)]))
+            .with_prop("gradient", ramp());
+        // Bottom and top rows of the same bar differ in colour.
+        assert_ne!(
+            row_colors(bars.clone(), 10, 6, 0),
+            row_colors(bars, 10, 6, 4)
+        );
+
+        let panel = Component::new(id!("p"), "panel")
+            .with_prop("border", "single")
+            .with_prop("border_gradient", ramp());
+        assert!(row_colors(panel, 40, 4, 0).len() > 8, "the top edge fades");
+    }
+
+    #[test]
+    fn a_filled_line_chart_covers_the_area_under_the_line() {
+        let line = Component::new(id!("l"), "linechart")
+            .with_prop("values", Value::List(vec![Value::Int(10); 8]))
+            .with_prop("axis", false);
+        let bottom = |c: Component| render_at(c, 8, 4)[3].trim().is_empty();
+        assert!(
+            bottom(line.clone()),
+            "a flat line at the top leaves the bottom empty"
+        );
+        assert!(!bottom(line.with_prop("fill", true)));
+    }
 }

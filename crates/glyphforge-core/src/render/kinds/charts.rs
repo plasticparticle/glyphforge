@@ -31,10 +31,39 @@ fn values_prop(initial: &[i64]) -> PropSpec {
 
 const SAMPLE: [i64; 16] = [3, 5, 4, 8, 12, 9, 7, 11, 15, 13, 10, 14, 18, 16, 12, 17];
 
-fn chart_style(c: &Component, ctx: &RenderContext<'_>) -> CellStyle {
-    CellStyle::new(
-        kit::color(c, ctx, "color", "primary"),
-        ctx.theme.color("surface"),
+/// A chart's colour: `color`, or a `gradient` from low to high values.
+struct Paint {
+    base: CellStyle,
+    ramp: Vec<Color>,
+}
+
+impl Paint {
+    fn of(c: &Component, ctx: &RenderContext<'_>, default: &str) -> Self {
+        Self {
+            base: CellStyle::new(
+                kit::color(c, ctx, "color", default),
+                ctx.theme.color("surface"),
+            ),
+            ramp: kit::ramp(c, ctx, "gradient"),
+        }
+    }
+
+    /// The style `share` (0..=1) of the way up the scale.
+    fn at(&self, share: f32) -> CellStyle {
+        if self.ramp.is_empty() {
+            self.base
+        } else {
+            CellStyle {
+                fg: kit::ramp_at(&self.ramp, share),
+                ..self.base
+            }
+        }
+    }
+}
+
+fn gradient_prop() -> PropSpec {
+    kit::gradient_prop(
+        "colours from low to high values, e.g. [\"success\", \"warning\", \"error\"]",
     )
 }
 
@@ -45,8 +74,9 @@ fn braille_bit(dx: u16, dy: u16) -> u32 {
 }
 
 /// Draws one column of a vertical bar of `level` (0..=rows*8) eighths
-/// from the bottom of `area`, in the chosen style.
-fn vertical_bar(canvas: &mut Canvas, x: u16, area: Rect, level: u32, look: &str, style: CellStyle) {
+/// from the bottom of `area`, in the chosen style; a gradient colours
+/// each cell by its height.
+fn vertical_bar(canvas: &mut Canvas, x: u16, area: Rect, level: u32, look: &str, paint: &Paint) {
     let rows = u32::from(area.height);
     for r in 0..rows {
         let y = (area.bottom() - 1 - r) as u16;
@@ -68,9 +98,41 @@ fn vertical_bar(canvas: &mut Canvas, x: u16, area: Rect, level: u32, look: &str,
             _ => EIGHTHS_UP[fill as usize],
         };
         if glyph != " " {
-            kit::put(canvas, x, y, glyph, style, area);
+            let share = (r * 8 + fill) as f32 / (rows * 8).max(1) as f32;
+            kit::put(canvas, x, y, glyph, paint.at(share), area);
         }
     }
+}
+
+/// Draws a horizontal bar of `eighths` from `x` (at most `room` cells);
+/// a gradient colours each cell by its place in the room. Returns the
+/// width drawn.
+#[allow(clippy::too_many_arguments, reason = "a drawing primitive")]
+fn horizontal_bar(
+    canvas: &mut Canvas,
+    x: u16,
+    y: u16,
+    eighths: u32,
+    room: u16,
+    look: &str,
+    paint: &Paint,
+    clip: Rect,
+) -> u16 {
+    let full = (eighths / 8) as usize;
+    let bar = match look {
+        "ascii" => "#".repeat(full),
+        _ => format!(
+            "{}{}",
+            "█".repeat(full),
+            EIGHTHS_RIGHT[(eighths % 8) as usize].trim()
+        ),
+    };
+    let mut w = 0;
+    for g in bar.chars() {
+        let share = f32::from(w) / f32::from(room.max(2) - 1);
+        w += kit::put(canvas, x + w, y, &g.to_string(), paint.at(share), clip);
+    }
+    w
 }
 
 /// One-row trend line.
@@ -90,6 +152,7 @@ impl ComponentRenderer for Sparkline {
             .prop(values_prop(&SAMPLE))
             .prop(style_prop())
             .prop(PropSpec::new("color", PropKind::Color, "line colour").default("primary"))
+            .prop(gradient_prop())
             .prop(kit::bind_prop())
     }
 
@@ -113,7 +176,7 @@ impl ComponentRenderer for Sparkline {
     ) {
         let values = kit::numbers(c, ctx, "values");
         let max = values.iter().copied().max().unwrap_or(1).max(1);
-        let style = chart_style(c, ctx);
+        let paint = Paint::of(c, ctx, "primary");
         let look = kit::str_or(c, "style", "block");
         let row = Rect::new(
             inner.x,
@@ -124,13 +187,16 @@ impl ComponentRenderer for Sparkline {
         if look == "braille" {
             for (col, pair) in values.chunks(2).enumerate().take(usize::from(inner.width)) {
                 let mut bits = 0;
+                let mut top = 0;
                 for (dx, v) in pair.iter().enumerate() {
                     let level = kit::scale(*v, max, 3);
+                    top = top.max(level);
                     bits |= braille_bit(dx as u16, (3 - level) as u16);
                 }
                 let glyph = char::from_u32(0x2800 + bits)
                     .map(String::from)
                     .unwrap_or_default();
+                let style = paint.at(top as f32 / 3.0);
                 kit::put(canvas, row.x + col as u16, row.y, &glyph, style, row);
             }
             return;
@@ -142,7 +208,7 @@ impl ComponentRenderer for Sparkline {
                 row,
                 kit::scale(*v, max, 8),
                 look,
-                style,
+                &paint,
             );
         }
     }
@@ -179,6 +245,7 @@ impl ComponentRenderer for BarChart {
             )
             .prop(style_prop())
             .prop(PropSpec::new("color", PropKind::Color, "bar colour").default("primary"))
+            .prop(gradient_prop())
             .prop(kit::bind_prop())
     }
 
@@ -193,7 +260,7 @@ impl ComponentRenderer for BarChart {
         let values = kit::numbers(c, ctx, "values");
         let labels = kit::strings(c, ctx, "labels");
         let max = values.iter().copied().max().unwrap_or(1).max(1);
-        let style = chart_style(c, ctx);
+        let paint = Paint::of(c, ctx, "primary");
         let muted = kit::style(ctx, "foreground-muted", "surface");
         let look = kit::str_or(c, "style", "block");
         if kit::str_or(c, "orientation", "vertical") == "horizontal" {
@@ -208,16 +275,8 @@ impl ComponentRenderer for BarChart {
                 kit::put(canvas, inner.x, y, &kit::fit(label, lw), muted, inner);
                 let room = inner.width.saturating_sub(lw + 1 + 5);
                 let eighths = kit::scale(*v, max, u32::from(room) * 8);
-                let bar = match look {
-                    "ascii" => "#".repeat((eighths / 8) as usize),
-                    _ => format!(
-                        "{}{}",
-                        "█".repeat((eighths / 8) as usize),
-                        EIGHTHS_RIGHT[(eighths % 8) as usize].trim()
-                    ),
-                };
                 let x = inner.x + lw + 1;
-                let w = kit::put(canvas, x, y, &bar, style, inner);
+                let w = horizontal_bar(canvas, x, y, eighths, room, look, &paint, inner);
                 kit::put(canvas, x + w + 1, y, &v.to_string(), muted, inner);
             }
             return;
@@ -235,7 +294,7 @@ impl ComponentRenderer for BarChart {
             let x0 = inner.x + i as u16 * slot;
             let level = kit::scale(*v, max, u32::from(chart.height) * 8);
             for dx in 0..bar_w {
-                vertical_bar(canvas, x0 + dx, chart, level, look, style);
+                vertical_bar(canvas, x0 + dx, chart, level, look, &paint);
             }
             if let Some(label) = labels.get(i) {
                 kit::put(
@@ -274,6 +333,7 @@ impl ComponentRenderer for Histogram {
             )
             .prop(style_prop())
             .prop(PropSpec::new("color", PropKind::Color, "bar colour").default("secondary"))
+            .prop(gradient_prop())
             .prop(kit::bind_prop())
     }
 
@@ -302,10 +362,7 @@ impl ComponentRenderer for Histogram {
             counts[i.min(bins - 1)] += 1;
         }
         let max = counts.iter().copied().max().unwrap_or(1).max(1);
-        let style = CellStyle::new(
-            kit::color(c, ctx, "color", "secondary"),
-            ctx.theme.color("surface"),
-        );
+        let paint = Paint::of(c, ctx, "secondary");
         let look = kit::str_or(c, "style", "block");
         let slot = (inner.width / bins as u16).max(1);
         for (i, n) in counts.iter().enumerate() {
@@ -317,7 +374,7 @@ impl ComponentRenderer for Histogram {
                     inner,
                     level,
                     look,
-                    style,
+                    &paint,
                 );
             }
         }
@@ -346,6 +403,12 @@ impl ComponentRenderer for LineChart {
                     .initial(true),
             )
             .prop(PropSpec::new("color", PropKind::Color, "line colour").default("primary"))
+            .prop(PropSpec::new(
+                "fill",
+                PropKind::Bool,
+                "fill the area under the line",
+            ))
+            .prop(gradient_prop())
             .prop(kit::bind_prop())
     }
 
@@ -362,7 +425,8 @@ impl ComponentRenderer for LineChart {
             return;
         }
         let max = values.iter().copied().max().unwrap_or(1).max(1);
-        let style = chart_style(c, ctx);
+        let paint = Paint::of(c, ctx, "primary");
+        let filled = c.prop_bool("fill") == Some(true);
         let muted = kit::style(ctx, "foreground-muted", "surface");
         let mut plot = inner;
         if c.prop_bool("axis") == Some(true) && inner.width > 6 && inner.height > 1 {
@@ -420,7 +484,8 @@ impl ComponentRenderer for LineChart {
             let y = ys[usize::from(px)];
             // Join to the previous column so steep lines stay connected.
             let prev = if px == 0 { y } else { ys[usize::from(px - 1)] };
-            for py in prev.min(y)..=prev.max(y) {
+            let bottom = if filled { ph - 1 } else { prev.max(y) };
+            for py in prev.min(y)..=bottom {
                 mark(px, py);
             }
         }
@@ -438,7 +503,15 @@ impl ComponentRenderer for LineChart {
                     "ascii" => "*".to_owned(),
                     _ => "•".to_owned(),
                 };
-                kit::put(canvas, plot.x + cx, plot.y + cy, &glyph, style, plot);
+                let share = 1.0 - f32::from(cy) / f32::from(plot.height.max(2) - 1);
+                kit::put(
+                    canvas,
+                    plot.x + cx,
+                    plot.y + cy,
+                    &glyph,
+                    paint.at(share),
+                    plot,
+                );
             }
         }
     }
@@ -499,6 +572,9 @@ impl ComponentRenderer for Meter {
             )
             .prop(style_prop())
             .prop(PropSpec::new("color", PropKind::Color, "fill colour").default("primary"))
+            .prop(kit::gradient_prop(
+                "colours along the bar; replaces the thresholds",
+            ))
             .prop(kit::bind_prop())
     }
 
@@ -571,14 +647,26 @@ impl ComponentRenderer for Meter {
                 "░",
             ),
         };
-        let w = kit::put(
-            canvas,
-            x,
-            inner.y,
-            &filled,
-            CellStyle::new(fg, ctx.theme.color("surface")),
-            inner,
-        );
+        let ramp = kit::ramp(c, ctx, "gradient");
+        let w = if ramp.is_empty() {
+            kit::put(
+                canvas,
+                x,
+                inner.y,
+                &filled,
+                CellStyle::new(fg, ctx.theme.color("surface")),
+                inner,
+            )
+        } else {
+            // Each cell takes its colour from its place along the bar.
+            let mut w = 0;
+            for g in filled.chars() {
+                let share = f32::from(w) / f32::from(room.max(2) - 1);
+                let style = CellStyle::new(kit::ramp_at(&ramp, share), ctx.theme.color("surface"));
+                w += kit::put(canvas, x + w, inner.y, &g.to_string(), style, inner);
+            }
+            w
+        };
         let rest = usize::from(room.saturating_sub(w));
         let ew = kit::put(
             canvas,
@@ -623,6 +711,9 @@ impl ComponentRenderer for Heatmap {
             )
             .prop(style_prop())
             .prop(PropSpec::new("color", PropKind::Color, "hot colour").default("primary"))
+            .prop(kit::gradient_prop(
+                "colours from cold to hot; replaces `color`",
+            ))
             .prop(kit::bind_prop())
     }
 
@@ -643,17 +734,28 @@ impl ComponentRenderer for Heatmap {
         let hot = kit::color(c, ctx, "color", "primary");
         let cold = ctx.theme.color("surface-alt");
         let ascii = kit::str_or(c, "style", "block") == "ascii";
+        let ramp = kit::ramp(c, ctx, "gradient");
         for (y, row) in grid.iter().enumerate().take(usize::from(inner.height)) {
             for (x, v) in row.iter().enumerate() {
                 let px = inner.x + x as u16 * cell_w;
                 let level = kit::scale(*v, max, 4);
+                let share = level as f32 / 4.0;
                 let (glyph, style) = if ascii {
+                    let fg = if ramp.is_empty() {
+                        hot
+                    } else {
+                        kit::ramp_at(&ramp, share)
+                    };
                     (
                         [" ", "░", "▒", "▓", "█"][level as usize],
-                        CellStyle::new(hot, ctx.theme.color("surface")),
+                        CellStyle::new(fg, ctx.theme.color("surface")),
                     )
                 } else {
-                    let mixed = mix(cold, hot, level as f32 / 4.0);
+                    let mixed = if ramp.is_empty() {
+                        kit::mix(cold, hot, share)
+                    } else {
+                        kit::ramp_at(&ramp, share)
+                    };
                     (" ", CellStyle::new(mixed, mixed))
                 };
                 kit::put(
@@ -666,15 +768,5 @@ impl ComponentRenderer for Heatmap {
                 );
             }
         }
-    }
-}
-
-fn mix(cold: Color, hot: Color, share: f32) -> Color {
-    match (cold.to_rgb(), hot.to_rgb()) {
-        (Some(from), Some(to)) => {
-            Color::Rgb(from.0, from.1, from.2).mix(Color::Rgb(to.0, to.1, to.2), share)
-        }
-        _ if share < 0.5 => cold,
-        _ => hot,
     }
 }

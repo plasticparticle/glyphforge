@@ -48,7 +48,12 @@ lists them, the inspector edits them):
   badge, tag, key hints, spinner
 - **Charts**: sparkline, bar chart, histogram, line chart, gauge,
   heatmap, progress; each drawn with eighth blocks, half blocks, Braille
-  or ASCII (`style`), so you see what each terminal will show
+  or ASCII (`style`), so you see what each terminal will show. A
+  `gradient` (`["success", "warning", "error"]` or hex colours) colours
+  bars and lines by height and meters along their length, btop style;
+  `fill` fills the area under a line chart. Panels take a
+  `border_gradient` that fades across the whole screen, so neighbouring
+  frames line up
 
 Every interactive kind has a `state` (normal, focused, hovered,
 selected, disabled, loading, error, empty) to preview its states side by
@@ -109,10 +114,19 @@ a logo can sit inside a sidebar and disappear with it on narrow terminals.
 
 ## Templates and examples
 
-Six designs in `examples/`, each with its own theme, double as templates:
+![agentop: a btop-style monitor for a fleet of AI agents, with gradient
+frames, a filled token graph, gradient gauges and bars, sparklines, an
+agent table, a tool-call heatmap, a latency histogram and an event
+log](docs/agent-monitor.png)
+
+<sub>`examples/agent-monitor.glyph`, rendered by `glyphforge export --format ansi`
+and `scripts/ansi_to_svg.py`.</sub>
+
+Seven designs in `examples/`, each with its own theme, double as templates:
 
 | Template | Shows |
 |----------|-------|
+| `agent-monitor` | btop-style AI agent fleet monitor: gradient frames, a filled Braille graph, gradient gauges, bars and histogram, sparklines, heatmap, agent table, log, queue (aurora, 140×44) |
 | `system-monitor` | sparklines, panels, a service list (minimal dark) |
 | `developer-dashboard` | breadcrumbs, tabs, gauges, a Braille line chart, a bound table, a log (cobalt) |
 | `git-client` | toolbar, a branch tree, commit history, a diff, status bar (verdant) |
@@ -570,7 +584,7 @@ crates/glyphforge-core   document model, layout, patches, history, rendering,
 crates/glyphforge        the editor and CLI binary
 examples/                example projects and the patch that builds them
 docs/                    the README screenshot
-scripts/                 pty smoke test
+scripts/                 pty smoke test, example builder, ANSI to SVG
 ```
 
 ## License

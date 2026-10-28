@@ -277,10 +277,13 @@ with stable codes.
 - [x] Glyph palettes in the document as extra brush pages (`set_palette`)
 
 ### P4 — Templates and showcase examples  `[x]`
-- [x] Six examples with distinct themes: system monitor, developer
+- [x] Seven examples with distinct themes: system monitor, developer
       dashboard, Git client, AI coding assistant, database explorer,
-      settings application (built reproducibly by
-      `scripts/build_examples.py`)
+      settings application, and a btop-style AI agent monitor (built
+      reproducibly by `scripts/build_examples.py`)
+- [x] Gradients in designs: `gradient` on every chart (by height or
+      along the bar), `fill` on line charts, `border_gradient` on panels
+      (diagonal across the screen); tested
 - [x] Templates compiled into the binary: `glyphforge templates`,
       `new --template [--theme]`, New From Template in the editor
 - [x] Test: every template loads, has no validation errors, is stored

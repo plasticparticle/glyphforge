@@ -12,7 +12,7 @@ use crate::layout::Edges;
 use crate::render::descriptor::{
     Category, Descriptor, PropKind, PropSpec, align_prop, state_props, style_props,
 };
-use crate::render::{RenderContext, painter};
+use crate::render::{RenderContext, kit, painter};
 use crate::theme::Theme;
 
 /// Renders one kind of component.
@@ -253,6 +253,11 @@ impl ComponentRenderer for Panel {
                 "border family (theme default)",
             ))
             .prop(PropSpec::new("border_color", PropKind::Color, "border colour").default("border"))
+            .prop(PropSpec::new(
+                "border_gradient",
+                PropKind::List,
+                "colours the frame fades through across the screen (replaces border_color)",
+            ))
             .props(style_props())
     }
 
@@ -283,6 +288,10 @@ impl ComponentRenderer for Panel {
             ..style
         };
         painter::draw_border(canvas, rect, family, border_style);
+        let ramp = kit::ramp(c, ctx, "border_gradient");
+        if !ramp.is_empty() {
+            gradient_frame(canvas, rect, &ramp);
+        }
         if let Some(title) = c.prop_str("title").filter(|t| !t.is_empty()) {
             if family.is_visible() && rect.width > 4 {
                 let max = rect.width - 4;
@@ -296,6 +305,30 @@ impl ComponentRenderer for Panel {
                 };
                 painter::draw_text(canvas, rect.x + 1, rect.y, &text, title_style, rect);
             }
+        }
+    }
+}
+
+/// Recolours the frame of `rect` along `ramp`, diagonally across the whole
+/// canvas, so neighbouring panels with the same gradient line up.
+fn gradient_frame(canvas: &mut Canvas, rect: Rect, ramp: &[Color]) {
+    let bounds = canvas.bounds();
+    let span = f32::from(bounds.width) + f32::from(bounds.height) * 2.0;
+    let (right, bottom) = (
+        rect.right().saturating_sub(1) as u16,
+        rect.bottom().saturating_sub(1) as u16,
+    );
+    for pos in rect.intersection(bounds).positions() {
+        if pos.x != rect.x && pos.x != right && pos.y != rect.y && pos.y != bottom {
+            continue;
+        }
+        if let Some(cell) = canvas.get(pos) {
+            let share = (f32::from(pos.x) + f32::from(pos.y) * 2.0) / span.max(1.0);
+            let style = CellStyle {
+                fg: kit::ramp_at(ramp, share),
+                ..cell.style
+            };
+            canvas.set_style(pos, style);
         }
     }
 }

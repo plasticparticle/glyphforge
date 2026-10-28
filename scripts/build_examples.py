@@ -321,3 +321,150 @@ build("settings", "paper", (100, 30), "Settings application", [
     C("saved", "notification", L(x=62, y=1, width=34, height=4), title="Settings saved",
       message="Restart the editor to apply the font.", level="success", hidden=True),
 ])
+
+# --- AI agent monitor (btop style, gradients) --------------------------------------
+import math
+
+HEAT = ["#3ddc84", "#f5d547", "#ff5f5f"]           # low -> high, btop's cpu ramp
+COOL = ["#4fc3f7", "#9575cd", "#f06292"]           # frames: blue -> violet -> pink
+SEA = ["#26c6da", "#5c6bc0", "#ab47bc"]
+
+
+def P(id, title, layout, children, **props):
+    """A btop-style panel: rounded frame fading across the screen."""
+    return C(id, "panel", layout, children, title=title, border="rounded",
+             border_gradient=COOL, **props)
+
+
+def wave(n, base, amp, period, drift=0.0, seed=0):
+    return [max(0, int(base + amp * math.sin((i + seed) / period)
+                       + amp * 0.45 * math.sin((i + seed) / (period / 3.1))
+                       + drift * i)) for i in range(n)]
+
+
+def spark_row(id, label, key, gradient):
+    return C(id, "group", ROW(height=1, gap=1), [
+        C(f"{id}-label", "label", L(width=7), text=label, color="foreground-muted"),
+        C(f"{id}-spark", "sparkline", L(width="fill"), bind=key, gradient=gradient),
+    ])
+
+
+def meter(id, label, value, gradient=HEAT):
+    return C(id, "gauge", L(height=1), label=label, value=value, gradient=gradient)
+
+
+build("agent-monitor", "aurora", (140, 44), "AI agent monitor", [
+    C("app", "group", COL(), [
+        C("header", "group", ROW(height=1, gap=2, padding=(0, 1)), [
+            C("brand", "label", L(width="content"), text="◆ agentop", color="primary", bold=True),
+            C("fleet", "label", L(width="content"), text="fleet prod-agents · 3 hosts · up 3d 04:12",
+              color="foreground-muted"),
+            C("n-run", "badge", L(width="content"), text="12 running", level="success"),
+            C("n-wait", "badge", L(width="content"), text="2 waiting", level="warning"),
+            C("n-fail", "badge", L(width="content"), text="1 failed", level="error"),
+            C("head-space", "group"),
+            C("sampling", "spinner", L(width="content"), label="sampling 500ms", style="dots", frame=3),
+            C("clock", "label", L(width="content"), text="14:32:07", bold=True),
+        ]),
+        C("top", "group", ROW(height=14), [
+            P("throughput", "tokens / s", COL(), [
+                C("tps", "linechart", L(), bind="tokens", fill=True, axis=True, gradient=HEAT),
+                spark_row("in", "input", "tokens_in", SEA),
+                spark_row("out", "output", "tokens_out", HEAT),
+                spark_row("cache", "cache", "cache_hits", ["#7e57c2", "#26c6da"]),
+            ]),
+            P("budget", "spend & limits", COL(width=44), [
+                meter("g-spend", "Budget ", 68),
+                meter("g-ctx", "Context", 81),
+                meter("g-rate", "RateLim", 43),
+                meter("g-gpu", "GPU q  ", 92),
+                meter("g-mem", "Memory ", 57, SEA),
+                C("budget-rule", "divider", L(height=1)),
+                C("spend", "keyvalue", L(), items=[
+                    "Cost today=$412.80", "Burn rate=$38.20 / h", "Projected=$918.00",
+                    "Cache hit=71 %", "Retries=14 (0.9 %)"]),
+            ]),
+            P("models", "requests by model", COL(width=34), [
+                C("model-bars", "barchart", L(), orientation="horizontal",
+                  values=[1840, 2920, 4410, 1230, 610],
+                  labels=["opus", "sonnet", "haiku", "embed", "local"], gradient=SEA),
+            ]),
+        ]),
+        C("middle", "group", ROW(height=15), [
+            P("agents", "agents", COL(), [
+                C("agent-table", "table", L(), bind="agents", selected=2, striped=True),
+            ]),
+            P("detail", "agent · reviewer-3", COL(width=46), [
+                C("detail-kv", "keyvalue", L(height=5), items=[
+                    "Task=Review PR #2291 (auth refactor)", "Model=opus · effort high",
+                    "Branch=feat/oauth-pkce", "Started=14:05:51 (26 min)", "Steps=38 / 60"]),
+                meter("d-ctx", "Context", 74),
+                meter("d-steps", "Steps  ", 63, SEA),
+                C("d-tps", "linechart", L(), bind="agent_tokens", fill=True, axis=False, gradient=SEA),
+                C("d-now", "label", L(height=1), text="▸ running: grep -rn \"refresh_token\" src/",
+                  color="foreground-muted"),
+            ]),
+        ]),
+        C("bottom", "group", ROW(), [
+            P("tools", "tool calls / min", ROW(width=40, gap=1), [
+                C("tool-names", "list", L(width=8), items=["read", "edit", "bash", "grep", "web", "mcp"],
+                  marker=""),
+                C("tool-heat", "heatmap", L(), bind="tool_heat", cell=1, gradient=["#1b2b34", "#26c6da", "#f5d547", "#ff5f5f"]),
+            ]),
+            P("latency", "latency ms", COL(width=26), [
+                C("lat-hist", "histogram", L(), bind="latency", bins=11, gradient=HEAT),
+            ]),
+            P("events", "events", COL(), [
+                C("event-log", "log", L(), text="\n".join([
+                    "14:31:40 INFO  planner-1 split #881 in 4",
+                    "14:31:44 INFO  coder-7 edit pkce.rs +42",
+                    "14:31:52 WARN  web-2 rate limited, 8s",
+                    "14:31:58 INFO  reviewer-3 ok 3/5 hunks",
+                    "14:32:01 ERROR tester-4 2 tests failed",
+                    "14:32:03 INFO  coder-7 takes the failure",
+                    "14:32:05 WARN  gpu queue above 90 %",
+                    "14:32:06 DEBUG cache hit 71 % / min",
+                ])),
+            ]),
+            P("queue", "queue", COL(width=26), [
+                C("queue-tree", "tree", L(), selected=1, items=[
+                    "#881 oauth pkce", "  ● write tests", "  ◐ implement", "  ○ docs",
+                    "#884 flaky ci", "  ◐ bisect", "#890 deps bump", "#893 changelog"]),
+            ]),
+        ]),
+        C("footer", "keyhint", L(height=1), items=[
+            "↑↓|select", "enter|attach", "k|kill", "p|pause", "r|resume", "t|tree", "/|filter",
+            "s|sort", "q|quit"]),
+    ]),
+], data={
+    "tokens": wave(80, 1900, 900, 7.0, drift=9, seed=3),
+    "tokens_in": wave(120, 60, 30, 6.0, seed=1),
+    "tokens_out": wave(120, 40, 28, 4.5, drift=0.15, seed=5),
+    "cache_hits": wave(120, 50, 22, 9.0, seed=2),
+    "agent_tokens": wave(60, 120, 70, 4.0, seed=8),
+    "agents": {
+        "columns": ["PID", "Agent", "Model", "Task", "State", "Tok/s", "Ctx", "Cost"],
+        "rows": [
+            ["4120", "planner-1", "opus", "#881 oauth pkce", "thinking", "212", "38%", "$4.12"],
+            ["4121", "coder-7", "sonnet", "#881 implement", "editing", "486", "62%", "$9.80"],
+            ["4122", "reviewer-3", "opus", "PR #2291 review", "tool:grep", "174", "74%", "$7.45"],
+            ["4123", "tester-4", "haiku", "#881 tests", "failed", "0", "21%", "$0.62"],
+            ["4124", "web-2", "sonnet", "docs research", "backoff", "0", "45%", "$2.30"],
+            ["4125", "coder-2", "sonnet", "#884 bisect", "running", "391", "55%", "$6.04"],
+            ["4126", "triage-1", "haiku", "inbox triage", "idle", "12", "9%", "$0.18"],
+            ["4127", "docs-5", "haiku", "#893 changelog", "waiting", "0", "14%", "$0.27"],
+            ["4128", "embed-1", "embed", "index repo", "running", "2310", "—", "$0.41"],
+            ["4129", "local-0", "local", "lint fixes", "running", "88", "33%", "$0.00"],
+            ["4130", "coder-9", "sonnet", "#890 deps bump", "queued", "0", "0%", "$0.00"],
+            ["4131", "planner-2", "opus", "#893 plan", "waiting", "0", "12%", "$0.94"],
+        ],
+    },
+    # Per tool: a base rate, a slow swell and a burst while tests run.
+    "tool_heat": [[max(0, int(base + swell * math.sin((m + phase) / 4.0)
+                              + (burst if 17 <= m <= 21 else 0)))
+                   for m in range(30)]
+                  for base, swell, phase, burst in [(6, 3, 0, 2), (4, 3, 5, 6), (3, 2, 2, 9),
+                                                    (5, 4, 7, 1), (1, 1, 1, 0), (2, 2, 9, 3)]],
+    "latency": [int(180 + 140 * math.sin(i * 1.7) ** 2 + (i % 7) * 35 + (300 if i % 23 == 0 else 0))
+                for i in range(160)],
+})

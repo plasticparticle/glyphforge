@@ -10,6 +10,11 @@ pub const TEMPLATES: &[(&str, &str, &str)] = &[
         include_str!("../../../examples/dashboard.glyph"),
     ),
     (
+        "agent-monitor",
+        "btop-style AI agent fleet monitor: gradients, sparklines, heatmap (aurora)",
+        include_str!("../../../examples/agent-monitor.glyph"),
+    ),
+    (
         "developer-dashboard",
         "Deploys, pipelines, traffic and logs (cobalt)",
         include_str!("../../../examples/developer-dashboard.glyph"),

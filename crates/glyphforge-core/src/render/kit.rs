@@ -214,6 +214,48 @@ pub fn color(c: &Component, ctx: &RenderContext<'_>, key: &str, default: &str) -
         .map_or_else(|| ctx.theme.color(default), |t| ctx.theme.resolve(t))
 }
 
+/// The `gradient` property: colours from low to high values (or from
+/// one end of a frame to the other).
+pub fn gradient_prop(what: &'static str) -> PropSpec {
+    PropSpec::new("gradient", PropKind::List, what)
+}
+
+/// A list of colours (tokens or literals) in property `key`; empty when
+/// the property is missing or holds fewer than two colours.
+pub fn ramp(c: &Component, ctx: &RenderContext<'_>, key: &str) -> Vec<Color> {
+    let names = match c.prop(key) {
+        Some(Value::List(items)) => items.iter().map(text).collect::<Vec<_>>(),
+        Some(Value::Str(s)) => s.split(',').map(|p| p.trim().to_owned()).collect(),
+        _ => Vec::new(),
+    };
+    if names.len() < 2 {
+        return Vec::new();
+    }
+    names.iter().map(|n| ctx.theme.resolve(n)).collect()
+}
+
+/// The colour `share` (0..=1) of the way along `ramp`.
+pub fn ramp_at(ramp: &[Color], share: f32) -> Color {
+    let Some(&first) = ramp.first() else {
+        return Color::Default;
+    };
+    if ramp.len() == 1 {
+        return first;
+    }
+    let pos = share.clamp(0.0, 1.0) * (ramp.len() - 1) as f32;
+    let i = (pos.floor() as usize).min(ramp.len() - 2);
+    mix(ramp[i], ramp[i + 1], pos - i as f32)
+}
+
+/// Mixes two colours in RGB, also when one is a token or palette index.
+pub fn mix(from: Color, to: Color, share: f32) -> Color {
+    match (from.to_rgb(), to.to_rgb()) {
+        (Some(a), Some(b)) => Color::Rgb(a.0, a.1, a.2).mix(Color::Rgb(b.0, b.1, b.2), share),
+        _ if share < 0.5 => from,
+        _ => to,
+    }
+}
+
 /// Text on a filled accent (`primary`, a status colour): whichever of
 /// the selection foreground, the background and the foreground reads
 /// best on it in this theme.
