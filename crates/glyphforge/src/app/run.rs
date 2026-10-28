@@ -135,6 +135,10 @@ pub(crate) fn handle_key(app: &mut App, key: Key) {
         }
         return;
     }
+    if app.prompt.is_none() && app.picker.is_none() && app.theme_editor.is_some() {
+        theme_editor_key(app, key);
+        return;
+    }
     if app.prompt.is_none() && app.gradient_editor.is_some() {
         gradient_editor_key(app, key);
         return;
@@ -271,6 +275,21 @@ fn inspector_key(app: &App, key: Key) -> Option<InspectorAction> {
         KeyCode::Delete | KeyCode::Backspace => InspectorAction::Clear,
         _ => return None,
     })
+}
+
+/// Keys of the theme editor: arrows choose a token, Enter types its
+/// colour, `c` opens the colour picker, `s` saves.
+fn theme_editor_key(app: &mut App, key: Key) {
+    match key.code {
+        KeyCode::Esc => app.theme_editor_cancel(),
+        KeyCode::Up | KeyCode::Char('k') => app.theme_editor_move(false),
+        KeyCode::Down | KeyCode::Char('j') | KeyCode::Tab => app.theme_editor_move(true),
+        KeyCode::Enter | KeyCode::Char('e') => app.theme_editor_edit(),
+        KeyCode::Char('c' | ' ') => app.open_color_picker(ColorTarget::Foreground),
+        KeyCode::Char('n') => app.theme_editor_rename(),
+        KeyCode::Char('s') => app.theme_editor_save(),
+        _ => {}
+    }
 }
 
 /// Keys of the gradient editor: arrows choose a stop, Shift+arrows (or

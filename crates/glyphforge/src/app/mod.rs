@@ -17,6 +17,7 @@ mod prompt;
 mod review;
 mod run;
 mod selection;
+mod theme_editor;
 mod viewport;
 
 use glyphforge_core::api::Session;
@@ -42,6 +43,8 @@ pub use paint::picker_rows;
 pub use paint::{ColorPicker, ColorTarget, PaintState, Tool, color_label, is_light};
 pub use prompt::Prompt;
 pub use review::ReviewItem;
+pub use theme_editor::{ThemeTarget, editor_tokens};
+
 pub use run::{RunError, run};
 pub use viewport::Viewport;
 
@@ -189,6 +192,12 @@ pub struct App {
     pub is_omarchy: bool,
     pub prompt: Option<Prompt>,
     pub menu: Option<Menu>,
+    /// The open theme editor.
+    pub theme_editor: Option<theme_editor::ThemeEditor>,
+    /// Theme files from the config directory.
+    pub custom_themes: Vec<Theme>,
+    /// Where theme files are read from and saved to.
+    pub themes_dir: Option<std::path::PathBuf>,
     /// The open gradient editor.
     pub gradient_editor: Option<gradient_editor::GradientEditor>,
     /// The open review of agent changes.
@@ -246,6 +255,8 @@ pub struct AppInit {
     pub startup_warnings: Vec<String>,
     /// XDG state directory, for remembering the chosen theme.
     pub state_dir: Option<std::path::PathBuf>,
+    /// Directory of theme files (`<config>/themes`).
+    pub themes_dir: Option<std::path::PathBuf>,
 }
 
 impl App {
@@ -297,6 +308,9 @@ impl App {
             is_omarchy,
             prompt: None,
             menu: None,
+            theme_editor: None,
+            custom_themes: Vec::new(),
+            themes_dir: init.themes_dir,
             gradient_editor: None,
             review: None,
             pending_proposals: 0,
@@ -326,6 +340,7 @@ impl App {
         };
         app.snap.neighbours = app.config.ui.snap;
         app.snap.grid = app.config.ui.snap_grid;
+        app.load_custom_themes();
         app.load_ui_theme();
         app.restore_ui_theme();
         if !app.caps.unicode {
@@ -593,5 +608,6 @@ pub(crate) fn test_app(size: Size) -> App {
         },
         startup_warnings: Vec::new(),
         state_dir: None,
+        themes_dir: None,
     })
 }

@@ -188,7 +188,7 @@ with stable codes.
       editor) with aspect-correct fitting per mode
 - [x] `artwork` component showing a raster layer region
 
-### E9 — Menu and themes  `[~]`
+### E9 — Menu and themes  `[x]`
 - [x] Esc menu (btop style): resume, theme, help, save, save as, new
       document, quit; keyboard and mouse; Esc cancels first, then opens it
 - [x] Ten designed themes (forge-dark, paper, cobalt, verdant, lagoon,
@@ -200,8 +200,11 @@ with stable codes.
       fade across the screen, dimmed when unfocused
 - [x] Muted chrome text falls back to a dimmed foreground when the theme's
       muted colour cannot be shown to contrast
-- [ ] Theme editor (edit tokens in the app, save as a theme file)
-- [ ] Per-document theme picker in the same menu
+- [x] Theme editor: every token with swatch and value, typed or picked
+      colours, live preview (chrome or canvas), rename, save as
+      `<config>/themes/<id>.toml` or into the document; theme files are
+      loaded at startup and listed with the built-in themes
+- [x] Design theme page in the menu (undoable `set_theme`)
 
 ### E5 — Command palette and context actions  `[x]`
 - [x] Ctrl+Space / Ctrl+P, fuzzy subsequence scoring (word starts, runs,

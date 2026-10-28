@@ -578,6 +578,11 @@ impl App {
     }
 
     pub fn set_color(&mut self, target: ColorTarget, color: Color) {
+        // While the theme editor is open the picker chooses a token colour.
+        if self.theme_editor.is_some() {
+            self.remember_color(color);
+            return self.theme_editor_set(color);
+        }
         match target {
             ColorTarget::Foreground => self.editor.style.fg = color,
             ColorTarget::Background => self.editor.style.bg = color,

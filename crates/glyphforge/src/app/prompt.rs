@@ -32,6 +32,9 @@ pub enum PromptKind {
     GradientStopColor,
     /// A PNG file to import as a pixel layer.
     ImportImage,
+    /// The colour of the theme editor's highlighted token.
+    ThemeToken,
+    ThemeName,
     /// An inspector row of the selection.
     Inspector(FieldKey),
 }

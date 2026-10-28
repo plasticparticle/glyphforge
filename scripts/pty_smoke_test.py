@@ -240,7 +240,7 @@ menu_keys = [
     (b"\x1b[B" * 7, 0.3), (b"\r", 0.4),   # down to Phosphor, apply
     (b"\x1b", 0.3),                      # close the menu
     (b"\x1b", 0.3),                      # open it again
-    (b"\x1b[B" * 6, 0.2), (b"\r", 0.5),   # down to Quit, enter
+    (b"\x1b[B" * 7, 0.2), (b"\r", 0.5),   # down to Quit, enter
 ]
 code, out = run(binary, mhome, keys=menu_keys, cols=100, rows=30, timeout=4)
 text = plain(out.decode("utf-8", "replace"))

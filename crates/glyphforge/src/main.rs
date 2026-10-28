@@ -99,7 +99,7 @@ fn main() -> ExitCode {
 
     init_logging(&dirs, &mut warnings);
 
-    match start(cli, config, omarchy_paths, warnings, dirs.state.clone()) {
+    match start(cli, config, omarchy_paths, warnings, &dirs) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             // The terminal guard has been dropped by now; stderr is safe.
@@ -145,7 +145,7 @@ fn start(
     config: Config,
     omarchy_paths: OmarchyPaths,
     mut warnings: Vec<String>,
-    state_dir: std::path::PathBuf,
+    dirs: &AppDirs,
 ) -> Result<(), StartupError> {
     let width = cli.width.unwrap_or(config.canvas.default_width);
     let height = cli.height.unwrap_or(config.canvas.default_height);
@@ -198,7 +198,8 @@ fn start(
         keymap,
         omarchy_paths,
         startup_warnings: warnings,
-        state_dir: Some(state_dir),
+        state_dir: Some(dirs.state.clone()),
+        themes_dir: Some(dirs.config.join("themes")),
     });
     if config_mouse_enabled {
         app.pixel_mouse = pixel_cell;

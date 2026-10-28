@@ -83,7 +83,8 @@ app/             App state, dispatch (behaviour), run loop, viewport,
                  layers (layer list, screens, preview size, find),
                  mouse (handles, rubber band, context menus, z-order),
                  paint (tools, brush, colours),
-                 pixels (raster tools), menu (Esc menu, theme choice)
+                 pixels (raster tools), menu (Esc menu, theme choice),
+                 theme_editor (theme files, token editing)
 actions/         Action enum + descriptors (names, keywords, default keys)
 input/           key model, key-chord parsing, keymap with config overrides
 terminal/        RAII guard, panic hook, capability detection,
@@ -581,6 +582,13 @@ drag opens one transaction and
   remembering it, Enter keeps it (written to `<state>/ui-theme`, restored
   at startup unless `[theme] ui` pins one) and Esc restores the choice
   captured when the page opened.
+- **Theme editor.** Theme files (`<config>/themes/*.toml`, the `Theme`
+  struct as TOML) are read at startup; built-in and custom themes are one
+  list for the menu, the palette and the document theme page. The editor
+  works on a copy: for the chrome it is assigned to `ui_theme` on every
+  change and the previous theme is restored on Esc; for the document the
+  canvas is rendered with the copy until `s` applies one `set_theme`
+  patch.
 - **Readable chrome.** `styles::muted` uses the muted token only when it
   provably contrasts with the background; the terminal's own palette is
   unknown, so otherwise the normal foreground is dimmed.

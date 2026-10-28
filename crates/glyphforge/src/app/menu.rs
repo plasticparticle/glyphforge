@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use glyphforge_core::{Color, Theme};
+use glyphforge_core::Color;
 
 use super::{App, StatusKind, UiThemeOrigin};
 use crate::actions::{Action, Direction, MenuAction, MenuPage};
@@ -182,6 +182,11 @@ impl App {
                         Action::Menu(MenuAction::Page(MenuPage::Theme)),
                     ),
                     entry(
+                        "Design theme",
+                        format!("{} ›", self.doc().theme.name),
+                        Action::Menu(MenuAction::Page(MenuPage::DocTheme)),
+                    ),
+                    entry(
                         "Help",
                         self.key_hint(&Action::ToggleHelp),
                         Action::ToggleHelp,
@@ -218,7 +223,7 @@ impl App {
                         Action::Menu(MenuAction::SetTheme(SYSTEM_THEME.to_owned())),
                     )
                 }];
-                entries.extend(Theme::builtin().into_iter().map(|theme| {
+                entries.extend(self.all_themes().into_iter().map(|theme| {
                     let id = theme.id.to_string();
                     MenuEntry {
                         label: theme.name.clone(),
@@ -236,6 +241,11 @@ impl App {
                     }
                 }));
                 entries.push(entry(
+                    "Edit this theme…",
+                    String::new(),
+                    Action::EditTheme(crate::app::ThemeTarget::Ui),
+                ));
+                entries.push(entry(
                     "Use in document",
                     self.key_hint(&Action::UseUiThemeInDocument),
                     Action::UseUiThemeInDocument,
@@ -244,6 +254,37 @@ impl App {
                     "Cancel",
                     "Esc".to_owned(),
                     Action::Menu(MenuAction::Close),
+                ));
+                entries
+            }
+            Some(MenuPage::DocTheme) => {
+                let current = self.doc().theme.id.clone();
+                let mut entries: Vec<MenuEntry> = self
+                    .all_themes()
+                    .into_iter()
+                    .map(|theme| {
+                        let id = theme.id.to_string();
+                        MenuEntry {
+                            label: theme.name.clone(),
+                            hint: String::new(),
+                            action: Action::SetDocTheme(id),
+                            active: theme.id == current,
+                            swatch: ["primary", "secondary", "foreground", "surface"]
+                                .iter()
+                                .map(|t| theme.color(t))
+                                .collect(),
+                        }
+                    })
+                    .collect();
+                entries.push(entry(
+                    "Edit document theme…",
+                    String::new(),
+                    Action::EditTheme(crate::app::ThemeTarget::Document),
+                ));
+                entries.push(entry(
+                    "Back",
+                    "Esc".to_owned(),
+                    Action::Menu(MenuAction::Page(MenuPage::Main)),
                 ));
                 entries
             }
@@ -267,7 +308,7 @@ impl App {
             let text = format!("Theme: system ({})", self.ui_theme.name);
             self.set_status(StatusKind::Info, text);
         } else {
-            let Some(theme) = Theme::builtin_by_id(choice) else {
+            let Some(theme) = self.theme_by_id(choice) else {
                 return self.set_status(StatusKind::Warning, format!("No theme {choice:?}"));
             };
             let text = format!("Theme: {}", theme.name);
@@ -313,7 +354,7 @@ impl App {
         if choice == SYSTEM_THEME {
             return;
         }
-        if let Some(theme) = Theme::builtin_by_id(&choice) {
+        if let Some(theme) = self.theme_by_id(&choice) {
             self.ui_theme = theme;
             self.ui_theme_origin = UiThemeOrigin::Named;
             self.ui_theme_choice = Some(choice);

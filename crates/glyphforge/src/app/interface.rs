@@ -639,6 +639,8 @@ impl App {
             PromptKind::Find => self.submit_find(&prompt),
             PromptKind::GradientStopColor => self.submit_gradient_stop_color(&value),
             PromptKind::ImportImage => self.submit_import_image(&prompt.input),
+            PromptKind::ThemeToken => self.submit_theme_token(&prompt.input),
+            PromptKind::ThemeName => self.submit_theme_name(&prompt.input),
             PromptKind::Inspector(key) => self.submit_inspector(&key, &prompt.input),
             PromptKind::SaveAs => {
                 if value.is_empty() {

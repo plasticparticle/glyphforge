@@ -160,7 +160,9 @@ impl App {
             | Action::SelectionToComponent
             | Action::DoubleClick(_)
             | Action::ZOrder(_)
-            | Action::Review) => self.dispatch_edit(action),
+            | Action::Review
+            | Action::EditTheme(_)
+            | Action::SetDocTheme(_)) => self.dispatch_edit(action),
             Action::OpenDocument => {
                 let title = descriptor_of(&action).map_or("This action", |d| d.title);
                 self.set_status(
@@ -251,6 +253,11 @@ impl App {
             Action::DoubleClick(pos) => self.double_click_canvas(pos),
             Action::ZOrder(order) => self.z_order(order),
             Action::Review => self.open_review(),
+            Action::EditTheme(target) => self.open_theme_editor(target),
+            Action::SetDocTheme(id) => {
+                self.menu = None;
+                self.set_document_theme(&id);
+            }
             _ => {}
         }
     }
@@ -411,6 +418,8 @@ impl App {
             self.context_menu = None;
         } else if self.review.is_some() {
             self.review = None;
+        } else if self.theme_editor.is_some() {
+            self.theme_editor_cancel();
         } else if self.gradient_editor.is_some() {
             self.gradient_editor = None;
             self.set_status(StatusKind::Info, "Gradient edit cancelled");

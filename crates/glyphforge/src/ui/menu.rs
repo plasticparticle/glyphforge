@@ -102,6 +102,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
     let title = match menu.page {
         MenuPage::Main => " Menu ",
         MenuPage::Theme => " Theme ",
+        MenuPage::DocTheme => " Design theme ",
     };
     let block = Block::default()
         .borders(Borders::ALL)
@@ -125,6 +126,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
                 match menu.page {
                     MenuPage::Main => "↑↓ move · ⏎ choose · Esc close",
                     MenuPage::Theme => "↑↓ preview · ⏎ keep · Esc cancel",
+                    MenuPage::DocTheme => "⏎ use for the design (undoable) · Esc back",
                 },
                 muted,
             ))),
@@ -145,13 +147,13 @@ mod tests {
         let mut app = test_app(Size::new(10, 3));
         app.dispatch(Action::Menu(MenuAction::Open));
         let entries = app.menu_entries();
-        assert_eq!(entries.len(), 7);
+        assert_eq!(entries.len(), 8);
         let area = Rect::new(0, 0, 80, 24);
         let g = geometry(area, &entries);
         assert_eq!(g.visible, entries.len() as u16);
         assert_eq!(hit(&g, (g.popup.x + 2, g.first_row)), Some(0));
-        assert_eq!(hit(&g, (g.popup.x + 2, g.first_row + 6)), Some(6));
-        assert_eq!(hit(&g, (g.popup.x + 2, g.first_row + 7)), None, "footer");
+        assert_eq!(hit(&g, (g.popup.x + 2, g.first_row + 7)), Some(7));
+        assert_eq!(hit(&g, (g.popup.x + 2, g.first_row + 8)), None, "footer");
         assert_eq!(hit(&g, (g.popup.x, g.first_row)), None, "border");
         assert_eq!(hit(&g, (0, 0)), None, "outside");
     }

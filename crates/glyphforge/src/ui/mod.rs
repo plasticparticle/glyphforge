@@ -14,6 +14,7 @@ pub mod panels;
 pub mod prompt;
 pub mod review;
 pub mod status_bar;
+pub mod theme_editor;
 
 use glyphforge_core::Color;
 use ratatui::Frame;
@@ -47,6 +48,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>) {
     if app.ui.help_open {
         help::render(app, frame, area);
     }
+    theme_editor::render(app, frame, area);
     color_picker::render(app, frame, area);
     menu::render(app, frame, area);
     gradient_editor::render(app, frame, area);

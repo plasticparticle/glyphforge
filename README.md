@@ -140,6 +140,14 @@ The choice is remembered in `$XDG_STATE_HOME/glyphforge/ui-theme`;
 (or "Use in document" in the menu) copies the editor's theme into the
 document, as an undoable change, so the design uses the colours you see.
 
+**Design theme** in the menu sets the document's own theme from the same
+list (one undoable step). **Edit this theme…** on either page opens the
+theme editor: every token with its swatch, Enter types a colour, `c`
+opens the colour picker, `n` names the theme, `s` saves. Editing the
+editor theme previews on the chrome and saves `~/.config/glyphforge/themes/<id>.toml`
+(theme files there are listed with the built-in themes); editing the
+design theme previews on the canvas and saves into the document.
+
 ## Editor keys
 
 **Ctrl+Space** (or Ctrl+P) opens the command palette: every action by

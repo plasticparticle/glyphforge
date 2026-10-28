@@ -8,7 +8,7 @@ use glyphforge_core::boxdraw::BorderFamily;
 use glyphforge_core::raster::{Dither, GradientShape, GradientStyle, PaletteLimit, RasterMode};
 use glyphforge_core::{Color, ObjectId, Position};
 
-use crate::app::{BrushKind, ColorTarget, LayerAction, ScreenAction, Tool, ZOrder};
+use crate::app::{BrushKind, ColorTarget, LayerAction, ScreenAction, ThemeTarget, Tool, ZOrder};
 
 /// Direction for cursor and viewport movement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -24,6 +24,8 @@ pub enum Direction {
 pub enum MenuPage {
     Main,
     Theme,
+    /// The design's own theme.
+    DocTheme,
 }
 
 /// Esc menu actions.
@@ -207,6 +209,10 @@ pub enum Action {
     ZOrder(ZOrder),
     /// Opens the review of agent proposals and changes.
     Review,
+    /// Opens the theme editor on the editor or the document theme.
+    EditTheme(ThemeTarget),
+    /// Sets the document's theme to a built-in or custom theme.
+    SetDocTheme(String),
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,
@@ -368,6 +374,8 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("use-ui-theme", "Use The Editor Theme In The Document", Application, Action::UseUiThemeInDocument, keys: ["ctrl+shift+o"], kw: ["omarchy", "theme", "colors", "document", "design"], aliases: [], implemented: true),
             desc!("menu", "Menu", Application, Action::Menu(MenuAction::Open), keys: ["f10"], kw: ["esc", "options", "theme", "quit"], aliases: ["options"], implemented: true),
             desc!("command-palette", "Command Palette", Application, Action::CommandPalette, keys: ["ctrl+space", "ctrl+p"], kw: ["search", "actions", "run"], aliases: ["palette"], implemented: true),
+            desc!("edit-theme", "Edit Editor Theme", Application, Action::EditTheme(ThemeTarget::Ui), keys: [], kw: ["theme", "colours", "tokens", "customise", "chrome"], aliases: [], implemented: true),
+            desc!("edit-document-theme", "Edit Document Theme", Application, Action::EditTheme(ThemeTarget::Document), keys: [], kw: ["theme", "colours", "tokens", "design", "palette"], aliases: [], implemented: true),
             desc!("review", "Review Agent Changes", Application, Action::Review, keys: ["f9"], kw: ["agent", "proposal", "accept", "reject", "revert", "ai", "patch"], aliases: ["proposals"], implemented: true),
             desc!("new-document", "New Document", File, Action::NewDocument, keys: ["ctrl+n"], kw: ["create", "canvas"], aliases: ["new"], implemented: true),
             desc!("open-document", "Open Document", File, Action::OpenDocument, keys: ["ctrl+o"], kw: ["load", "file"], aliases: ["open"], implemented: false),
