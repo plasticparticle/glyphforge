@@ -222,6 +222,7 @@ pub enum Action {
     ImportLibrary,
     ExportLibrary,
     EditPalette,
+    Export,
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,
@@ -390,6 +391,7 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("insert-symbol", "Insert Symbol", Interface, Interface, Action::InsertSymbol, keys: ["ctrl+shift+k"], kw: ["symbol", "instance", "reuse", "place"], aliases: [], implemented: true),
             desc!("detach-instance", "Detach Instance", Interface, Interface, Action::DetachInstance, keys: [], kw: ["symbol", "instance", "unlink", "edit"], aliases: ["detach"], implemented: true),
             desc!("push-to-symbol", "Push To Symbol", Interface, Interface, Action::PushToSymbol, keys: [], kw: ["symbol", "master", "update", "propagate"], aliases: [], implemented: true),
+            desc!("export", "Export", File, Action::Export, keys: ["ctrl+e"], kw: ["ansi", "text", "handoff", "yaml", "ratatui", "textual", "bubbletea", "ink", "code", "generate"], aliases: [], implemented: true),
             desc!("import-library", "Import Library", File, Action::ImportLibrary, keys: [], kw: ["library", "symbols", "shared", "kit", "design system"], aliases: [], implemented: true),
             desc!("export-library", "Export Library", File, Action::ExportLibrary, keys: [], kw: ["library", "symbols", "share", "kit", "design system"], aliases: [], implemented: true),
             desc!("edit-palette", "Edit Glyph Palette", Paint, Action::EditPalette, keys: [], kw: ["palette", "glyphs", "characters", "brushes", "library"], aliases: [], implemented: true),

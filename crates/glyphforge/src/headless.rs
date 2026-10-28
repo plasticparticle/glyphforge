@@ -34,7 +34,9 @@ pub enum HeadlessError {
         path: String,
         source: std::io::Error,
     },
-    #[error("unsupported export format {0:?}; supported: text")]
+    #[error(
+        "unsupported export format {0:?}; supported: text, ansi, ansi256, ansi16, handoff, ratatui, textual, bubbletea, ink"
+    )]
     Format(String),
     #[error("unknown component kind {0:?}; `glyphforge kinds` lists them")]
     Kind(String),
@@ -160,15 +162,12 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
             screen,
             out: out_path,
         } => {
-            if format != "text" {
-                return Err(HeadlessError::Format(format));
-            }
             let session = Session::open(&file)?;
             let id = screen_id(&session, screen.as_deref())?;
-            let text = session.render_text(&id, None)?;
+            let text = export_text(&session, &id, &format)?;
             match out_path {
-                Some(p) => std::fs::write(&p, format!("{text}\n")).map_err(write_err(&p))?,
-                None => writeln!(out, "{text}").map_err(write_err(&file))?,
+                Some(p) => std::fs::write(&p, &text).map_err(write_err(&p))?,
+                None => write!(out, "{text}").map_err(write_err(&file))?,
             }
             Ok(0)
         }
@@ -257,6 +256,31 @@ struct ImportArgs {
     rows: Option<u16>,
 }
 
+/// A screen (or, for `handoff`, the whole design) in an export format.
+pub fn export_text(
+    session: &Session,
+    screen: &ObjectId,
+    format: &str,
+) -> Result<String, HeadlessError> {
+    use glyphforge_core::export::{ansi, codegen, handoff};
+    if format == "text" {
+        return Ok(format!("{}\n", session.render_text(screen, None)?));
+    }
+    if format == "handoff" {
+        return Ok(handoff::handoff(session.document(), session.registry()));
+    }
+    if let Some(depth) = ansi::Depth::parse(format) {
+        return Ok(ansi::to_ansi(&session.render(screen, None)?, depth));
+    }
+    let exporter =
+        codegen::exporter(format).ok_or_else(|| HeadlessError::Format(format.to_owned()))?;
+    let s = session
+        .document()
+        .screen(screen)
+        .ok_or_else(|| ApiError::NoSuchScreen(screen.clone()))?;
+    Ok(exporter.generate(session.document(), s))
+}
+
 fn import(args: ImportArgs, out: &mut dyn Write) -> Result<u8, HeadlessError> {
     let ImportArgs {
         file,
@@ -273,12 +297,28 @@ fn import(args: ImportArgs, out: &mut dyn Write) -> Result<u8, HeadlessError> {
         .ok_or_else(|| HeadlessError::Mode(mode.clone()))?;
     let mut session = Session::open(&file)?;
     let screen = screen_id(&session, screen.as_deref())?;
-    let pixels = crate::image::load_png(&image)?;
     let name = name.unwrap_or_else(|| {
         image
             .file_stem()
             .map_or_else(|| "Image".to_owned(), |s| s.to_string_lossy().into_owned())
     });
+    if !image
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("png"))
+    {
+        let text = std::fs::read_to_string(&image).map_err(|source| HeadlessError::ReadPatch {
+            path: image.display().to_string(),
+            source,
+        })?;
+        let (patch, id) =
+            crate::image::text_patch(session.document(), &screen, &text, (x, y), &name)?;
+        session.apply_patch(patch, "Import text art", Origin::User)?;
+        session.save_as(&file)?;
+        writeln!(out, "imported {} as artwork layer {id}", image.display())
+            .map_err(write_err(&file))?;
+        return Ok(0);
+    }
+    let pixels = crate::image::load_png(&image)?;
     let options = crate::image::ImportOptions {
         mode,
         at: (x, y),
@@ -807,6 +847,65 @@ mod tests {
         let doc = Session::open(&b).unwrap();
         assert_eq!(doc.document().palettes.len(), 1);
         assert_eq!(doc.document().data.len(), 1);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn export_formats_and_text_art_import() {
+        let dir = temp_dir("formats");
+        let file = dir.join("d.glyph");
+        run_str(Command::New {
+            file: file.clone(),
+            width: 20,
+            height: 4,
+        });
+        let art = dir.join("logo.ans");
+        std::fs::write(&art, "\x1b[31mHI\x1b[0m there\n").unwrap();
+        let (code, text) = run_str(Command::Import {
+            file: file.clone(),
+            image: art,
+            screen: None,
+            mode: "sextant".into(),
+            name: None,
+            x: 1,
+            y: 1,
+            cols: None,
+            rows: None,
+        });
+        assert_eq!(code, 0, "{text}");
+        let export = |format: &str| {
+            run_str(Command::Export {
+                file: file.clone(),
+                format: format.into(),
+                screen: None,
+                out: None,
+            })
+            .1
+        };
+        assert!(
+            export("text")
+                .lines()
+                .nth(1)
+                .unwrap()
+                .starts_with(" HI there")
+        );
+        assert!(export("ansi16").contains("\x1b[31mHI"));
+        assert!(export("handoff").contains("kind: artwork"));
+        for code in ["ratatui", "textual", "bubbletea", "ink"] {
+            assert!(!export(code).is_empty(), "{code}");
+        }
+        assert!(matches!(
+            run(
+                Command::Export {
+                    file,
+                    format: "pdf".into(),
+                    screen: None,
+                    out: None
+                },
+                &mut Vec::new()
+            ),
+            Err(HeadlessError::Format(_))
+        ));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

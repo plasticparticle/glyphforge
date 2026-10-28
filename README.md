@@ -116,7 +116,17 @@ glyphforge apply    design.glyph patch.json # validated, transactional, undoable
 glyphforge render   design.glyph            # plain-text preview
 glyphforge validate design.glyph --strict   # exit 1 on problems
 glyphforge kinds    [KIND] [--json]         # component kinds, their properties and types
+glyphforge export   design.glyph --format handoff   # YAML: tree, solved rects, tokens, fixtures
+glyphforge export   design.glyph --format ratatui   # also textual, bubbletea, ink
+glyphforge export   design.glyph --format ansi256   # ansi (truecolor), ansi256, ansi16, text
+glyphforge import   design.glyph logo.ans       # text/ANSI art as an artwork layer (PNG: pixels)
 ```
+
+The code generators turn a screen into starter code: containers become
+the framework's layouts (Ratatui `Layout` constraints, Textual containers
+and CSS, Lip Gloss joins, Ink `Box`es), components the closest widget;
+the Ratatui output compiles as generated. In the editor, Ctrl+E exports
+the screen in any of these formats.
 
 Agents can also propose instead of apply: `glyphforge propose design.glyph
 patch.json --agent "Claude Code" -m "tighten the sidebar"` validates the

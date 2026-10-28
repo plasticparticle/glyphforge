@@ -82,9 +82,9 @@ marker; editor typing and agent patches both go through it.
 for layout changes, run-based artwork storage, atomic save, `Session`
 API, CLI `inspect`/`render`/`validate`/`apply`/`export`/`new`, validator
 with stable codes.
-- [ ] YAML-style outline export for hand-off (`inspect` prints a compact
-      outline today; a dedicated `handoff` format follows the exporter
-      interfaces)
+- [x] YAML hand-off (`export --format handoff`): semantic tree with
+      solved rectangles, layout, properties, theme tokens, fixtures,
+      symbols
 
 ---
 
@@ -285,12 +285,14 @@ settings application), each with a distinct aesthetic; the shipped
 Navigation actions (open dialog, switch tab, go to screen, close modal),
 prototype mode, screen graph overview.
 
-### P6 — Import and export  `[ ]`
-Plain text and ANSI import; ANSI 16/256/TrueColor export with minimal SGR
-deltas and clean reset; clipboard (internal, OSC 52, wl-copy/xclip);
-hand-off representation for code generation; exporter interfaces for
-Ratatui, Textual, Bubble Tea and Ink (implementations only after the
-semantic model has stabilised).
+### P6 — Import and export  `[x]`
+- [x] Plain text and ANSI (SGR) import as artwork layers (CLI, editor)
+- [x] ANSI 16/256/TrueColor export with minimal SGR deltas, nearest
+      palette colours and a reset per line; round-trips through import
+- [x] Clipboard: internal, OSC 52, wl-copy/xclip (E3)
+- [x] Hand-off YAML; `Exporter` interface with Ratatui (compiles as
+      generated), Textual, Bubble Tea and Ink starter-code generators;
+      editor export prompt (Ctrl+E)
 
 ### P7 — Validation and design analysis  `[ ]`
 More deterministic checks (invisible fg/bg combinations, wide-character

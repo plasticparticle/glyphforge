@@ -97,7 +97,8 @@ pub enum Command {
         #[arg(long, short, default_value = "")]
         message: String,
     },
-    /// Export a screen; formats: text.
+    /// Export a screen. Formats: text, ansi (truecolor), ansi256, ansi16,
+    /// handoff (YAML of the whole design), ratatui, textual, bubbletea, ink.
     Export {
         file: PathBuf,
         #[arg(long, default_value = "text")]
@@ -108,7 +109,8 @@ pub enum Command {
         #[arg(long)]
         out: Option<PathBuf>,
     },
-    /// Import a PNG image as a pixel layer on top of a screen.
+    /// Import a PNG image as a pixel layer, or a text/ANSI art file as an
+    /// artwork layer, on top of a screen.
     Import {
         file: PathBuf,
         image: PathBuf,

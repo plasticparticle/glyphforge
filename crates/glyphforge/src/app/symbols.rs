@@ -290,6 +290,49 @@ impl App {
         }
     }
 
+    /// Prompt for an export: `format path`.
+    pub fn open_export(&mut self) {
+        let stem = self
+            .session
+            .path()
+            .and_then(|p| p.file_stem())
+            .map_or_else(|| "design".to_owned(), |s| s.to_string_lossy().into_owned());
+        let candidates = [
+            ("text", "txt"),
+            ("ansi", "ans"),
+            ("ansi256", "ans"),
+            ("ansi16", "ans"),
+            ("handoff", "yaml"),
+            ("ratatui", "rs"),
+            ("textual", "py"),
+            ("bubbletea", "go"),
+            ("ink", "tsx"),
+        ]
+        .iter()
+        .map(|(f, ext)| format!("{f} {stem}.{ext}"))
+        .collect();
+        self.prompt = Some(Prompt::new(
+            PromptKind::Export,
+            "Export the screen: format path",
+            candidates,
+        ));
+    }
+
+    pub(super) fn submit_export(&mut self, value: &str) {
+        let mut parts = value.split_whitespace();
+        let (Some(format), Some(path)) = (parts.next(), parts.next()) else {
+            return self.set_status(StatusKind::Warning, "Expected: format path");
+        };
+        let screen = self.editor.screen.clone();
+        let result = crate::headless::export_text(&self.session, &screen, format)
+            .map_err(|e| e.to_string())
+            .and_then(|text| std::fs::write(path, text).map_err(|e| e.to_string()));
+        match result {
+            Ok(()) => self.set_status(StatusKind::Info, format!("Exported {format} to {path}")),
+            Err(e) => self.set_status(StatusKind::Error, format!("Export failed: {e}")),
+        }
+    }
+
     /// Prompt for a glyph palette: `Name: glyph glyph glyph`.
     pub fn open_palette_prompt(&mut self) {
         let candidates = self

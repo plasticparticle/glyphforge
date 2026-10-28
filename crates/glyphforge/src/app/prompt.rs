@@ -36,6 +36,8 @@ pub enum PromptKind {
     EditData,
     InsertSymbol,
     OpenDocument,
+    /// Export format and path.
+    Export,
     /// Restore or discard an autosave found on start.
     Recover,
     ImportLibrary,

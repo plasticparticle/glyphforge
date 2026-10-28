@@ -10,6 +10,7 @@ pub mod api;
 pub mod boxdraw;
 pub mod component;
 pub mod document;
+pub mod export;
 pub mod history;
 pub mod id;
 pub mod layout;

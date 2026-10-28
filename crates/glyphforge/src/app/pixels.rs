@@ -301,7 +301,7 @@ impl App {
     pub fn open_import_image(&mut self) {
         self.prompt = Some(Prompt::new(
             PromptKind::ImportImage,
-            "Import PNG at the cursor: path [half|quadrant|sextant|braille|octant]",
+            "Import at the cursor: PNG [half|quadrant|sextant|braille|octant], or text/ANSI art",
             vec![],
         ));
     }
@@ -316,6 +316,12 @@ impl App {
             return;
         }
         let path = std::path::Path::new(path);
+        if !path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("png"))
+        {
+            return self.import_text_art(path);
+        }
         let image = match crate::image::load_png(path) {
             Ok(i) => i,
             Err(e) => return self.report_error(&e),
@@ -338,6 +344,36 @@ impl App {
                     self.set_status(
                         StatusKind::Info,
                         format!("Imported {}×{} pixels as {id}", image.width, image.height),
+                    );
+                }
+            }
+            Err(e) => self.report_error(&e),
+        }
+    }
+
+    /// Text or ANSI art at the cursor as a new artwork layer.
+    fn import_text_art(&mut self, path: &std::path::Path) {
+        let text = match std::fs::read_to_string(path) {
+            Ok(t) => t,
+            Err(e) => {
+                return self.set_status(
+                    StatusKind::Error,
+                    format!("Cannot read {}: {e}", path.display()),
+                );
+            }
+        };
+        let name = path
+            .file_stem()
+            .map_or_else(|| "Art".to_owned(), |s| s.to_string_lossy().into_owned());
+        let cursor = self.editor.cursor;
+        let screen = self.editor.screen.clone();
+        match crate::image::text_patch(self.doc(), &screen, &text, (cursor.x, cursor.y), &name) {
+            Ok((patch, id)) => {
+                if self.apply(patch, "Import text art") {
+                    self.activate_layer(&id);
+                    self.set_status(
+                        StatusKind::Info,
+                        format!("Imported {} as {id}", path.display()),
                     );
                 }
             }

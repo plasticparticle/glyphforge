@@ -119,6 +119,43 @@ pub fn import_patch(
     ))
 }
 
+/// A patch adding an artwork layer with text or ANSI art (SGR colours are
+/// kept) at cell `at`, and the new layer's id.
+pub fn text_patch(
+    doc: &Document,
+    screen: &ObjectId,
+    text: &str,
+    at: (u16, u16),
+    name: &str,
+) -> Result<(Patch, ObjectId), ImageError> {
+    let s = doc
+        .screen(screen)
+        .ok_or_else(|| ImageError::NoScreen(screen.clone()))?;
+    let art = glyphforge_core::export::ansi::from_ansi(text, None);
+    let ids = doc.ids();
+    let id = ObjectId::slugify(name).unique_among(|i| ids.contains(i));
+    let mut layer = Layer::artwork(id.clone(), name, s.size())
+        .unwrap_or_else(|_| unreachable!("screen sizes are valid canvas sizes"));
+    if let Some(cells) = layer.cells_mut() {
+        for p in art.bounds().positions() {
+            let Some(cell) = art.get(p).filter(|c| !c.is_empty() && !c.is_wide_tail()) else {
+                continue;
+            };
+            let target =
+                glyphforge_core::Position::new(p.x.saturating_add(at.0), p.y.saturating_add(at.1));
+            let _ = cells.put(target, cell.clone());
+        }
+    }
+    Ok((
+        Patch::single(Operation::CreateLayer {
+            layer,
+            screen: Some(screen.clone()),
+            index: None,
+        }),
+        id,
+    ))
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;

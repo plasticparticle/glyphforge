@@ -264,6 +264,7 @@ impl App {
             Action::ImportLibrary => self.open_library_prompt(true),
             Action::ExportLibrary => self.open_library_prompt(false),
             Action::EditPalette => self.open_palette_prompt(),
+            Action::Export => self.open_export(),
             Action::SetDocTheme(id) => {
                 self.menu = None;
                 self.set_document_theme(&id);

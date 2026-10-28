@@ -68,6 +68,9 @@ validate.rs      deterministic diagnostics with stable codes
 project.rs       .glyph envelope, schema_version, migration chain, atomic save
 proposal.rs      agent proposals stored beside a file for review
 symbol.rs        symbols, instance expansion, glyph palettes, libraries
+export/          ansi (export at three depths, SGR import), handoff
+                 (YAML), codegen (Exporter: ratatui, textual, bubbletea,
+                 ink)
 api.rs           Session: the application API
 ```
 
@@ -417,7 +420,9 @@ glyphforge inspect  FILE [--json]
 glyphforge render   FILE [--screen ID] [--width W --height H]
 glyphforge validate FILE [--width W --height H] [--strict]
 glyphforge apply    FILE PATCH.json [--out FILE] [--dry-run]
-glyphforge export   FILE --format text [--out FILE]
+glyphforge export   FILE --format text|ansi|ansi256|ansi16|handoff|
+                    ratatui|textual|bubbletea|ink [--out FILE]
+glyphforge import   FILE IMAGE.png|ART.txt|ART.ans [--mode M] [--x X --y Y]
 glyphforge new      FILE [--width W --height H]
 glyphforge propose  FILE PATCH.json [--agent NAME] [-m MESSAGE]
 glyphforge kinds    [KIND] [--json]
@@ -466,6 +471,22 @@ unversioned or newer files, then validates ids. Saving writes to a
 temporary sibling and renames, so a crash never leaves a half-written file.
 
 ---
+
+## 10.1 Export
+
+`export::ansi::to_ansi` walks the rendered canvas row by row, reduces
+colours to the target depth (nearest palette colour, perceptually
+weighted), emits only the SGR parameters that change between cells
+(resetting when an attribute turns off) and ends every styled line with
+a reset; unstyled trailing blanks are dropped. `from_ansi` is the inverse
+(SGR 0–9, 22–29, 30–49, 90–107, 38/48;5 and ;2; other escapes skipped;
+plain spaces stay transparent), so art round-trips. The hand-off solves
+each interface layer's layout at the screen size and writes the tree
+with rectangles as YAML (JSON strings as scalars). Code generators
+implement `Exporter { id, extension, generate(doc, screen) }`; they walk
+the visible interface roots, turn flow containers into the framework's
+layout primitive with constraints derived from `Dimension`, absolute
+children into explicit offsets, and leaves into the closest widget.
 
 ## 11. Validation
 
