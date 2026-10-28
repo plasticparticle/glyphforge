@@ -285,6 +285,9 @@ with stable codes.
       `new --template [--theme]`, New From Template in the editor
 - [x] Test: every template loads, has no validation errors, is stored
       canonically and renders at its size and at 80×24
+- [x] README screenshot (`docs/screenshot.svg`) drawn in the editor by an
+      ignored test that drives tools, brushes, colours and mouse strokes
+      and renders the whole UI as SVG (`GLYPHFORGE_SCREENSHOT=path`)
 
 ### P5 — Multi-screen prototypes and overview  `[x]`
 - [x] `on_activate` actions: goto, open, close, toggle, select, back,

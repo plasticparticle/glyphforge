@@ -19,6 +19,8 @@ mod prompt;
 mod prototype;
 mod review;
 mod run;
+#[cfg(test)]
+mod screenshot;
 mod selection;
 mod symbols;
 mod theme_editor;

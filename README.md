@@ -10,6 +10,14 @@ Think: Figma + terminal-native editor + semantic UI model + ANSI/Unicode
 art tools. Built in Rust on Ratatui and Crossterm, with a core crate that
 knows nothing about either.
 
+![Drawing in Subcell Mode: a double-framed sketch with auto-joining rounded
+lines, a shade-ramp bar chart, button and toggle stamps, and a pixel layer
+filled with a gradient](docs/screenshot.svg)
+
+<sub>Drawn in the editor by a test that picks tools, brushes and colours and
+makes the mouse strokes, then renders the whole UI. Regenerate it with
+`GLYPHFORGE_SCREENSHOT=docs/screenshot.svg cargo test -p glyphforge screenshot -- --ignored`.</sub>
+
 > Status: the foundations are in place (semantic model with stable ids,
 > layout solver, style tokens and themes, transactional patches,
 > undo/redo, rendering pipeline, versioned diff-friendly project format,
@@ -560,6 +568,7 @@ crates/glyphforge-core   document model, layout, patches, history, rendering,
                          validation, project format, application API
 crates/glyphforge        the editor and CLI binary
 examples/                example projects and the patch that builds them
+docs/                    the README screenshot
 scripts/                 pty smoke test
 ```
 
