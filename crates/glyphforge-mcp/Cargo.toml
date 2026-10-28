@@ -1,0 +1,21 @@
+[package]
+name = "glyphforge-mcp"
+description = "Model Context Protocol server for Glyphforge designs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "glyphforge-mcp"
+path = "src/main.rs"
+
+[dependencies]
+glyphforge-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

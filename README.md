@@ -141,6 +141,23 @@ and CSS, Lip Gloss joins, Ink `Box`es), components the closest widget;
 the Ratatui output compiles as generated. In the editor, Ctrl+E exports
 the screen in any of these formats.
 
+### MCP server
+
+`glyphforge-mcp design.glyph` speaks the Model Context Protocol over
+stdio, so MCP clients can work on a design directly. For Claude Code:
+
+```sh
+claude mcp add glyphforge -- glyphforge-mcp /path/to/design.glyph --agent claude
+```
+
+Tools: `get_document` (outline, JSON or hand-off), `query_components`,
+`list_kinds`, `create_component`, `apply_patch`, `render_preview` (text or
+ANSI, any size), `validate_layout` (with optional suggestions) and
+`export_document`. Edits are agent transactions saved to the file; with
+`"propose": true` they are stored for review in the editor instead (see
+below). There are no cell-by-cell tools: agents work with components and
+patches.
+
 Agents can also propose instead of apply: `glyphforge propose design.glyph
 patch.json --agent "Claude Code" -m "tighten the sidebar"` validates the
 patch and stores it in `design.glyph.proposals/`. The open editor notices

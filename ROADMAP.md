@@ -306,11 +306,14 @@ settings application), each with a distinct aesthetic; the shipped
       `alignment`, `hierarchy`, `density`; `validate --advice`
 - [x] Check Design panel in the editor (F5) with jump to component
 
-### P8 — MCP server  `[ ]`
-Only after the `Session` API is stable: a `glyphforge-mcp` crate exposing
-`get_document`, `query_components`, `create_component`, `apply_patch`,
-`render_preview`, `validate_layout`, `export_document`. No `set_cell`-sized
-tools.
+### P8 — MCP server  `[x]`
+- [x] `glyphforge-mcp` crate: stdio JSON-RPC (MCP 2025-06-18),
+      `initialize`, `ping`, `tools/list`, `tools/call`
+- [x] Tools `get_document`, `query_components`, `list_kinds`,
+      `create_component`, `apply_patch`, `render_preview`,
+      `validate_layout`, `export_document`; no cell-sized tools
+- [x] Edits are agent transactions saved to the file, or proposals for
+      review with `propose`
 
 ### P9 — Omarchy integration and packaging  `[ ]`
 Theme change polling and `theme-set.d` hook, checks in the four Omarchy

@@ -5,3 +5,4 @@
 pub mod ansi;
 pub mod codegen;
 pub mod handoff;
+pub mod outline;

@@ -595,6 +595,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "glyphforge-mcp"
+version = "0.1.0"
+dependencies = [
+ "glyphforge-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

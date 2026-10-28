@@ -26,15 +26,16 @@ glyphforge-core          domain: ids, components, layout, themes, cells,
         │  api::Session  (the application API)
         │
    ┌────┼───────────────┐
-  CLI  TUI            MCP (later)
+  CLI  TUI            MCP
    glyphforge          glyphforge          glyphforge-mcp
-   headless.rs         app/, ui/, ...      not before the API is stable
+   headless.rs         app/, ui/, ...      server.rs (stdio JSON-RPC)
 ```
 
 | Crate | Responsibility | Allowed dependencies |
 |-------|----------------|----------------------|
 | `crates/glyphforge-core` | Everything about designs. | `serde`, `serde_json`, `unicode-*`, `thiserror`. **Never** `ratatui`/`crossterm`. |
-| `crates/glyphforge` | The binary: terminal lifecycle, input, actions, editor UI, config, Omarchy detection, CLI subcommands. | core + `ratatui`, `crossterm`, `clap`, `toml`, `tracing`. |
+| `crates/glyphforge` | The binary: terminal lifecycle, input, actions, editor UI, config, Omarchy detection, CLI subcommands. | core + `ratatui`, `crossterm`, `clap`, `toml`, `tracing`, `png`. |
+| `crates/glyphforge-mcp` | MCP server over stdio for coding agents. | core + `serde_json`. |
 
 The manifest enforces the boundary: the core cannot name a Ratatui type.
 The interactive editor, the CLI and a future MCP server call the same
@@ -413,8 +414,12 @@ file path, and exposes: `document`, `component`, `query_components`,
 `validate_at(screen, size)`, `save`/`save_as`/`open`, `to_json`.
 
 The TUI's `App` holds a `Session` and dispatches actions into it; the CLI
-subcommands call the same methods; an MCP server will wrap them once the
-surface has settled. Nothing is added for agents that humans do not use.
+subcommands call the same methods; the MCP server (`glyphforge-mcp`)
+opens the file per tool call, applies changes as `Origin::Agent`
+transactions and saves, or validates them and writes a proposal. Its
+tools mirror the CLI (outline, query, kinds, create, patch, preview,
+validate, export) and are described with JSON schemas in `tools/list`.
+Nothing is added for agents that humans do not use.
 
 ### 9.1 CLI
 

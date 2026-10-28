@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/glyphforge-core", "crates/glyphforge"]
+members = ["crates/glyphforge-core", "crates/glyphforge", "crates/glyphforge-mcp"]
 default-members = ["crates/glyphforge"]
 
 [workspace.package]
