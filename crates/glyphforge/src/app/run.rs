@@ -39,6 +39,9 @@ pub fn run(app: &mut App, guard: &mut TerminalGuard) -> Result<(), RunError> {
         if let Some(text) = app.take_system_clipboard() {
             crate::terminal::clipboard::copy(&text);
         }
+        if app.poll_proposals() {
+            needs_redraw = true;
+        }
         if !event::poll(TICK)? {
             continue;
         }
@@ -90,6 +93,17 @@ fn handle_event(app: &mut App, ev: &Event) -> bool {
 /// Routes a key: help overlay first, then the keymap, then Vim navigation,
 /// then text insertion.
 pub(crate) fn handle_key(app: &mut App, key: Key) {
+    if app.review.is_some() {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('q') | KeyCode::F(9) => app.review = None,
+            KeyCode::Enter | KeyCode::Char('a') => app.review_accept(),
+            KeyCode::Char('x' | 'r') | KeyCode::Delete => app.review_reject(),
+            KeyCode::Up | KeyCode::Char('k') => app.review_move(false),
+            KeyCode::Down | KeyCode::Char('j') | KeyCode::Tab => app.review_move(true),
+            _ => {}
+        }
+        return;
+    }
     if app.context_menu.is_some() {
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => app.context_menu = None,

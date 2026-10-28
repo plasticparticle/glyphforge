@@ -231,6 +231,105 @@ impl Operation {
         }
     }
 
+    /// A one-line, human-readable description for reviews and logs.
+    pub fn summary(&self) -> String {
+        let opt = |o: &Option<ObjectId>| {
+            o.as_ref()
+                .map_or_else(|| "top level".to_owned(), ToString::to_string)
+        };
+        match self {
+            Self::Move { target, x, y } => format!("move {target} to {x},{y}"),
+            Self::Resize {
+                target,
+                width,
+                height,
+            } => format!("resize {target} to {width}×{height}"),
+            Self::SetProperty {
+                target,
+                property,
+                value,
+            } if value.is_null() => format!("remove {target}.{property}"),
+            Self::SetProperty {
+                target,
+                property,
+                value,
+            } => format!(
+                "set {target}.{property} = {}",
+                serde_json::to_string(value).unwrap_or_default()
+            ),
+            Self::SetLayout { target, layout } => {
+                format!("layout of {target}: {} × {}", layout.width, layout.height)
+            }
+            Self::CreateComponent {
+                component, parent, ..
+            } => format!(
+                "add {} {} ({} nodes) under {}",
+                component.kind,
+                component.id,
+                component.iter().count(),
+                opt(parent)
+            ),
+            Self::DeleteComponent { target } => format!("delete {target}"),
+            Self::Reparent { target, parent, .. } => {
+                format!("move {target} into {}", opt(parent))
+            }
+            Self::SetCells { layer, cells } => format!("paint {} cells on {layer}", cells.len()),
+            Self::SetPixels { layer, pixels } => {
+                format!("paint {} pixels on {layer}", pixels.len())
+            }
+            Self::UpdateRaster { target, .. } => format!("change raster settings of {target}"),
+            Self::ReplaceRaster { target, .. } => format!("replace raster {target}"),
+            Self::SetGradient { gradient } => format!("set gradient {}", gradient.id),
+            Self::DeleteGradient { target } => format!("delete gradient {target}"),
+            Self::CreateLayer { layer, .. } => {
+                format!("add {} layer {}", layer.kind().name(), layer.id)
+            }
+            Self::DeleteLayer { target } => format!("delete layer {target}"),
+            Self::UpdateLayer {
+                target,
+                name,
+                visible,
+                locked,
+            } => {
+                let mut parts = Vec::new();
+                if let Some(n) = name {
+                    parts.push(format!("rename to {n:?}"));
+                }
+                if let Some(v) = visible {
+                    parts.push(if *v { "show" } else { "hide" }.to_owned());
+                }
+                if let Some(l) = locked {
+                    parts.push(if *l { "lock" } else { "unlock" }.to_owned());
+                }
+                format!("layer {target}: {}", parts.join(", "))
+            }
+            Self::ReorderLayer { target, index } => format!("move layer {target} to {index}"),
+            Self::SetTheme { theme } => format!("use theme {}", theme.name),
+            Self::CreateScreen { screen, .. } => format!("add screen {}", screen.id),
+            Self::DeleteScreen { target } => format!("delete screen {target}"),
+            Self::UpdateScreen {
+                target,
+                name,
+                width,
+                height,
+            } => {
+                let mut parts = Vec::new();
+                if let Some(n) = name {
+                    parts.push(format!("rename to {n:?}"));
+                }
+                if width.is_some() || height.is_some() {
+                    parts.push(format!(
+                        "resize to {}×{}",
+                        width.map_or_else(|| "·".to_owned(), |w| w.to_string()),
+                        height.map_or_else(|| "·".to_owned(), |h| h.to_string())
+                    ));
+                }
+                format!("screen {target}: {}", parts.join(", "))
+            }
+            Self::ReplaceScreen { screen } => format!("replace screen {}", screen.id),
+        }
+    }
+
     pub const fn name(&self) -> &'static str {
         match self {
             Self::Move { .. } => "move",
@@ -1455,6 +1554,28 @@ mod tests {
             .apply(&mut doc)
             .is_err(),
             "the last screen stays"
+        );
+    }
+
+    #[test]
+    fn summaries_name_targets() {
+        assert_eq!(
+            Operation::Move {
+                target: id!("a"),
+                x: 1,
+                y: 2
+            }
+            .summary(),
+            "move a to 1,2"
+        );
+        assert_eq!(
+            Operation::SetProperty {
+                target: id!("a"),
+                property: "title".into(),
+                value: "Hi".into()
+            }
+            .summary(),
+            "set a.title = \"Hi\""
         );
     }
 }

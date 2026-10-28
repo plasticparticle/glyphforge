@@ -28,6 +28,8 @@ pub enum ApiError {
     NoSuchComponent(ObjectId),
     #[error("the document has no file path yet")]
     NoPath,
+    #[error("no transaction at history position {0}")]
+    NoSuchTransaction(usize),
 }
 
 /// A document with its history, file binding and renderer registry.
@@ -111,6 +113,39 @@ impl Session {
     ) -> Result<(), ApiError> {
         self.history.apply(&mut self.doc, patch, label, origin)?;
         Ok(())
+    }
+
+    /// Applies an agent's proposal as one agent transaction.
+    pub fn apply_proposal(&mut self, proposal: &crate::proposal::Proposal) -> Result<(), ApiError> {
+        let label = if proposal.message.is_empty() {
+            format!(
+                "{}: {} operations",
+                proposal.agent,
+                proposal.patch.operations.len()
+            )
+        } else {
+            format!("{}: {}", proposal.agent, proposal.message)
+        };
+        self.apply_patch(
+            proposal.patch.clone(),
+            label,
+            Origin::Agent {
+                name: proposal.agent.clone(),
+                description: proposal.message.clone(),
+            },
+        )
+    }
+
+    /// Undoes one transaction of the history that is not the last one by
+    /// applying its inverse as a new transaction (later edits stay). Fails
+    /// when later edits make the inverse impossible.
+    pub fn revert(&mut self, index: usize) -> Result<String, ApiError> {
+        let Some(t) = self.history.undo_stack().get(index).cloned() else {
+            return Err(ApiError::NoSuchTransaction(index));
+        };
+        let label = format!("Revert: {}", t.label);
+        self.apply_patch(t.inverse, label.clone(), Origin::User)?;
+        Ok(label)
     }
 
     fn single(&mut self, op: Operation, label: &str) -> Result<(), ApiError> {

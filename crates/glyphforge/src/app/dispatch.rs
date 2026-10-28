@@ -159,7 +159,8 @@ impl App {
             | Action::InvertSelection
             | Action::SelectionToComponent
             | Action::DoubleClick(_)
-            | Action::ZOrder(_)) => self.dispatch_edit(action),
+            | Action::ZOrder(_)
+            | Action::Review) => self.dispatch_edit(action),
             Action::OpenDocument => {
                 let title = descriptor_of(&action).map_or("This action", |d| d.title);
                 self.set_status(
@@ -249,6 +250,7 @@ impl App {
             Action::SelectionToComponent => self.selection_to_component(),
             Action::DoubleClick(pos) => self.double_click_canvas(pos),
             Action::ZOrder(order) => self.z_order(order),
+            Action::Review => self.open_review(),
             _ => {}
         }
     }
@@ -406,6 +408,8 @@ impl App {
             self.palette = None;
         } else if self.context_menu.is_some() {
             self.context_menu = None;
+        } else if self.review.is_some() {
+            self.review = None;
         } else if self.prompt.is_some() {
             self.prompt = None;
         } else if self.picker.is_some() {

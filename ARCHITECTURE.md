@@ -64,6 +64,7 @@ render/          RenderContext, Registry, ComponentRenderer, descriptors
                  render_screen, to_text_lines
 validate.rs      deterministic diagnostics with stable codes
 project.rs       .glyph envelope, schema_version, migration chain, atomic save
+proposal.rs      agent proposals stored beside a file for review
 api.rs           Session: the application API
 ```
 
@@ -372,7 +373,19 @@ glyphforge validate FILE [--width W --height H] [--strict]
 glyphforge apply    FILE PATCH.json [--out FILE] [--dry-run]
 glyphforge export   FILE --format text [--out FILE]
 glyphforge new      FILE [--width W --height H]
+glyphforge propose  FILE PATCH.json [--agent NAME] [-m MESSAGE]
+glyphforge kinds    [KIND] [--json]
 ```
+
+`propose` validates the patch against the file, then writes it to
+`FILE.proposals/NNNN-agent.json` (atomic rename) instead of applying it.
+The editor polls that directory once a second; its review panel previews
+a proposal by applying it to a clone of the document, accepting applies
+it through `Session::apply_proposal` (an `Origin::Agent` transaction) and
+deletes the file. `Session::revert(index)` applies an older transaction's
+inverse as a new transaction, so later edits stay; it fails cleanly when
+they conflict. `Operation::summary` gives every operation a one-line
+description for the review and logs.
 
 The intended agent loop is `inspect -> apply -> render -> validate`, each a
 cheap process.

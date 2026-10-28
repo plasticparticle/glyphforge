@@ -204,6 +204,8 @@ pub enum Action {
     DoubleClick(Position),
     /// Moves the selection among its siblings.
     ZOrder(ZOrder),
+    /// Opens the review of agent proposals and changes.
+    Review,
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,
@@ -365,6 +367,7 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("use-ui-theme", "Use The Editor Theme In The Document", Application, Action::UseUiThemeInDocument, keys: ["ctrl+shift+o"], kw: ["omarchy", "theme", "colors", "document", "design"], aliases: [], implemented: true),
             desc!("menu", "Menu", Application, Action::Menu(MenuAction::Open), keys: ["f10"], kw: ["esc", "options", "theme", "quit"], aliases: ["options"], implemented: true),
             desc!("command-palette", "Command Palette", Application, Action::CommandPalette, keys: ["ctrl+space", "ctrl+p"], kw: ["search", "actions", "run"], aliases: ["palette"], implemented: true),
+            desc!("review", "Review Agent Changes", Application, Action::Review, keys: ["f9"], kw: ["agent", "proposal", "accept", "reject", "revert", "ai", "patch"], aliases: ["proposals"], implemented: true),
             desc!("new-document", "New Document", File, Action::NewDocument, keys: ["ctrl+n"], kw: ["create", "canvas"], aliases: ["new"], implemented: true),
             desc!("open-document", "Open Document", File, Action::OpenDocument, keys: ["ctrl+o"], kw: ["load", "file"], aliases: ["open"], implemented: false),
             desc!("save-document", "Save Document", File, Action::SaveDocument, keys: ["ctrl+s"], kw: ["write", "file"], aliases: ["save"], implemented: true),

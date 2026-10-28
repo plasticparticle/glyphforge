@@ -85,6 +85,18 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Validate a patch and leave it for review in the editor instead of
+    /// applying it (stored in FILE.proposals/).
+    Propose {
+        file: PathBuf,
+        patch: PathBuf,
+        /// Who proposes the change.
+        #[arg(long, default_value = "agent")]
+        agent: String,
+        /// Why, in one line.
+        #[arg(long, short, default_value = "")]
+        message: String,
+    },
     /// Export a screen; formats: text.
     Export {
         file: PathBuf,

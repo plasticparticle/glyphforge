@@ -12,6 +12,7 @@ mod mouse;
 mod paint;
 mod pixels;
 mod prompt;
+mod review;
 mod run;
 mod selection;
 mod viewport;
@@ -38,6 +39,7 @@ pub use mouse::{ContextMenu, ContextTarget, ZOrder, handles as resize_handles};
 pub use paint::picker_rows;
 pub use paint::{ColorPicker, ColorTarget, PaintState, Tool, color_label, is_light};
 pub use prompt::Prompt;
+pub use review::ReviewItem;
 pub use run::{RunError, run};
 pub use viewport::Viewport;
 
@@ -185,6 +187,11 @@ pub struct App {
     pub is_omarchy: bool,
     pub prompt: Option<Prompt>,
     pub menu: Option<Menu>,
+    /// The open review of agent changes.
+    pub review: Option<review::Review>,
+    /// Proposals waiting next to the file, as last counted.
+    pub pending_proposals: usize,
+    last_proposal_poll: Option<std::time::Instant>,
     /// The open command palette.
     pub palette: Option<commands::CommandPalette>,
     /// Titles of recently run palette commands, newest first.
@@ -286,6 +293,9 @@ impl App {
             is_omarchy,
             prompt: None,
             menu: None,
+            review: None,
+            pending_proposals: 0,
+            last_proposal_poll: None,
             palette: None,
             recent_commands: Vec::new(),
             ui_theme_choice: None,

@@ -63,7 +63,11 @@ component bridging the modes, plain-text preview.
 ### F7 — History  `[x]`
 Transactions with origin, stroke grouping, undo/redo, limit, saved
 marker; editor typing and agent patches both go through it.
-- [ ] Review UI for agent transactions (list, inspect diff, accept, reject)
+- [x] Review of agent changes: `glyphforge propose` stores validated
+      patches beside the file, the editor polls them, F9 lists proposals
+      and applied agent transactions with one-line operation summaries,
+      previews proposals on the canvas, accepts (agent transaction),
+      rejects, or reverts applied ones (`Session::revert`)
 
 ### F8 — Component abstraction  `[x]`
 - [x] Renderer registry, placeholder for unknown kinds

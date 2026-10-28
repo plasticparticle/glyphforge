@@ -11,6 +11,7 @@ pub mod menu;
 pub mod palette;
 pub mod panels;
 pub mod prompt;
+pub mod review;
 pub mod status_bar;
 
 use glyphforge_core::Color;
@@ -48,6 +49,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>) {
     color_picker::render(app, frame, area);
     menu::render(app, frame, area);
     prompt::render(app, frame, area);
+    review::render(app, frame, area);
     commands::render(app, frame, area);
     context_menu::render(app, frame, area);
 }

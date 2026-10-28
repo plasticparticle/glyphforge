@@ -67,6 +67,14 @@ glyphforge validate design.glyph --strict   # exit 1 on problems
 glyphforge kinds    [KIND] [--json]         # component kinds, their properties and types
 ```
 
+Agents can also propose instead of apply: `glyphforge propose design.glyph
+patch.json --agent "Claude Code" -m "tighten the sidebar"` validates the
+patch and stores it in `design.glyph.proposals/`. The open editor notices
+it ("1 agent proposal waiting"); F9 opens the review: each proposal is
+previewed on the canvas with its operations listed, Enter accepts it as an
+agent transaction (undoable like any edit), `x` rejects it, and applied
+agent changes can be reverted later while other edits stay.
+
 A patch:
 
 ```json

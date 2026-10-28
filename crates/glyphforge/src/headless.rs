@@ -42,6 +42,8 @@ pub enum HeadlessError {
     Exists(String),
     #[error(transparent)]
     Document(#[from] glyphforge_core::DocumentError),
+    #[error(transparent)]
+    Proposal(#[from] glyphforge_core::proposal::ProposalError),
 }
 
 fn parse_id(s: &str) -> Result<ObjectId, HeadlessError> {
@@ -117,16 +119,7 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
             dry_run,
         } => {
             let mut session = Session::open(&file)?;
-            let text =
-                std::fs::read_to_string(&patch).map_err(|source| HeadlessError::ReadPatch {
-                    path: patch.display().to_string(),
-                    source,
-                })?;
-            let patch: Patch =
-                serde_json::from_str(&text).map_err(|source| HeadlessError::ParsePatch {
-                    path: patch.display().to_string(),
-                    source,
-                })?;
+            let patch = read_patch(&patch)?;
             let count = patch.operations.len();
             session.apply_patch(
                 patch,
@@ -149,6 +142,33 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
                 )
                 .map_err(write_err(&target))?;
             }
+            Ok(0)
+        }
+        Command::Propose {
+            file,
+            patch: patch_path,
+            agent,
+            message,
+        } => {
+            let mut session = Session::open(&file)?;
+            let patch = read_patch(&patch_path)?;
+            let count = patch.operations.len();
+            // Validate against the file now, so the agent learns about
+            // errors here rather than the reviewer later.
+            session.apply_patch(patch.clone(), "Check proposal", Origin::User)?;
+            let proposal = glyphforge_core::proposal::Proposal {
+                agent,
+                message,
+                created: glyphforge_core::proposal::now(),
+                patch,
+            };
+            let path = glyphforge_core::proposal::submit(&file, &proposal)?;
+            writeln!(
+                out,
+                "proposed {count} operation(s) for review: {}",
+                path.display()
+            )
+            .map_err(write_err(&file))?;
             Ok(0)
         }
         Command::Export {
@@ -201,6 +221,17 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
             Ok(0)
         }
     }
+}
+
+fn read_patch(path: &Path) -> Result<Patch, HeadlessError> {
+    let text = std::fs::read_to_string(path).map_err(|source| HeadlessError::ReadPatch {
+        path: path.display().to_string(),
+        source,
+    })?;
+    serde_json::from_str(&text).map_err(|source| HeadlessError::ParsePatch {
+        path: path.display().to_string(),
+        source,
+    })
 }
 
 fn write_err(path: &Path) -> impl Fn(std::io::Error) -> HeadlessError + '_ {
@@ -506,5 +537,53 @@ mod tests {
             ),
             Err(HeadlessError::Kind(_))
         ));
+    }
+
+    #[test]
+    fn propose_validates_and_stores_without_applying() {
+        let dir = temp_dir("propose");
+        let file = dir.join("d.glyph");
+        run_str(Command::New {
+            file: file.clone(),
+            width: 30,
+            height: 6,
+        });
+        let patch = dir.join("p.json");
+        std::fs::write(
+            &patch,
+            r#"{"operations":[{"op":"create_component","layer":"main-ui","component":{"id":"hello","kind":"label","props":{"text":"Hi"}}}]}"#,
+        )
+        .unwrap();
+        let (code, text) = run_str(Command::Propose {
+            file: file.clone(),
+            patch: patch.clone(),
+            agent: "tester".into(),
+            message: "say hi".into(),
+        });
+        assert_eq!(code, 0, "{text}");
+        assert!(text.contains("0001-tester.json"), "{text}");
+        let doc = Session::open(&file).unwrap();
+        assert!(doc.document().components().next().is_none(), "not applied");
+        assert_eq!(glyphforge_core::proposal::list(&file).len(), 1);
+        // An invalid patch is refused at once.
+        std::fs::write(
+            &patch,
+            r#"{"operations":[{"op":"delete_component","target":"nope"}]}"#,
+        )
+        .unwrap();
+        assert!(
+            run(
+                Command::Propose {
+                    file: file.clone(),
+                    patch,
+                    agent: "tester".into(),
+                    message: String::new()
+                },
+                &mut Vec::new()
+            )
+            .is_err()
+        );
+        assert_eq!(glyphforge_core::proposal::list(&file).len(), 1);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
