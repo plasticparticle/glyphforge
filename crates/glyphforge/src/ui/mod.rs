@@ -11,6 +11,7 @@ pub mod layout;
 pub mod menu;
 pub mod palette;
 pub mod panels;
+pub mod problems;
 pub mod prompt;
 pub mod review;
 pub mod status_bar;
@@ -54,6 +55,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>) {
     gradient_editor::render(app, frame, area);
     prompt::render(app, frame, area);
     review::render(app, frame, area);
+    problems::render(app, frame, area);
     commands::render(app, frame, area);
     context_menu::render(app, frame, area);
 }

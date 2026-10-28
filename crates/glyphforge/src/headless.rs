@@ -99,6 +99,7 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
             width,
             height,
             strict,
+            advice,
         } => {
             let session = Session::open(&file)?;
             let mut diagnostics = session.validate();
@@ -115,6 +116,11 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
                 .count();
             if diagnostics.is_empty() {
                 writeln!(out, "ok: no problems found").map_err(write_err(&file))?;
+            }
+            if advice {
+                for a in glyphforge_core::advice::advise(session.document(), session.registry()) {
+                    writeln!(out, "{a}").map_err(write_err(&file))?;
+                }
             }
             Ok(u8::from(errors > 0))
         }
@@ -638,6 +644,7 @@ mod tests {
             width: None,
             height: None,
             strict: false,
+            advice: false,
         });
         assert_eq!(code, 0, "{text}");
         assert!(text.contains("ok"));
@@ -646,6 +653,7 @@ mod tests {
             width: Some(10),
             height: Some(2),
             strict: false,
+            advice: true,
         });
         assert_eq!(code, 0, "warnings alone do not fail: {text}");
         assert!(text.contains("clipped"), "{text}");
@@ -654,6 +662,7 @@ mod tests {
             width: Some(10),
             height: Some(2),
             strict: true,
+            advice: false,
         });
         assert_eq!(code, 1);
         let exported = dir.join("out.txt");

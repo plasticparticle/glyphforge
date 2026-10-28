@@ -294,11 +294,13 @@ prototype mode, screen graph overview.
       generated), Textual, Bubble Tea and Ink starter-code generators;
       editor export prompt (Ctrl+E)
 
-### P7 — Validation and design analysis  `[ ]`
-More deterministic checks (invisible fg/bg combinations, wide-character
-collisions, minimum sizes, unreachable controls); a separate heuristic
-module for spacing, alignment and hierarchy suggestions, clearly labelled
-as opinions.
+### P7 — Validation and design analysis  `[x]`
+- [x] Checks on the rendered screen: `invisible`, `low-contrast` (text
+      only), `wide-glyph` cut at a component edge, `too-small`,
+      `unreachable` controls under opaque later components
+- [x] `advice` module (opinions, separate from validation): `spacing`,
+      `alignment`, `hierarchy`, `density`; `validate --advice`
+- [x] Check Design panel in the editor (F5) with jump to component
 
 ### P8 — MCP server  `[ ]`
 Only after the `Session` API is stable: a `glyphforge-mcp` crate exposing

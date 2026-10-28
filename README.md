@@ -115,6 +115,7 @@ glyphforge inspect  design.glyph --json     # the full document
 glyphforge apply    design.glyph patch.json # validated, transactional, undoable
 glyphforge render   design.glyph            # plain-text preview
 glyphforge validate design.glyph --strict   # exit 1 on problems
+glyphforge validate design.glyph --advice   # plus design suggestions (opinions)
 glyphforge kinds    [KIND] [--json]         # component kinds, their properties and types
 glyphforge export   design.glyph --format handoff   # YAML: tree, solved rects, tokens, fixtures
 glyphforge export   design.glyph --format ratatui   # also textual, bubbletea, ink
@@ -211,6 +212,13 @@ editor theme previews on the chrome and saves `~/.config/glyphforge/themes/<id>.
 design theme previews on the canvas and saves into the document.
 
 ## Editor keys
+
+**F5** (Check Design) lists what validation finds on the screen (clipped,
+truncated, overlapping, invisible or low-contrast text, cut wide glyphs,
+components too small for their content, controls covered by others) and,
+separately labelled, design suggestions (uneven spacing, near-misses in
+alignment, missing or competing headings, crowded text); Enter jumps to
+the component.
 
 **Ctrl+Space** (or Ctrl+P) opens the command palette: every action by
 name, fuzzy matched over titles, keywords and aliases ("togall" finds

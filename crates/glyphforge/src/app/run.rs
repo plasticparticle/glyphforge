@@ -93,46 +93,7 @@ fn handle_event(app: &mut App, ev: &Event) -> bool {
 /// Routes a key: help overlay first, then the keymap, then Vim navigation,
 /// then text insertion.
 pub(crate) fn handle_key(app: &mut App, key: Key) {
-    if app.review.is_some() {
-        match key.code {
-            KeyCode::Esc | KeyCode::Char('q') | KeyCode::F(9) => app.review = None,
-            KeyCode::Enter | KeyCode::Char('a') => app.review_accept(),
-            KeyCode::Char('x' | 'r') | KeyCode::Delete => app.review_reject(),
-            KeyCode::Up | KeyCode::Char('k') => app.review_move(false),
-            KeyCode::Down | KeyCode::Char('j') | KeyCode::Tab => app.review_move(true),
-            _ => {}
-        }
-        return;
-    }
-    if app.context_menu.is_some() {
-        match key.code {
-            KeyCode::Esc | KeyCode::Char('q') => app.context_menu = None,
-            KeyCode::Enter | KeyCode::Char(' ') => app.context_run(None),
-            KeyCode::Up | KeyCode::Char('k') => app.context_move(false),
-            KeyCode::Down | KeyCode::Char('j') | KeyCode::Tab => app.context_move(true),
-            _ => {}
-        }
-        return;
-    }
-    if app.palette.is_some() {
-        match key.code {
-            KeyCode::Esc => app.dispatch(Action::Cancel),
-            KeyCode::Enter => app.palette_run(None),
-            KeyCode::Backspace => app.palette_backspace(),
-            KeyCode::Down | KeyCode::Tab => app.palette_move(true),
-            KeyCode::Up | KeyCode::BackTab => app.palette_move(false),
-            _ if key.mods.ctrl && matches!(key.code, KeyCode::Char('n' | 'j')) => {
-                app.palette_move(true);
-            }
-            _ if key.mods.ctrl && matches!(key.code, KeyCode::Char('p' | 'k')) => {
-                app.palette_move(false);
-            }
-            _ => {
-                if let Some(c) = key.text_char() {
-                    app.palette_input(c);
-                }
-            }
-        }
+    if popup_key(app, key) {
         return;
     }
     if app.prompt.is_none() && app.picker.is_none() && app.theme_editor.is_some() {
@@ -385,6 +346,65 @@ fn layers_key(app: &App, key: Key) -> Option<Action> {
         KeyCode::Char('S') => Action::Screen(ScreenAction::Resize),
         _ => return None,
     })
+}
+
+/// Keys of the popups that own the keyboard while open: the review of
+/// agent changes, the problems panel, context menus and the command
+/// palette. Returns whether the key was handled.
+fn popup_key(app: &mut App, key: Key) -> bool {
+    if app.review.is_some() {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('q') | KeyCode::F(9) => app.review = None,
+            KeyCode::Enter | KeyCode::Char('a') => app.review_accept(),
+            KeyCode::Char('x' | 'r') | KeyCode::Delete => app.review_reject(),
+            KeyCode::Up | KeyCode::Char('k') => app.review_move(false),
+            KeyCode::Down | KeyCode::Char('j') | KeyCode::Tab => app.review_move(true),
+            _ => {}
+        }
+        return true;
+    }
+    if app.problems.is_some() && app.prompt.is_none() {
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => app.problems_move(false),
+            KeyCode::Down | KeyCode::Char('j') => app.problems_move(true),
+            KeyCode::Enter => app.problems_jump(),
+            KeyCode::Esc | KeyCode::F(5) => app.problems = None,
+            _ => return false,
+        }
+        return true;
+    }
+    if app.context_menu.is_some() {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('q') => app.context_menu = None,
+            KeyCode::Enter | KeyCode::Char(' ') => app.context_run(None),
+            KeyCode::Up | KeyCode::Char('k') => app.context_move(false),
+            KeyCode::Down | KeyCode::Char('j') | KeyCode::Tab => app.context_move(true),
+            _ => {}
+        }
+        return true;
+    }
+    if app.palette.is_some() {
+        match key.code {
+            KeyCode::Esc => app.dispatch(Action::Cancel),
+            KeyCode::Enter => app.palette_run(None),
+            KeyCode::Backspace => app.palette_backspace(),
+            KeyCode::Down | KeyCode::Tab => app.palette_move(true),
+            KeyCode::Up | KeyCode::BackTab => app.palette_move(false),
+            _ if key.mods.ctrl && matches!(key.code, KeyCode::Char('n' | 'j')) => {
+                app.palette_move(true);
+            }
+            _ if key.mods.ctrl && matches!(key.code, KeyCode::Char('p' | 'k')) => {
+                app.palette_move(false);
+            }
+            _ => {
+                if let Some(c) = key.text_char() {
+                    app.palette_input(c);
+                }
+            }
+        }
+        return true;
+    }
+    false
 }
 
 /// With pixel-precise reports (mode 1016) the coordinates are pixels:

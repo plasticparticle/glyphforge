@@ -73,6 +73,9 @@ pub enum Command {
         /// Treat warnings as errors.
         #[arg(long)]
         strict: bool,
+        /// Also print design suggestions (opinions; never fail the run).
+        #[arg(long)]
+        advice: bool,
     },
     /// Apply a semantic patch (JSON) to a project and save it.
     Apply {

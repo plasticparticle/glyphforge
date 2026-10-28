@@ -48,6 +48,8 @@ value.rs         Value/Properties: JSON-like, totally ordered (no floats)
 component.rs     Component tree, responsive rules, tree helpers
 layout.rs        Dimension/Placement/Container + deterministic solver
 align.rs         align, distribute, equal size, snapping with guides
+advice.rs        design suggestions (opinions): spacing, alignment,
+                 hierarchy, density
 theme.rs         Theme, style tokens, fallback chain, built-in themes
 boxdraw.rs       Border families, glyph tables, line topology (Arms per glyph)
 paint.rs         Cell drawing: line, outline, box, flood fill, stamping,
@@ -493,7 +495,13 @@ children into explicit offsets, and leaves into the closest widget.
 `validate::validate(doc)` returns `Diagnostic { severity, code, screen,
 target, message }` with stable codes (`duplicate-id`, `no-space`,
 `clipped`, `truncated`, `overlap`, `unknown-kind`, `theme-tokens`,
-`prop-type`).
+`prop-type`, and from the rendered screen `invisible`, `low-contrast`,
+`wide-glyph`, `too-small`, `unreachable`). The rendered checks walk the
+components in paint order and only judge the cells a component still
+owns (not covered by a later one); contrast is measured on letters and
+digits, not on frame or block graphics. `advice::advise` is the separate
+heuristic module; its results are `Advice` values printed as
+"suggestion:" and never affect exit codes.
 Messages name components, not coordinates ("`metrics-table`: "Request
 latency percentile" will be truncated at 80×24"). `validate_at(screen,
 size)` checks responsiveness. Deterministic layout validation is kept

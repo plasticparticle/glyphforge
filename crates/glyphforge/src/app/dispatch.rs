@@ -265,6 +265,7 @@ impl App {
             Action::ExportLibrary => self.open_library_prompt(false),
             Action::EditPalette => self.open_palette_prompt(),
             Action::Export => self.open_export(),
+            Action::CheckDesign => self.check_design(),
             Action::SetDocTheme(id) => {
                 self.menu = None;
                 self.set_document_theme(&id);
@@ -436,6 +437,8 @@ impl App {
             self.context_menu = None;
         } else if self.review.is_some() {
             self.review = None;
+        } else if self.problems.is_some() {
+            self.problems = None;
         } else if self.theme_editor.is_some() {
             self.theme_editor_cancel();
         } else if self.gradient_editor.is_some() {

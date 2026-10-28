@@ -263,6 +263,166 @@ pub fn validate_screen(
             }
         }
     }
+    out.extend(validate_rendered(screen, theme, registry, size));
+    out
+}
+
+/// Kinds a user operates; they must stay visible and reachable.
+const INTERACTIVE: &[&str] = &[
+    "button", "input", "password", "search", "textarea", "checkbox", "radio", "toggle", "select",
+    "tabs", "menu", "list", "table", "datagrid", "tree",
+];
+
+/// Kinds that paint their whole rectangle (they hide what is beneath).
+const OPAQUE: &[&str] = &[
+    "panel",
+    "modal",
+    "dialog",
+    "notification",
+    "textarea",
+    "menu",
+];
+
+/// Perceived brightness 0..=255, if the colour is known.
+fn brightness(c: crate::document::Color) -> Option<i32> {
+    c.to_rgb()
+        .map(|(r, g, b)| (i32::from(r) * 299 + i32::from(g) * 587 + i32::from(b) * 114) / 1000)
+}
+
+/// Checks on the rendered screen: text drawn in its background colour,
+/// low contrast, wide glyphs cut by a component edge, components smaller
+/// than their content, and controls hidden under later components.
+pub fn validate_rendered(
+    screen: &Screen,
+    theme: &Theme,
+    registry: &Registry,
+    size: Size,
+) -> Vec<Diagnostic> {
+    use crate::document::Position;
+    let mut out = Vec::new();
+    let Ok(canvas) = crate::render::render_screen(screen, theme, registry, Some(size)) else {
+        return out;
+    };
+    let ctx = RenderContext {
+        theme,
+        screen: Some(screen),
+        data: None,
+        symbols: &[],
+        depth: 0,
+    };
+    let measure = RegistryMeasure { registry, ctx };
+    // Components in paint order (layers bottom to top, parents first).
+    let mut placed: Vec<(Component, Rect)> = Vec::new();
+    for layer in screen.layers().iter().filter(|l| l.visible) {
+        let Some(roots) = layer.components() else {
+            continue;
+        };
+        let resolved: Vec<Component> = roots
+            .iter()
+            .filter_map(|c| c.resolve_responsive(size.width))
+            .collect();
+        let result = layout::solve(&resolved, Rect::from_size(size), &measure);
+        for c in resolved.iter().flat_map(Component::iter) {
+            if let Some(r) = result.rect(&c.id).filter(|r| !r.is_empty()) {
+                placed.push((c.clone(), r));
+            }
+        }
+    }
+    let diag = |severity, code, target: &ObjectId, message: String| Diagnostic {
+        severity,
+        code,
+        screen: Some(screen.id.clone()),
+        target: Some(target.clone()),
+        message,
+    };
+    for (i, (c, rect)) in placed.iter().enumerate() {
+        // The cells this component owns: not covered by a later one.
+        let owned = |p: Position| !placed[i + 1..].iter().any(|(_, r)| r.contains(p));
+        let mut invisible = 0;
+        let mut low = 0;
+        let mut cut = None;
+        for p in rect.positions().filter(|p| owned(*p)) {
+            let Some(cell) = canvas.get(p) else { continue };
+            // Readability applies to text: letters and digits, not frame
+            // lines, blocks or Braille graphics.
+            let Some(_) = cell
+                .as_glyph()
+                .filter(|g| g.as_str().chars().any(char::is_alphanumeric))
+            else {
+                continue;
+            };
+            let (fg, bg) = (theme.resolve(&cell.style.fg.to_string()), cell.style.bg);
+            if fg == bg && fg != crate::document::Color::Default {
+                invisible += 1;
+            } else if let (Some(a), Some(b)) = (brightness(fg), brightness(bg)) {
+                if (a - b).abs() < 40 {
+                    low += 1;
+                }
+            }
+            // A wide glyph whose second half leaves the owner.
+            if cell.is_wide_head() && !rect.contains(Position::new(p.x + 1, p.y)) {
+                cut.get_or_insert(p);
+            }
+        }
+        if let Some(p) = cut {
+            out.push(diag(
+                Severity::Warning,
+                "wide-glyph",
+                &c.id,
+                format!(
+                    "a double-width glyph at {},{} crosses the edge at {}×{}",
+                    p.x, p.y, size.width, size.height
+                ),
+            ));
+        }
+        if invisible > 0 {
+            out.push(diag(
+                Severity::Error,
+                "invisible",
+                &c.id,
+                format!("{invisible} cell(s) of text in the same colour as their background"),
+            ));
+        } else if low > 0 {
+            out.push(diag(
+                Severity::Warning,
+                "low-contrast",
+                &c.id,
+                format!("{low} cell(s) of text with too little contrast to read"),
+            ));
+        }
+        // Smaller than the content needs (text kinds report truncation).
+        if let Some(min) = registry.renderer(&c.kind).intrinsic_size(c, &ctx) {
+            let chrome = registry.renderer(&c.kind).chrome_inset(c, &ctx);
+            let need_h = min.height + chrome.vertical() + c.layout.padding.vertical();
+            if rect.height < need_h && min.height > 0 {
+                out.push(diag(
+                    Severity::Warning,
+                    "too-small",
+                    &c.id,
+                    format!("{} rows tall, its content needs {need_h}", rect.height),
+                ));
+            }
+        }
+        // Interactive components hidden under later ones.
+        if INTERACTIVE.contains(&c.kind.as_str()) {
+            let covered = placed[i + 1..].iter().any(|(k, r)| {
+                OPAQUE.contains(&k.kind.as_str())
+                    && r.intersection(*rect) == *rect
+                    && !c.iter().any(|d| d.id == k.id)
+            });
+            if covered {
+                out.push(diag(
+                    Severity::Warning,
+                    "unreachable",
+                    &c.id,
+                    format!(
+                        "covered by a later component at {}×{}; nobody can see or click it",
+                        size.width, size.height
+                    ),
+                ));
+            }
+        }
+    }
     out
 }
 
@@ -378,5 +538,26 @@ mod tests {
         let codes: Vec<_> = diags.iter().filter(|d| d.code == "prop-type").collect();
         assert_eq!(codes.len(), 2, "{diags:?}");
         assert!(codes[0].message.starts_with("align = \"middle\""));
+    }
+
+    #[test]
+    fn rendered_checks_find_invisible_small_and_hidden_controls() {
+        let roots = vec![
+            Component::new(id!("ghost"), "label")
+                .with_prop("text", "boo")
+                .with_prop("color", "surface")
+                .with_prop("background", "surface")
+                .with_layout(Layout::absolute(0, 0, 5, 1)),
+            Component::new(id!("ok"), "button")
+                .with_prop("label", "OK")
+                .with_layout(Layout::absolute(0, 2, 8, 1)),
+            Component::new(id!("cover"), "panel").with_layout(Layout::absolute(0, 2, 10, 3)),
+            Component::new(id!("squashed"), "textarea").with_layout(Layout::absolute(12, 0, 8, 1)),
+        ];
+        let mut doc = doc_with(roots, 24, 6);
+        doc.theme = crate::theme::Theme::builtin_by_id("forge-dark").unwrap();
+        let codes = codes(&doc);
+        assert!(codes.contains(&"invisible"), "{codes:?}");
+        assert!(codes.contains(&"unreachable"), "{codes:?}");
     }
 }

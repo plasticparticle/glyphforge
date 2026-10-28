@@ -199,17 +199,17 @@ impl Ratatui {
         let pad = "    ".repeat(depth);
         let name = ident(&c.id);
         let _ = writeln!(s, "{pad}// {} ({})", c.id, c.kind);
-        if !c.children.is_empty() {
-            let _ = writeln!(s, "{pad}let {name}_block = {};", Self::widget(doc, c));
-            let _ = writeln!(s, "{pad}let {name}_inner = {name}_block.inner({area});");
-            let _ = writeln!(s, "{pad}frame.render_widget({name}_block, {area});");
-            Self::children(s, doc, c, &format!("{name}_inner"), depth);
-        } else {
+        if c.children.is_empty() {
             let _ = writeln!(
                 s,
                 "{pad}frame.render_widget({}, {area});",
                 Self::widget(doc, c)
             );
+        } else {
+            let _ = writeln!(s, "{pad}let {name}_block = {};", Self::widget(doc, c));
+            let _ = writeln!(s, "{pad}let {name}_inner = {name}_block.inner({area});");
+            let _ = writeln!(s, "{pad}frame.render_widget({name}_block, {area});");
+            Self::children(s, doc, c, &format!("{name}_inner"), depth);
         }
     }
 

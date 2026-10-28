@@ -14,6 +14,7 @@ mod mouse;
 mod paint;
 mod pixel_select;
 mod pixels;
+mod problems;
 mod prompt;
 mod review;
 mod run;
@@ -202,6 +203,8 @@ pub struct App {
     pub themes_dir: Option<std::path::PathBuf>,
     /// The open gradient editor.
     pub gradient_editor: Option<gradient_editor::GradientEditor>,
+    /// The open "Check Design" panel.
+    pub problems: Option<problems::Problems>,
     /// The open review of agent changes.
     pub review: Option<review::Review>,
     /// Proposals waiting next to the file, as last counted.
@@ -316,6 +319,7 @@ impl App {
             custom_themes: Vec::new(),
             themes_dir: init.themes_dir,
             gradient_editor: None,
+            problems: None,
             review: None,
             pending_proposals: 0,
             last_autosave: None,
