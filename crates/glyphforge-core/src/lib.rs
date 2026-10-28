@@ -5,6 +5,7 @@
 //! style tokens), keeps raw artwork as cells, renders both to a cell canvas,
 //! and provides the patch/history mechanism that humans and agents share.
 
+pub mod align;
 pub mod api;
 pub mod boxdraw;
 pub mod component;

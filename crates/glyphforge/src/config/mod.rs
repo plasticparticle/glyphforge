@@ -54,6 +54,10 @@ pub struct UiConfig {
     pub vim_navigation: bool,
     /// Preferred colour output: `auto`, `truecolor`, `ansi256`, `ansi16`.
     pub color_mode: ColorMode,
+    /// Snap dragged components to the edges and centres of others.
+    pub snap: bool,
+    /// Snap grid in cells while dragging (0 = off).
+    pub snap_grid: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -129,6 +133,8 @@ impl Default for UiConfig {
             show_right_panel: true,
             vim_navigation: false,
             color_mode: ColorMode::Auto,
+            snap: true,
+            snap_grid: 0,
         }
     }
 }

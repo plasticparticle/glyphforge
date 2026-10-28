@@ -43,6 +43,11 @@ impl App {
             | Action::SelectFirstChild
             | Action::Reparent
             | Action::Inspector(_)
+            | Action::Align(_)
+            | Action::Distribute(_)
+            | Action::EqualSize { .. }
+            | Action::ToggleSnap
+            | Action::CycleSnapGrid
             | Action::MoveSelection(_)
             | Action::ResizeSelection(_)
             | Action::AddComponent
@@ -221,6 +226,11 @@ impl App {
             Action::SelectFirstChild => self.select_first_child(),
             Action::Reparent => self.open_reparent(),
             Action::Inspector(a) => self.dispatch_inspector(a),
+            Action::Align(edge) => self.align_selection(edge),
+            Action::Distribute(axis) => self.distribute_selection(axis),
+            Action::EqualSize { width, height } => self.equal_size_selection(width, height),
+            Action::ToggleSnap => self.toggle_snap(),
+            Action::CycleSnapGrid => self.cycle_snap_grid(),
             Action::AddComponent => self.open_add_component(),
             Action::EditProperty => self.open_edit_property(),
             Action::DeleteSelection => self.delete_selection(),
@@ -897,6 +907,7 @@ mod tests {
     #[test]
     fn mouse_drag_moves_and_resizes_as_single_transactions() {
         let mut app = interface_app();
+        app.snap.neighbours = false;
         app.dispatch(Action::AddComponent);
         submit(&mut app, "panel p");
         let id = app.selection().cloned().unwrap();

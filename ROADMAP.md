@@ -105,9 +105,14 @@ with stable codes.
 - [x] Interactive inspector: every layout field and descriptor property
       as a row; cycle, edit with suggestions, reset; keyboard and mouse
 
-### E2 — Alignment and geometry  `[ ]`
-Snap to grid and neighbours, alignment guides while dragging, align and
-distribute operations on multi-selection, equal size.
+### E2 — Alignment and geometry  `[x]`
+- [x] Core `align`: bounds, align on six edges/centres, distribute with
+      exact remainder handling, equal size, snapping with guides
+- [x] Drag snapping to the edges and centres of other components and the
+      screen, or to a grid; dotted guides while dragging; corner snapping
+      for resizes; `[ui] snap`, `snap_grid`
+- [x] Align, distribute and equal size on the multi-selection as one
+      undo step each; a single component aligns inside its parent
 
 ### E3 — Subcell Mode tools  `[~]`
 - [x] Tool palette in the left panel (mouse and keys): text, brush, eraser,

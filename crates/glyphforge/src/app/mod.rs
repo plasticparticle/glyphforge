@@ -1,5 +1,6 @@
 //! Application state and the single dispatch entry point.
 
+mod arrange;
 mod brushes;
 mod dispatch;
 mod inspector;
@@ -169,6 +170,10 @@ pub struct App {
     pub state_dir: Option<std::path::PathBuf>,
     pub picker: Option<ColorPicker>,
     pub drag: Option<Drag>,
+    /// Snapping while dragging components.
+    pub snap: glyphforge_core::align::Snap,
+    /// Guides that explain the current snap (shown while dragging).
+    pub guides: Vec<glyphforge_core::align::Guide>,
     /// Subcell Mode tool, brush and colour state.
     pub paint: PaintState,
     /// Cell size in pixels when the terminal reports pixel-precise mouse
@@ -244,6 +249,8 @@ impl App {
             state_dir: init.state_dir,
             picker: None,
             drag: None,
+            snap: glyphforge_core::align::Snap::default(),
+            guides: Vec::new(),
             paint: PaintState::default(),
             pixel_mouse: None,
             composite_cache: None,
@@ -253,6 +260,8 @@ impl App {
             new_armed: false,
             should_quit: false,
         };
+        app.snap.neighbours = app.config.ui.snap;
+        app.snap.grid = app.config.ui.snap_grid;
         app.load_ui_theme();
         app.restore_ui_theme();
         if !app.caps.unicode {

@@ -148,10 +148,15 @@ Interface mode:
 | Ctrl+F | Select a component by id (jumps to its layer and screen) |
 | Arrows | Nudge the selection (or move the cursor when nothing is selected) |
 | Shift+Arrows | Resize the selection |
-| Mouse drag | Move; dragging the `◆` corner resizes |
+| Mouse drag | Move; dragging the `◆` corner resizes; edges and centres snap to other components (dotted guides) |
 | `a` | Add a component at the cursor (inside the selection if any): `kind [name]` |
 | Enter | Edit a property of the selection: `key=value` (empty value removes) |
 | `i`, Tab, click | Focus the inspector |
+| Shift+H / L / K / J | Align left / right / top / bottom (one component: inside its parent) |
+| Shift+C / M | Align centres horizontally / middles vertically |
+| Shift+D / V | Distribute horizontally / vertically (three or more) |
+| Shift+W / E / Z | Equal width / height / size (the last selected sets it) |
+| Shift+S, Shift+G | Toggle snapping to components; cycle the snap grid (off, 2, 4, 8) |
 | Delete | Delete the selection |
 | Esc | Clear the selection |
 
@@ -297,6 +302,8 @@ default_height = 24
 show_left_panel = true
 show_right_panel = true
 vim_navigation = false      # h/j/k/l/0/$ in normal mode, i enters insert mode
+snap = true                 # snap dragged components to neighbours (Shift+S toggles)
+snap_grid = 0               # snap grid in cells while dragging (Shift+G cycles 0 2 4 8)
 color_mode = "auto"         # auto | truecolor | ansi256 | ansi16
 
 [theme]

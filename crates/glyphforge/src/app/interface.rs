@@ -138,7 +138,7 @@ impl App {
 
     /// Rect of the selected component's parent content area (or the
     /// screen), used to express positions relative to the parent.
-    fn parent_inner(&mut self, id: &ObjectId) -> Rect {
+    pub(super) fn parent_inner(&mut self, id: &ObjectId) -> Rect {
         let parent = self
             .active_layer()
             .and_then(|l| l.components())
@@ -463,17 +463,42 @@ impl App {
         };
         let dx = i32::from(pos.x) - i32::from(drag.origin.x);
         let dy = i32::from(pos.y) - i32::from(drag.origin.y);
+        let inner = self.parent_inner(&drag.target);
+        let (ox, oy) = (
+            (i32::from(drag.start_offset.0) + dx).max(0) as u16,
+            (i32::from(drag.start_offset.1) + dy).max(0) as u16,
+        );
+        let (w, h) = (
+            (i32::from(drag.start_size.0) + dx).max(1) as u16,
+            (i32::from(drag.start_size.1) + dy).max(1) as u16,
+        );
         let op = match drag.mode {
-            DragMode::Move => Operation::Move {
-                target: drag.target.clone(),
-                x: (i32::from(drag.start_offset.0) + dx).max(0) as u16,
-                y: (i32::from(drag.start_offset.1) + dy).max(0) as u16,
-            },
-            DragMode::Resize => Operation::Resize {
-                target: drag.target.clone(),
-                width: (i32::from(drag.start_size.0) + dx).max(1) as u16,
-                height: (i32::from(drag.start_size.1) + dy).max(1) as u16,
-            },
+            DragMode::Move => {
+                let rect = Rect::new(
+                    inner.x.saturating_add(ox),
+                    inner.y.saturating_add(oy),
+                    drag.start_size.0,
+                    drag.start_size.1,
+                );
+                let snapped = self.snap_drag(&drag.target, rect);
+                Operation::Move {
+                    target: drag.target.clone(),
+                    x: snapped.x.saturating_sub(inner.x),
+                    y: snapped.y.saturating_sub(inner.y),
+                }
+            }
+            DragMode::Resize => {
+                // Snap the corner cell, then size up to it.
+                let x0 = inner.x.saturating_add(drag.start_offset.0);
+                let y0 = inner.y.saturating_add(drag.start_offset.1);
+                let corner = Rect::new(x0 + w - 1, y0 + h - 1, 1, 1);
+                let snapped = self.snap_drag(&drag.target, corner);
+                Operation::Resize {
+                    target: drag.target.clone(),
+                    width: (snapped.x + 1).saturating_sub(x0).max(1),
+                    height: (snapped.y + 1).saturating_sub(y0).max(1),
+                }
+            }
         };
         match self.session.record(op) {
             Ok(()) => self.mark_edited(),
@@ -482,6 +507,7 @@ impl App {
     }
 
     pub fn end_drag(&mut self) {
+        self.guides.clear();
         if self.drag.take().is_some() {
             self.commit_edits();
         }

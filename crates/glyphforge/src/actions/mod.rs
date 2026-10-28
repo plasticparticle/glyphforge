@@ -3,6 +3,7 @@
 
 use std::sync::OnceLock;
 
+use glyphforge_core::align::{Axis, Edge};
 use glyphforge_core::boxdraw::BorderFamily;
 use glyphforge_core::raster::{Dither, GradientShape, GradientStyle, PaletteLimit, RasterMode};
 use glyphforge_core::{Color, ObjectId, Position};
@@ -131,6 +132,17 @@ pub enum Action {
     /// Prompt for a new parent of the selection.
     Reparent,
     Inspector(InspectorAction),
+    /// Aligns the selection on an edge of its bounds (one component: of
+    /// its parent).
+    Align(Edge),
+    Distribute(Axis),
+    /// Gives the selection the primary's width and/or height.
+    EqualSize {
+        width: bool,
+        height: bool,
+    },
+    ToggleSnap,
+    CycleSnapGrid,
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,
@@ -310,6 +322,19 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("select-child", "Select First Child", Interface, Interface, Action::SelectFirstChild, keys: ["alt+down", "d"], kw: ["children", "down", "tree"], aliases: ["child"], implemented: true),
             desc!("reparent", "Move Into Container", Interface, Interface, Action::Reparent, keys: ["p"], kw: ["reparent", "parent", "nest", "group", "container", "tree"], aliases: ["move into"], implemented: true),
             desc!("inspector-edit", "Edit Inspector Field", Interface, Interface, Action::Inspector(InspectorAction::Edit), keys: ["i"], kw: ["inspector", "property", "layout", "padding", "gap"], aliases: ["inspect"], implemented: true),
+            desc!("align-left", "Align Left", Interface, Interface, Action::Align(Edge::Left), keys: ["shift+h"], kw: ["alignment", "edge", "arrange"], aliases: [], implemented: true),
+            desc!("align-right", "Align Right", Interface, Interface, Action::Align(Edge::Right), keys: ["shift+l"], kw: ["alignment", "edge", "arrange"], aliases: [], implemented: true),
+            desc!("align-top", "Align Top", Interface, Interface, Action::Align(Edge::Top), keys: ["shift+k"], kw: ["alignment", "edge", "arrange"], aliases: [], implemented: true),
+            desc!("align-bottom", "Align Bottom", Interface, Interface, Action::Align(Edge::Bottom), keys: ["shift+j"], kw: ["alignment", "edge", "arrange"], aliases: [], implemented: true),
+            desc!("align-center", "Align Centres Horizontally", Interface, Interface, Action::Align(Edge::Center), keys: ["shift+c"], kw: ["alignment", "centre", "center", "arrange"], aliases: [], implemented: true),
+            desc!("align-middle", "Align Middles Vertically", Interface, Interface, Action::Align(Edge::Middle), keys: ["shift+m"], kw: ["alignment", "middle", "centre", "arrange"], aliases: [], implemented: true),
+            desc!("distribute-horizontal", "Distribute Horizontally", Interface, Interface, Action::Distribute(Axis::Horizontal), keys: ["shift+d"], kw: ["spacing", "even", "gaps", "arrange"], aliases: [], implemented: true),
+            desc!("distribute-vertical", "Distribute Vertically", Interface, Interface, Action::Distribute(Axis::Vertical), keys: ["shift+v"], kw: ["spacing", "even", "gaps", "arrange"], aliases: [], implemented: true),
+            desc!("equal-width", "Equal Width", Interface, Interface, Action::EqualSize { width: true, height: false }, keys: ["shift+w"], kw: ["size", "match", "same"], aliases: [], implemented: true),
+            desc!("equal-height", "Equal Height", Interface, Interface, Action::EqualSize { width: false, height: true }, keys: ["shift+e"], kw: ["size", "match", "same"], aliases: [], implemented: true),
+            desc!("equal-size", "Equal Size", Interface, Interface, Action::EqualSize { width: true, height: true }, keys: ["shift+z"], kw: ["size", "match", "same"], aliases: [], implemented: true),
+            desc!("toggle-snap", "Toggle Snapping", Interface, Interface, Action::ToggleSnap, keys: ["shift+s"], kw: ["snap", "guides", "magnet"], aliases: ["snap"], implemented: true),
+            desc!("cycle-snap-grid", "Cycle Snap Grid", Interface, Interface, Action::CycleSnapGrid, keys: ["shift+g"], kw: ["snap", "grid", "spacing"], aliases: ["grid"], implemented: true),
             desc!("delete-component", "Delete Component", Interface, Interface, Action::DeleteSelection, keys: ["delete", "backspace"], kw: ["remove"], aliases: [], implemented: true),
             desc!("move-selection-up", "Move Selection Up", Interface, Interface, Action::MoveSelection(Direction::Up), keys: ["up"], kw: ["nudge"], aliases: [], implemented: true),
             desc!("move-selection-down", "Move Selection Down", Interface, Interface, Action::MoveSelection(Direction::Down), keys: ["down"], kw: ["nudge"], aliases: [], implemented: true),

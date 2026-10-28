@@ -47,6 +47,7 @@ id.rs            ObjectId: validated slug, unique per document
 value.rs         Value/Properties: JSON-like, totally ordered (no floats)
 component.rs     Component tree, responsive rules, tree helpers
 layout.rs        Dimension/Placement/Container + deterministic solver
+align.rs         align, distribute, equal size, snapping with guides
 theme.rs         Theme, style tokens, fallback chain, built-in themes
 boxdraw.rs       Border families, glyph tables, line topology (Arms per glyph)
 paint.rs         Cell drawing: line, outline, box, flood fill, stamping,
@@ -73,6 +74,7 @@ main.rs, cli.rs  argument parsing; TUI by default, subcommands headless
 headless.rs      inspect / render / validate / apply / export / new
 app/             App state, dispatch (behaviour), run loop, viewport,
                  interface (selection), inspector (editable rows),
+                 arrange (align, distribute, snapping),
                  paint (tools, brush, colours),
                  pixels (raster tools), menu (Esc menu, theme choice)
 actions/         Action enum + descriptors (names, keywords, default keys)
@@ -450,7 +452,14 @@ selected (Shift+click, Ctrl+A) every operation is issued per component in
 one patch. The inspector (`app/inspector.rs`) lists the primary
 selection's layout fields and descriptor properties as rows (`FieldKey`)
 and edits them as `set_layout` and `set_property` patches over the whole
-selection; its geometry function serves drawing and mouse hits. A mouse
+selection; its geometry function serves drawing and mouse hits.
+Arranging (`app/arrange.rs`) takes the selection's solved rects, runs
+them through `glyphforge_core::align` and issues `move`/`resize` per
+changed rect in one patch; positions go back to parent-relative offsets.
+A move drag snaps the dragged rect, a resize drag snaps its corner cell,
+against every other component on the layer and the screen (not its own
+descendants); the guides are editor state drawn over the canvas until the
+button is released. A mouse
 drag opens one transaction and
   records an operation per motion event, so undo removes the whole drag.
   The `Prompt` (input line with candidates) serves select-by-id, add

@@ -5,6 +5,9 @@ use ratatui::layout::{Position as RPosition, Rect};
 use ratatui::style::Modifier;
 use ratatui::widgets::{Block, BorderType, Borders};
 
+use glyphforge_core::Position;
+use glyphforge_core::align::Guide;
+
 use super::styles;
 use crate::app::{App, Focus};
 use crate::render::{draw_cells, to_ratatui_style};
@@ -107,6 +110,24 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
                 if is_primary && is_corner && rect.width > 1 && rect.height > 1 {
                     cell.set_symbol("◆");
                 }
+            }
+        }
+    }
+
+    // Snap guides while dragging: dotted lines in the accent colour.
+    let guide_style = styles::accent(app);
+    for guide in app.active_guides() {
+        let (cells, symbol): (Vec<Position>, &str) = match *guide {
+            Guide::Column { x, from, to } => {
+                ((from..=to).map(|y| Position::new(x, y)).collect(), "┊")
+            }
+            Guide::Row { y, from, to } => ((from..=to).map(|x| Position::new(x, y)).collect(), "┈"),
+        };
+        for pos in cells.into_iter().filter(|p| viewport.contains(*p)) {
+            let sx = canvas_area.x + (pos.x - viewport.x);
+            let sy = canvas_area.y + (pos.y - viewport.y);
+            if let Some(cell) = buf.cell_mut((sx, sy)) {
+                cell.set_symbol(symbol).set_style(guide_style);
             }
         }
     }
