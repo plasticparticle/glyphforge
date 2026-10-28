@@ -34,6 +34,11 @@ pub enum PromptKind {
     ImportImage,
     /// A document data fixture (`key = JSON`).
     EditData,
+    InsertSymbol,
+    OpenDocument,
+    ImportLibrary,
+    ExportLibrary,
+    GlyphPalette,
     /// The colour of the theme editor's highlighted token.
     ThemeToken,
     ThemeName,

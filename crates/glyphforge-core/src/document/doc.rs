@@ -54,6 +54,12 @@ pub struct Document {
     /// property: rows for tables, series for charts, items for lists.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub data: std::collections::BTreeMap<String, crate::value::Value>,
+    /// Reusable component trees shown by `instance` components.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub symbols: Vec<crate::symbol::Symbol>,
+    /// Glyph sets offered as brush pages.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub palettes: Vec<crate::symbol::GlyphPalette>,
     screens: Vec<Screen>,
 }
 
@@ -68,6 +74,8 @@ impl Document {
             theme: Theme::default(),
             gradients: Vec::new(),
             data: std::collections::BTreeMap::new(),
+            symbols: Vec::new(),
+            palettes: Vec::new(),
             screens: vec![screen],
         })
     }
@@ -173,6 +181,7 @@ impl Document {
             }
         }
         out.extend(self.gradients.iter().map(|g| g.id.clone()));
+        out.extend(self.symbols.iter().map(|s| s.id.clone()));
         out
     }
 

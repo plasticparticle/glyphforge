@@ -17,6 +17,7 @@ mod prompt;
 mod review;
 mod run;
 mod selection;
+mod symbols;
 mod theme_editor;
 mod viewport;
 

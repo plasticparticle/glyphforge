@@ -196,6 +196,7 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
             },
             out,
         ),
+        Command::Library { op } => library(op, out),
         Command::Kinds { kind, json } => kinds(kind.as_deref(), json, out),
         Command::New {
             file,
@@ -295,6 +296,41 @@ fn import(args: ImportArgs, out: &mut dyn Write) -> Result<u8, HeadlessError> {
         pixels.height
     )
     .map_err(write_err(&file))?;
+    Ok(0)
+}
+
+fn library(op: crate::cli::LibraryOp, out: &mut dyn Write) -> Result<u8, HeadlessError> {
+    use glyphforge_core::symbol::{export_library, import_library};
+    match op {
+        crate::cli::LibraryOp::Export { file, out: target } => {
+            let session = Session::open(&file)?;
+            let lib =
+                Session::new(export_library(session.document())).with_path(Some(target.clone()));
+            let mut lib = lib;
+            lib.save()?;
+            let doc = lib.document();
+            writeln!(
+                out,
+                "library {}: {} symbol(s), {} gradient(s), {} palette(s), {} fixture(s)",
+                target.display(),
+                doc.symbols.len(),
+                doc.gradients.len(),
+                doc.palettes.len(),
+                doc.data.len()
+            )
+            .map_err(write_err(&target))?;
+        }
+        crate::cli::LibraryOp::Import { file, library } => {
+            let mut session = Session::open(&file)?;
+            let lib = Session::open(&library)?;
+            let patch = import_library(session.document(), lib.document());
+            let n = patch.operations.len();
+            session.apply_patch(patch, "Import library", Origin::User)?;
+            session.save()?;
+            writeln!(out, "imported {n} item(s) from {}", library.display())
+                .map_err(write_err(&file))?;
+        }
+    }
     Ok(0)
 }
 
@@ -725,6 +761,52 @@ mod tests {
             rendered.contains("⣤⣤") && rendered.contains("⠛⠛"),
             "{rendered}"
         );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn library_export_and_import_round_trip() {
+        let dir = temp_dir("library");
+        let a = dir.join("a.glyph");
+        let b = dir.join("b.glyph");
+        let lib = dir.join("lib.glyph");
+        for f in [&a, &b] {
+            run_str(Command::New {
+                file: f.clone(),
+                width: 20,
+                height: 5,
+            });
+        }
+        let patch = dir.join("p.json");
+        std::fs::write(
+            &patch,
+            r#"{"operations":[{"op":"set_palette","name":"Stars","glyphs":"★ ☆"},{"op":"set_data","key":"cpu","value":[1,2]}]}"#,
+        )
+        .unwrap();
+        run_str(Command::Apply {
+            file: a.clone(),
+            patch,
+            out: None,
+            dry_run: false,
+        });
+        let (code, text) = run_str(Command::Library {
+            op: crate::cli::LibraryOp::Export {
+                file: a,
+                out: lib.clone(),
+            },
+        });
+        assert_eq!(code, 0);
+        assert!(text.contains("1 palette(s), 1 fixture(s)"), "{text}");
+        let (code, _) = run_str(Command::Library {
+            op: crate::cli::LibraryOp::Import {
+                file: b.clone(),
+                library: lib,
+            },
+        });
+        assert_eq!(code, 0);
+        let doc = Session::open(&b).unwrap();
+        assert_eq!(doc.document().palettes.len(), 1);
+        assert_eq!(doc.document().data.len(), 1);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

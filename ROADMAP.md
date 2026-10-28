@@ -264,11 +264,16 @@ with stable codes.
       operation, editor prompt, `inspect` lists them, the inspector
       suggests fixture keys
 
-### P3 — Symbols and libraries  `[ ]`
-Symbol definitions with instances and property overrides, propagation of
-source changes, project libraries (themes, tokens, symbols, templates,
-character palettes) as separate `.glyph`-compatible files that can be
-shared.
+### P3 — Symbols and libraries  `[x]`
+- [x] Symbols in the document; `instance` component expanding the master
+      at render time with root and nested (`overrides`) overrides;
+      recursion guard; `set_symbol`, `delete_symbol`
+- [x] Make symbol, insert, detach, push to symbol (propagates to every
+      instance)
+- [x] Libraries as `.glyph` files: export/import of symbols, gradients,
+      glyph palettes and fixtures (CLI and editor); themes travel as theme
+      files (E9), templates in P4
+- [x] Glyph palettes in the document as extra brush pages (`set_palette`)
 
 ### P4 — Templates and showcase examples  `[ ]`
 Starter templates and at least six polished examples (system monitor,

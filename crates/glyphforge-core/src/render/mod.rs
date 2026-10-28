@@ -74,6 +74,11 @@ pub struct RenderContext<'a> {
     pub screen: Option<&'a Screen>,
     /// The document's fixtures, for components with a `bind` property.
     pub data: Option<&'a std::collections::BTreeMap<String, crate::value::Value>>,
+    /// The document's symbols, for `instance` components.
+    pub symbols: &'a [crate::symbol::Symbol],
+    /// How many instances deep this render is (guards against symbols
+    /// that contain themselves).
+    pub depth: u8,
 }
 
 impl<'a> RenderContext<'a> {
@@ -82,6 +87,8 @@ impl<'a> RenderContext<'a> {
             theme,
             screen: None,
             data: None,
+            symbols: &[],
+            depth: 0,
         }
     }
 
@@ -193,11 +200,57 @@ pub fn render_screen_with(
     registry: &Registry,
     size: Option<Size>,
 ) -> Result<Canvas, CanvasError> {
+    render_screen_full(
+        screen,
+        &Scene {
+            theme,
+            data,
+            symbols: &[],
+        },
+        registry,
+        size,
+    )
+}
+
+/// What a screen is rendered with besides its own layers.
+#[derive(Debug, Clone, Copy)]
+pub struct Scene<'a> {
+    pub theme: &'a Theme,
+    pub data: Option<&'a std::collections::BTreeMap<String, crate::value::Value>>,
+    pub symbols: &'a [crate::symbol::Symbol],
+}
+
+impl<'a> Scene<'a> {
+    /// Theme, fixtures and symbols of a document.
+    pub fn of(doc: &'a crate::document::Document) -> Self {
+        Self {
+            theme: &doc.theme,
+            data: Some(&doc.data),
+            symbols: &doc.symbols,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_theme(mut self, theme: &'a Theme) -> Self {
+        self.theme = theme;
+        self
+    }
+}
+
+/// Renders a screen with a document's theme, fixtures and symbols.
+pub fn render_screen_full(
+    screen: &Screen,
+    scene: &Scene<'_>,
+    registry: &Registry,
+    size: Option<Size>,
+) -> Result<Canvas, CanvasError> {
     let size = size.unwrap_or(screen.size());
     let ctx = RenderContext {
-        theme,
+        theme: scene.theme,
         screen: Some(screen),
-        data,
+        data: scene.data,
+        symbols: scene.symbols,
+        depth: 0,
     };
     let mut out = Canvas::new(size)?;
     for layer in screen.layers().iter().filter(|l| l.visible) {

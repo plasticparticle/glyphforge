@@ -7,7 +7,7 @@ use glyphforge_core::patch::{CellWrite, Operation, Patch};
 use glyphforge_core::{Cell, Document, Grapheme, Layer, Position, Size};
 
 use super::{App, EditorMode, Focus, StatusKind};
-use crate::actions::{Action, Direction, descriptor_of};
+use crate::actions::{Action, Direction};
 
 impl App {
     /// Applies an action to the application state. Recoverable errors are
@@ -148,29 +148,30 @@ impl App {
             Action::Redo => self.redo(),
             Action::NewDocument => self.new_document(),
             Action::SaveDocument => self.save(),
-            action @ (Action::Copy
-            | Action::Cut
-            | Action::Paste
-            | Action::Duplicate
-            | Action::CommandPalette
-            | Action::AddKind(_)
-            | Action::ActivateLayer(_)
-            | Action::FlipSelection(_)
-            | Action::InvertSelection
-            | Action::SelectionToComponent
-            | Action::DoubleClick(_)
-            | Action::ZOrder(_)
-            | Action::Review
-            | Action::EditTheme(_)
-            | Action::SetDocTheme(_)
-            | Action::EditData) => self.dispatch_edit(action),
             Action::OpenDocument => {
-                let title = descriptor_of(&action).map_or("This action", |d| d.title);
-                self.set_status(
-                    StatusKind::Warning,
-                    format!("{title} is not implemented yet"),
+                let title = if self.dirty() {
+                    "Open (unsaved changes in this document will be lost)"
+                } else {
+                    "Open"
+                };
+                let current = self
+                    .session
+                    .path()
+                    .and_then(|p| p.parent())
+                    .map(|d| format!("{}/", d.display()))
+                    .unwrap_or_default();
+                self.prompt = Some(
+                    super::prompt::Prompt::new(
+                        super::prompt::PromptKind::OpenDocument,
+                        title,
+                        vec![],
+                    )
+                    .with_input(current),
                 );
             }
+            // Clipboard, palette, symbols, libraries and the other
+            // document-level actions.
+            action => self.dispatch_edit(action),
         }
     }
 
@@ -256,6 +257,13 @@ impl App {
             Action::Review => self.open_review(),
             Action::EditTheme(target) => self.open_theme_editor(target),
             Action::EditData => self.open_edit_data(),
+            Action::MakeSymbol => self.make_symbol(),
+            Action::InsertSymbol => self.open_insert_symbol(),
+            Action::DetachInstance => self.detach_instance(),
+            Action::PushToSymbol => self.push_to_symbol(),
+            Action::ImportLibrary => self.open_library_prompt(true),
+            Action::ExportLibrary => self.open_library_prompt(false),
+            Action::EditPalette => self.open_palette_prompt(),
             Action::SetDocTheme(id) => {
                 self.menu = None;
                 self.set_document_theme(&id);

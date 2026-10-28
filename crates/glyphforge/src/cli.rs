@@ -132,6 +132,12 @@ pub enum Command {
         #[arg(long, requires = "cols")]
         rows: Option<u16>,
     },
+    /// Share symbols, gradients, glyph palettes and fixtures between
+    /// projects.
+    Library {
+        #[command(subcommand)]
+        op: LibraryOp,
+    },
     /// List the component kinds with their properties.
     Kinds {
         /// Only this kind.
@@ -148,4 +154,12 @@ pub enum Command {
         #[arg(long, default_value_t = 24)]
         height: u16,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum LibraryOp {
+    /// Write FILE's reusable parts to a library file.
+    Export { file: PathBuf, out: PathBuf },
+    /// Merge a library into FILE (entries with the same id are replaced).
+    Import { file: PathBuf, library: PathBuf },
 }

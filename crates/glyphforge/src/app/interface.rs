@@ -647,6 +647,20 @@ impl App {
             PromptKind::GradientStopColor => self.submit_gradient_stop_color(&value),
             PromptKind::ImportImage => self.submit_import_image(&prompt.input),
             PromptKind::EditData => self.submit_edit_data(&prompt.input),
+            PromptKind::InsertSymbol => self.submit_insert_symbol(&value),
+            PromptKind::OpenDocument => {
+                let path = std::path::PathBuf::from(prompt.input.trim());
+                match glyphforge_core::api::Session::open(&path) {
+                    Ok(session) => {
+                        self.replace_session(session);
+                        self.set_status(StatusKind::Info, format!("Opened {}", path.display()));
+                    }
+                    Err(e) => self.report_error(&e),
+                }
+            }
+            PromptKind::ImportLibrary => self.submit_import_library(&prompt.input),
+            PromptKind::ExportLibrary => self.submit_export_library(&prompt.input),
+            PromptKind::GlyphPalette => self.submit_palette(&prompt.input),
             PromptKind::ThemeToken => self.submit_theme_token(&prompt.input),
             PromptKind::ThemeName => self.submit_theme_name(&prompt.input),
             PromptKind::Inspector(key) => self.submit_inspector(&key, &prompt.input),

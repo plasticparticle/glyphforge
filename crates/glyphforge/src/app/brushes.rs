@@ -507,6 +507,18 @@ impl App {
         if self.on_raster_layer() {
             return self.pixel_pages();
         }
+        let custom = self.doc().palettes.iter().map(|p| PalettePage {
+            name: p.name.chars().take(10).collect(),
+            entries: p
+                .glyphs
+                .split_whitespace()
+                .map(|g| {
+                    let active =
+                        self.paint.kind == BrushKind::Glyph && self.paint.brush.as_str() == g;
+                    PaletteEntry::new(g, Action::SetBrushGlyph(g.to_owned()), active)
+                })
+                .collect(),
+        });
         BRUSH_PAGES
             .iter()
             .map(|page| PalettePage {
@@ -529,6 +541,7 @@ impl App {
                     })
                     .collect(),
             })
+            .chain(custom)
             .collect()
     }
 

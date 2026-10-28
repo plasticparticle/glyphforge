@@ -67,6 +67,7 @@ render/          RenderContext, Registry, ComponentRenderer, descriptors
 validate.rs      deterministic diagnostics with stable codes
 project.rs       .glyph envelope, schema_version, migration chain, atomic save
 proposal.rs      agent proposals stored beside a file for review
+symbol.rs        symbols, instance expansion, glyph palettes, libraries
 api.rs           Session: the application API
 ```
 
@@ -124,6 +125,8 @@ Document
             └─ Raster    { raster }          pixels         (Pixel Mode)
  gradients[]        Gradient { id, name, stops[], space } for gradient fills
  data{}             fixtures: key -> Value (rows, items, series)
+ symbols[]          Symbol { id, name, component } shown by `instance`s
+ palettes[]         GlyphPalette { name, glyphs } as extra brush pages
 ```
 
 - A **screen** is one terminal-sized design surface; a project holds many
@@ -325,6 +328,20 @@ fixture (a map fixture provides several fields), and `strings`, `rows`,
 identically. Charts share a `style` property (block, half, braille,
 ascii) that picks the glyph strategy.
 
+Symbols: an `instance` component carries `symbol` and optional
+`overrides`. At render time `symbol::expand` clones the master, makes it
+fill the instance, applies the instance's other properties to the root
+and `overrides` (`"<child>.<prop>"`) to descendants; the instance renders
+that tree into its own inner rect through a nested `render_components`
+call, so master ids never collide with document ids and every instance
+follows master changes immediately. `RenderContext` carries the symbols
+and a nesting depth (instances deeper than 8 render as placeholders, so a
+symbol containing itself cannot recurse). `render::Scene` bundles a
+document's theme, fixtures and symbols for `render_screen_full`.
+Libraries are documents: `export_library` copies the reusable parts into
+a fresh document; `import_library` turns another document's parts into
+one patch (replacing same ids, renaming clashing symbol ids).
+
 The editor shows the rendered canvas through a scrolling viewport and
 degrades colours to the detected depth. Previews at other terminal sizes
 render the same screen with a different `size` argument; nothing in the
@@ -345,7 +362,7 @@ set_pixels, update_raster, replace_raster,
 set_gradient, delete_gradient,
 create_layer, delete_layer, update_layer, reorder_layer,
 create_screen, delete_screen, update_screen, replace_screen,
-set_data, set_theme
+set_data, set_symbol, delete_symbol, set_palette, set_theme
 ```
 
 `Patch::apply(&mut Document) -> Result<Patch>`:

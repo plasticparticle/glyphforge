@@ -50,6 +50,29 @@ or series under a key, and a component's `bind` property points at it.
 A fixture can be a list, or a map with several fields (`columns` and
 `rows` for a table).
 
+## Symbols and libraries
+
+Select a component and run **Make Symbol** (Ctrl+K): it becomes a symbol
+and an instance of it takes its place. **Insert Symbol** (Ctrl+Shift+K)
+places more instances. Instances follow their master and override its
+properties: set `title` on an instance to change the master root's
+title, or `overrides` (`{"body.text": "Hello"}`) for nested components.
+To change the master, **Detach Instance**, edit, then **Push To Symbol**:
+every instance updates.
+
+A library is an ordinary `.glyph` file. **Export Library** writes the
+document's symbols, gradients, glyph palettes and data fixtures; **Import
+Library** merges one into the open document (same ids are replaced, so
+re-importing updates). On the command line:
+
+```sh
+glyphforge library export design.glyph kit.glyph
+glyphforge library import other.glyph kit.glyph
+```
+
+**Edit Glyph Palette** stores a named set of glyphs (`Stars: ★ ☆ ✦`) in the
+document; it appears as an extra brush page.
+
 ## Two editing models, one document
 
 - **Interface Mode** — components with identity, properties, layout and
@@ -116,7 +139,7 @@ A patch:
 Operations: `move`, `resize`, `set_property`, `set_layout`,
 `create_component`, `delete_component`, `reparent`, `set_cells`,
 `create_screen`, `delete_screen`, `update_screen`, `replace_screen`,
-`set_data`, `set_pixels`,
+`set_data`, `set_symbol`, `delete_symbol`, `set_palette`, `set_pixels`,
 `update_raster`, `replace_raster`, `set_gradient`, `delete_gradient`,
 `create_layer`, `delete_layer`, `update_layer`, `reorder_layer`,
 `set_theme`. The same

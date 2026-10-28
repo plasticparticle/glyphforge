@@ -207,6 +207,19 @@ pub enum Operation {
         key: String,
         value: Value,
     },
+    /// Adds a symbol, or replaces the one with the same id (every
+    /// instance follows).
+    SetSymbol {
+        symbol: crate::symbol::Symbol,
+    },
+    DeleteSymbol {
+        target: ObjectId,
+    },
+    /// Adds or replaces a glyph palette (empty glyphs remove it).
+    SetPalette {
+        name: String,
+        glyphs: String,
+    },
 }
 
 impl Operation {
@@ -226,12 +239,14 @@ impl Operation {
             | Self::ReplaceRaster { target, .. }
             | Self::DeleteGradient { target }
             | Self::DeleteScreen { target }
-            | Self::UpdateScreen { target, .. } => Some(target),
+            | Self::UpdateScreen { target, .. }
+            | Self::DeleteSymbol { target } => Some(target),
+            Self::SetSymbol { symbol } => Some(&symbol.id),
             Self::SetGradient { gradient } => Some(&gradient.id),
             Self::CreateComponent { component, .. } => Some(&component.id),
             Self::SetCells { layer, .. } | Self::SetPixels { layer, .. } => Some(layer),
             Self::CreateLayer { layer, .. } => Some(&layer.id),
-            Self::SetTheme { .. } | Self::SetData { .. } => None,
+            Self::SetTheme { .. } | Self::SetData { .. } | Self::SetPalette { .. } => None,
             Self::CreateScreen { screen, .. } | Self::ReplaceScreen { screen } => Some(&screen.id),
         }
     }
@@ -334,6 +349,12 @@ impl Operation {
             Self::ReplaceScreen { screen } => format!("replace screen {}", screen.id),
             Self::SetData { key, value } if value.is_null() => format!("remove data {key}"),
             Self::SetData { key, .. } => format!("set data {key}"),
+            Self::SetSymbol { symbol } => format!("set symbol {}", symbol.id),
+            Self::DeleteSymbol { target } => format!("delete symbol {target}"),
+            Self::SetPalette { name, glyphs } if glyphs.is_empty() => {
+                format!("remove palette {name:?}")
+            }
+            Self::SetPalette { name, .. } => format!("set palette {name:?}"),
         }
     }
 
@@ -351,6 +372,9 @@ impl Operation {
             Self::UpdateScreen { .. } => "update_screen",
             Self::ReplaceScreen { .. } => "replace_screen",
             Self::SetData { .. } => "set_data",
+            Self::SetSymbol { .. } => "set_symbol",
+            Self::DeleteSymbol { .. } => "delete_symbol",
+            Self::SetPalette { .. } => "set_palette",
             Self::SetCells { .. } => "set_cells",
             Self::SetPixels { .. } => "set_pixels",
             Self::UpdateRaster { .. } => "update_raster",
@@ -446,6 +470,8 @@ pub enum OperationError {
     PixelOutOfBounds { layer: ObjectId, x: u16, y: u16 },
     #[error("{0} is not a gradient")]
     NotAGradient(ObjectId),
+    #[error("{0} is not a symbol")]
+    NotASymbol(ObjectId),
     #[error("cannot move {target} into {parent}: it is inside {target}")]
     Cycle { target: ObjectId, parent: ObjectId },
 }
@@ -501,6 +527,53 @@ fn apply_one(doc: &mut Document, op: &Operation) -> Result<Operation, OperationE
             Ok(Operation::SetData {
                 key: key.clone(),
                 value: before.unwrap_or(Value::Null),
+            })
+        }
+        Operation::SetSymbol { symbol } => {
+            let existing = doc.symbols.iter().position(|s| s.id == symbol.id);
+            if existing.is_none() && doc.has_id(&symbol.id) {
+                return Err(DocumentError::DuplicateId(symbol.id.clone()).into());
+            }
+            Ok(if let Some(i) = existing {
+                Operation::SetSymbol {
+                    symbol: std::mem::replace(&mut doc.symbols[i], symbol.clone()),
+                }
+            } else {
+                doc.symbols.push(symbol.clone());
+                Operation::DeleteSymbol {
+                    target: symbol.id.clone(),
+                }
+            })
+        }
+        Operation::DeleteSymbol { target } => {
+            let i = doc
+                .symbols
+                .iter()
+                .position(|s| &s.id == target)
+                .ok_or_else(|| OperationError::NotASymbol(target.clone()))?;
+            Ok(Operation::SetSymbol {
+                symbol: doc.symbols.remove(i),
+            })
+        }
+        Operation::SetPalette { name, glyphs } => {
+            let existing = doc.palettes.iter().position(|p| &p.name == name);
+            let before = existing
+                .map(|i| doc.palettes[i].glyphs.clone())
+                .unwrap_or_default();
+            match (existing, glyphs.is_empty()) {
+                (Some(i), true) => {
+                    doc.palettes.remove(i);
+                }
+                (Some(i), false) => glyphs.clone_into(&mut doc.palettes[i].glyphs),
+                (None, false) => doc.palettes.push(crate::symbol::GlyphPalette {
+                    name: name.clone(),
+                    glyphs: glyphs.clone(),
+                }),
+                (None, true) => {}
+            }
+            Ok(Operation::SetPalette {
+                name: name.clone(),
+                glyphs: before,
             })
         }
         Operation::CreateScreen { .. }

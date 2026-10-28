@@ -257,10 +257,9 @@ impl Session {
             .doc
             .screen(screen)
             .ok_or_else(|| ApiError::NoSuchScreen(screen.clone()))?;
-        Ok(render::render_screen_with(
+        Ok(render::render_screen_full(
             s,
-            &self.doc.theme,
-            Some(&self.doc.data),
+            &render::Scene::of(&self.doc),
             &self.registry,
             size,
         )?)
@@ -285,6 +284,8 @@ impl Session {
             theme: &self.doc.theme,
             screen: Some(s),
             data: Some(&self.doc.data),
+            symbols: &self.doc.symbols,
+            depth: 0,
         };
         Ok(render::solve_components(
             roots,

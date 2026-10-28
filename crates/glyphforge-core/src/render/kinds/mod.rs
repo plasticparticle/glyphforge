@@ -191,6 +191,8 @@ mod tests {
             theme: &theme,
             screen: None,
             data: Some(&data),
+            symbols: &[],
+            depth: 0,
         };
         let c = Component::new(id!("t"), "table")
             .with_prop("bind", "servers")

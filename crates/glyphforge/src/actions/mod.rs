@@ -215,6 +215,13 @@ pub enum Action {
     SetDocTheme(String),
     /// Prompt for a data fixture.
     EditData,
+    MakeSymbol,
+    InsertSymbol,
+    DetachInstance,
+    PushToSymbol,
+    ImportLibrary,
+    ExportLibrary,
+    EditPalette,
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,
@@ -379,9 +386,16 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("edit-theme", "Edit Editor Theme", Application, Action::EditTheme(ThemeTarget::Ui), keys: [], kw: ["theme", "colours", "tokens", "customise", "chrome"], aliases: [], implemented: true),
             desc!("edit-document-theme", "Edit Document Theme", Application, Action::EditTheme(ThemeTarget::Document), keys: [], kw: ["theme", "colours", "tokens", "design", "palette"], aliases: [], implemented: true),
             desc!("edit-data", "Edit Data Fixture", Application, Action::EditData, keys: [], kw: ["data", "fixture", "rows", "sample", "mock", "bind", "series"], aliases: ["data"], implemented: true),
+            desc!("make-symbol", "Make Symbol", Interface, Interface, Action::MakeSymbol, keys: ["ctrl+k"], kw: ["symbol", "component", "reuse", "master", "create"], aliases: ["symbol"], implemented: true),
+            desc!("insert-symbol", "Insert Symbol", Interface, Interface, Action::InsertSymbol, keys: ["ctrl+shift+k"], kw: ["symbol", "instance", "reuse", "place"], aliases: [], implemented: true),
+            desc!("detach-instance", "Detach Instance", Interface, Interface, Action::DetachInstance, keys: [], kw: ["symbol", "instance", "unlink", "edit"], aliases: ["detach"], implemented: true),
+            desc!("push-to-symbol", "Push To Symbol", Interface, Interface, Action::PushToSymbol, keys: [], kw: ["symbol", "master", "update", "propagate"], aliases: [], implemented: true),
+            desc!("import-library", "Import Library", File, Action::ImportLibrary, keys: [], kw: ["library", "symbols", "shared", "kit", "design system"], aliases: [], implemented: true),
+            desc!("export-library", "Export Library", File, Action::ExportLibrary, keys: [], kw: ["library", "symbols", "share", "kit", "design system"], aliases: [], implemented: true),
+            desc!("edit-palette", "Edit Glyph Palette", Paint, Action::EditPalette, keys: [], kw: ["palette", "glyphs", "characters", "brushes", "library"], aliases: [], implemented: true),
             desc!("review", "Review Agent Changes", Application, Action::Review, keys: ["f9"], kw: ["agent", "proposal", "accept", "reject", "revert", "ai", "patch"], aliases: ["proposals"], implemented: true),
             desc!("new-document", "New Document", File, Action::NewDocument, keys: ["ctrl+n"], kw: ["create", "canvas"], aliases: ["new"], implemented: true),
-            desc!("open-document", "Open Document", File, Action::OpenDocument, keys: ["ctrl+o"], kw: ["load", "file"], aliases: ["open"], implemented: false),
+            desc!("open-document", "Open Document", File, Action::OpenDocument, keys: ["ctrl+o"], kw: ["load", "file"], aliases: ["open"], implemented: true),
             desc!("save-document", "Save Document", File, Action::SaveDocument, keys: ["ctrl+s"], kw: ["write", "file"], aliases: ["save"], implemented: true),
             desc!("save-document-as", "Save Document As", File, Action::SaveDocumentAs, keys: ["ctrl+shift+s"], kw: ["write", "file", "rename"], aliases: ["save as"], implemented: true),
             desc!("undo", "Undo", Edit, Action::Undo, keys: ["ctrl+z"], kw: ["history", "revert"], aliases: [], implemented: true),
@@ -520,6 +534,7 @@ pub fn find_descriptor(name: &str) -> Option<&'static ActionDescriptor> {
 }
 
 /// The descriptor of a bindable action, if it has one.
+#[cfg(test)]
 pub fn descriptor_of(action: &Action) -> Option<&'static ActionDescriptor> {
     descriptors().iter().find(|d| d.action == *action)
 }

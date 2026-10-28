@@ -126,6 +126,8 @@ pub fn validate_screen(
             theme,
             screen: Some(screen),
             data: None,
+            symbols: &[],
+            depth: 0,
         },
     };
     for layer in screen.layers().iter().filter(|l| l.visible) {

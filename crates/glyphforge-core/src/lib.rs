@@ -20,6 +20,7 @@ pub mod proposal;
 pub mod raster;
 pub mod render;
 pub mod stamp;
+pub mod symbol;
 pub mod theme;
 pub mod validate;
 pub mod value;

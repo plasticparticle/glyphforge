@@ -81,6 +81,7 @@ impl Registry {
         r.register(Box::new(Button));
         r.register(Box::new(Divider));
         r.register(Box::new(Artwork));
+        r.register(Box::new(Instance));
         super::kinds::register(&mut r);
         r
     }
@@ -533,6 +534,85 @@ impl ComponentRenderer for Artwork {
     }
 }
 
+/// The built-in registry, built once (instances render their master
+/// through it).
+fn builtin_registry() -> &'static Registry {
+    static REGISTRY: std::sync::OnceLock<Registry> = std::sync::OnceLock::new();
+    REGISTRY.get_or_init(Registry::builtin)
+}
+
+/// Shows a symbol: the master expanded with this instance's overrides,
+/// laid out inside the instance's rect.
+#[derive(Debug)]
+pub struct Instance;
+
+impl ComponentRenderer for Instance {
+    fn kind(&self) -> &'static str {
+        "instance"
+    }
+
+    fn descriptor(&self) -> Descriptor {
+        Descriptor::new("instance", "Symbol Instance", Category::Layout)
+            .summary("A copy of a symbol that follows its master")
+            .keywords(&["symbol", "component", "reuse", "master", "copy"])
+            .size(None)
+            .prop(PropSpec::new("symbol", PropKind::Reference, "symbol id"))
+            .prop(PropSpec::new(
+                "overrides",
+                PropKind::Map,
+                "\"<child id>.<property>\" -> value for nested components",
+            ))
+    }
+
+    fn intrinsic_size(&self, c: &Component, ctx: &RenderContext<'_>) -> Option<Size> {
+        let id = c.prop_str("symbol")?;
+        let master = &ctx.symbols.iter().find(|s| s.id.as_str() == id)?.component;
+        let dim = |d: crate::layout::Dimension| match d {
+            crate::layout::Dimension::Fixed(n) => Some(n),
+            _ => None,
+        };
+        Some(Size::new(
+            dim(master.layout.width).unwrap_or(20),
+            dim(master.layout.height).unwrap_or(4),
+        ))
+    }
+
+    fn render(
+        &self,
+        c: &Component,
+        rect: Rect,
+        inner: Rect,
+        ctx: &RenderContext<'_>,
+        canvas: &mut Canvas,
+    ) {
+        let root = (ctx.depth < 8)
+            .then(|| crate::symbol::expand(c, ctx.symbols))
+            .flatten();
+        let Some(root) = root else {
+            Placeholder.render(c, rect, inner, ctx, canvas);
+            return;
+        };
+        let nested = RenderContext {
+            depth: ctx.depth + 1,
+            ..*ctx
+        };
+        let size = Size::new(inner.width, inner.height);
+        let registry = builtin_registry();
+        let Ok((art, _)) = crate::render::render_components(&[root], size, &nested, registry)
+        else {
+            return;
+        };
+        for pos in art.bounds().positions() {
+            let Some(cell) = art.get(pos) else { continue };
+            if cell.is_empty() || cell.is_wide_tail() {
+                continue;
+            }
+            let target = crate::document::Position::new(inner.x + pos.x, inner.y + pos.y);
+            let _ = canvas.put(target, cell.clone());
+        }
+    }
+}
+
 /// Renders unknown kinds as a labelled outline so nothing disappears
 /// silently.
 #[derive(Debug)]
@@ -671,6 +751,8 @@ mod tests {
             theme: &theme,
             screen: Some(&screen),
             data: None,
+            symbols: &[],
+            depth: 0,
         };
         let art = Component::new(id!("logo"), "artwork")
             .with_prop("layer", "px")

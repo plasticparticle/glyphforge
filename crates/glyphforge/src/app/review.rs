@@ -134,10 +134,9 @@ impl App {
                     let screen = doc
                         .screen(&self.editor.screen)
                         .unwrap_or_else(|| doc.first_screen());
-                    render::render_screen_with(
+                    render::render_screen_full(
                         screen,
-                        &doc.theme,
-                        Some(&doc.data),
+                        &glyphforge_core::render::Scene::of(&doc),
                         self.session.registry(),
                         self.editor.preview_size,
                     )

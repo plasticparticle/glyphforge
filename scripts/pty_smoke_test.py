@@ -87,7 +87,7 @@ print("smoke 1 ok: typing + dirty quit + terminal restore")
 code, out = run(binary, home, keys=[(b"\x1bOP", 0.3), (b"\x1b", 0.2), (b"\x11", 0.3)])
 text = out.decode("utf-8", "replace")
 assert code == 0, f"exit {code}"
-assert " Keys " in plain(text) and "later milestone" in plain(text), "help overlay rendered"
+assert " Keys " in plain(text) and re.search(r"Toggle\s*Help", plain(text)), "help overlay rendered"
 print("smoke 2 ok: help overlay + clean quit")
 
 # 3. Omarchy fixture: theme is picked up and reported in the header.

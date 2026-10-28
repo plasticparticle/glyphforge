@@ -919,10 +919,9 @@ impl App {
         for w in writes {
             raster.pixels.set(w.x, w.y, w.pixel);
         }
-        glyphforge_core::render::render_screen_with(
+        glyphforge_core::render::render_screen_full(
             &screen,
-            &self.doc().theme,
-            Some(&self.doc().data),
+            &glyphforge_core::render::Scene::of(self.doc()),
             self.session.registry(),
             self.editor.preview_size,
         )
