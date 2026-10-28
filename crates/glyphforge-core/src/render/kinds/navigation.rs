@@ -103,10 +103,7 @@ impl ComponentRenderer for Tabs {
             let (label, _) = split(item);
             let active = i == current;
             let (text, style) = match (look, active) {
-                ("pills", true) => (
-                    format!(" {label} "),
-                    kit::style(ctx, "selection-foreground", "primary"),
-                ),
+                ("pills", true) => (format!(" {label} "), kit::on(ctx, "primary")),
                 ("boxed", true) => (
                     format!("[{label}]"),
                     kit::bold(kit::style(ctx, "primary", "surface")),
@@ -367,7 +364,7 @@ impl ComponentRenderer for Toolbar {
             }
             let (label, key) = split(item);
             let style = if current == Some(i) {
-                kit::style(ctx, "selection-foreground", "primary")
+                kit::on(ctx, "primary")
             } else {
                 kit::style(ctx, "foreground", "surface-alt")
             };
@@ -418,7 +415,7 @@ impl ComponentRenderer for StatusBar {
         let mut x = inner.x;
         for (i, item) in kit::strings(c, ctx, "items").iter().enumerate() {
             let style = if i == 0 {
-                kit::bold(kit::style(ctx, "selection-foreground", "primary"))
+                kit::bold(kit::on(ctx, "primary"))
             } else {
                 bar
             };

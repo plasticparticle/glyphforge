@@ -214,6 +214,25 @@ pub fn color(c: &Component, ctx: &RenderContext<'_>, key: &str, default: &str) -
         .map_or_else(|| ctx.theme.color(default), |t| ctx.theme.resolve(t))
 }
 
+/// Text on a filled accent (`primary`, a status colour): whichever of
+/// the selection foreground, the background and the foreground reads
+/// best on it in this theme.
+pub fn on(ctx: &RenderContext<'_>, bg: &str) -> CellStyle {
+    let back = ctx.theme.color(bg);
+    let lum = |c: Color| {
+        c.to_rgb()
+            .map(|(r, g, b)| (i32::from(r) * 299 + i32::from(g) * 587 + i32::from(b) * 114) / 1000)
+    };
+    let best = ["selection-foreground", "background", "foreground"]
+        .into_iter()
+        .max_by_key(|t| match (lum(ctx.theme.color(t)), lum(back)) {
+            (Some(a), Some(b)) => (a - b).abs(),
+            _ => 0,
+        })
+        .unwrap_or("selection-foreground");
+    CellStyle::new(ctx.theme.color(best), back)
+}
+
 pub fn style(ctx: &RenderContext<'_>, fg: &str, bg: &str) -> CellStyle {
     CellStyle::new(ctx.theme.color(fg), ctx.theme.color(bg))
 }
@@ -293,6 +312,31 @@ pub fn put(
         return 0;
     }
     painter::draw_text(canvas, x, y, text, style, rect)
+}
+
+/// Word-wraps `text` to lines of at most `width` columns; words longer
+/// than a line are cut.
+pub fn wrap(text: &str, width: u16) -> Vec<String> {
+    let width = width.max(1);
+    let mut lines = Vec::new();
+    let mut line = String::new();
+    for word in text.split(' ') {
+        let candidate = if line.is_empty() {
+            word.to_owned()
+        } else {
+            format!("{line} {word}")
+        };
+        if painter::text_width(&candidate) <= width {
+            line = candidate;
+        } else {
+            if !line.is_empty() {
+                lines.push(std::mem::take(&mut line));
+            }
+            line = painter::truncate(word, width);
+        }
+    }
+    lines.push(line);
+    lines
 }
 
 /// `text` padded or cut to exactly `width` columns.

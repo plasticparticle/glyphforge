@@ -158,7 +158,15 @@ pub enum Command {
         width: u16,
         #[arg(long, default_value_t = 24)]
         height: u16,
+        /// A built-in theme for the design (forge-dark, cobalt, paper, ...).
+        #[arg(long)]
+        theme: Option<String>,
+        /// Start from a template (see `glyphforge templates`).
+        #[arg(long, conflicts_with_all = ["width", "height"])]
+        template: Option<String>,
     },
+    /// List the built-in templates.
+    Templates,
 }
 
 #[derive(Debug, Subcommand)]

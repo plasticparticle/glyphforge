@@ -38,6 +38,8 @@ pub enum PromptKind {
     OpenDocument,
     /// Export format and path.
     Export,
+    /// A template for a new document.
+    Template,
     /// Restore or discard an autosave found on start.
     Recover,
     ImportLibrary,

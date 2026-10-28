@@ -1,0 +1,1102 @@
+{
+  "format": "glyphforge",
+  "schema_version": 3,
+  "meta": {
+    "title": "",
+    "author": "",
+    "description": ""
+  },
+  "theme": {
+    "id": "cobalt",
+    "name": "Cobalt",
+    "colors": {
+      "background": "#091a2b",
+      "border": "#2c5f8f",
+      "border-muted": "#1b3f61",
+      "error": "#ff7a7a",
+      "focus": "#4ea6ff",
+      "foreground": "#d7e7f7",
+      "foreground-muted": "#8badcb",
+      "info": "#6fd3ff",
+      "primary": "#4ea6ff",
+      "secondary": "#9d8cff",
+      "selection": "#1d4d7a",
+      "selection-foreground": "#ffffff",
+      "success": "#43c59e",
+      "surface": "#0f2740",
+      "surface-alt": "#16344f",
+      "warning": "#f0b429"
+    },
+    "border": "rounded",
+    "spacing": {
+      "padding": 1,
+      "gap": 1
+    }
+  },
+  "data": {
+    "deploys": {
+      "columns": [
+        "Version",
+        "Author",
+        "When",
+        "Status"
+      ],
+      "rows": [
+        [
+          "v2.31.0",
+          "ana",
+          "2 min ago",
+          "rolling out"
+        ],
+        [
+          "v2.30.2",
+          "jun",
+          "3 h ago",
+          "live"
+        ],
+        [
+          "v2.30.1",
+          "sam",
+          "yesterday",
+          "rolled back"
+        ],
+        [
+          "v2.30.0",
+          "ana",
+          "2 days ago",
+          "superseded"
+        ]
+      ]
+    },
+    "requests": [
+      120,
+      132,
+      128,
+      150,
+      171,
+      160,
+      158,
+      190,
+      240,
+      230,
+      210,
+      260,
+      300,
+      280,
+      250,
+      270,
+      310,
+      330,
+      300,
+      290
+    ]
+  },
+  "screens": [
+    {
+      "id": "main",
+      "name": "Main",
+      "size": {
+        "width": 100,
+        "height": 30
+      },
+      "layers": [
+        {
+          "id": "main-artwork",
+          "name": "Artwork",
+          "visible": true,
+          "locked": false,
+          "kind": "artwork",
+          "cells": {
+            "width": 100,
+            "height": 30
+          }
+        },
+        {
+          "id": "main-ui",
+          "name": "UI",
+          "visible": true,
+          "locked": false,
+          "kind": "interface",
+          "components": [
+            {
+              "id": "app",
+              "kind": "group",
+              "layout": {
+                "placement": {
+                  "mode": "flow"
+                },
+                "width": "fill",
+                "height": "fill",
+                "min_width": null,
+                "max_width": null,
+                "min_height": null,
+                "max_height": null,
+                "padding": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "margin": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "container": {
+                  "direction": "vertical",
+                  "gap": 0,
+                  "columns": 0,
+                  "align": "stretch"
+                }
+              },
+              "children": [
+                {
+                  "id": "topbar",
+                  "kind": "group",
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fill",
+                    "height": "fixed(1)",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "horizontal",
+                      "gap": 2,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  },
+                  "children": [
+                    {
+                      "id": "crumbs",
+                      "kind": "breadcrumbs",
+                      "props": {
+                        "items": [
+                          "acme",
+                          "platform",
+                          "checkout-service"
+                        ]
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "content",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "env",
+                      "kind": "badge",
+                      "props": {
+                        "level": "error",
+                        "text": "PROD"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "content",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "spacer",
+                      "kind": "group",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "who",
+                      "kind": "label",
+                      "props": {
+                        "color": "foreground-muted",
+                        "text": "ana@acme.dev"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "content",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "tabs",
+                  "kind": "tabs",
+                  "props": {
+                    "items": [
+                      "Overview",
+                      "Builds",
+                      "Deploys",
+                      "Incidents"
+                    ],
+                    "on_activate": "select:tabs=2",
+                    "selected": 0
+                  },
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fill",
+                    "height": "fixed(2)",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "vertical",
+                      "gap": 0,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  }
+                },
+                {
+                  "id": "body",
+                  "kind": "group",
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fill",
+                    "height": "fill",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "horizontal",
+                      "gap": 1,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  },
+                  "children": [
+                    {
+                      "id": "left",
+                      "kind": "group",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 1,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "meters",
+                          "kind": "group",
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fixed(3)",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "horizontal",
+                              "gap": 1,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "m-cpu",
+                              "kind": "panel",
+                              "props": {
+                                "title": "Compute"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "fill",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 1,
+                                  "bottom": 0,
+                                  "left": 1
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              },
+                              "children": [
+                                {
+                                  "id": "g-cpu",
+                                  "kind": "gauge",
+                                  "props": {
+                                    "label": "CPU",
+                                    "value": 46
+                                  },
+                                  "layout": {
+                                    "placement": {
+                                      "mode": "flow"
+                                    },
+                                    "width": "fill",
+                                    "height": "fixed(1)",
+                                    "min_width": null,
+                                    "max_width": null,
+                                    "min_height": null,
+                                    "max_height": null,
+                                    "padding": {
+                                      "top": 0,
+                                      "right": 0,
+                                      "bottom": 0,
+                                      "left": 0
+                                    },
+                                    "margin": {
+                                      "top": 0,
+                                      "right": 0,
+                                      "bottom": 0,
+                                      "left": 0
+                                    },
+                                    "container": {
+                                      "direction": "vertical",
+                                      "gap": 0,
+                                      "columns": 0,
+                                      "align": "stretch"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "id": "m-err",
+                              "kind": "panel",
+                              "props": {
+                                "title": "Error budget"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "fill",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 1,
+                                  "bottom": 0,
+                                  "left": 1
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              },
+                              "children": [
+                                {
+                                  "id": "g-err",
+                                  "kind": "gauge",
+                                  "props": {
+                                    "critical": 80,
+                                    "label": "Errors",
+                                    "value": 93,
+                                    "warn": 50
+                                  },
+                                  "layout": {
+                                    "placement": {
+                                      "mode": "flow"
+                                    },
+                                    "width": "fill",
+                                    "height": "fixed(1)",
+                                    "min_width": null,
+                                    "max_width": null,
+                                    "min_height": null,
+                                    "max_height": null,
+                                    "padding": {
+                                      "top": 0,
+                                      "right": 0,
+                                      "bottom": 0,
+                                      "left": 0
+                                    },
+                                    "margin": {
+                                      "top": 0,
+                                      "right": 0,
+                                      "bottom": 0,
+                                      "left": 0
+                                    },
+                                    "container": {
+                                      "direction": "vertical",
+                                      "gap": 0,
+                                      "columns": 0,
+                                      "align": "stretch"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "id": "m-lat",
+                              "kind": "panel",
+                              "props": {
+                                "title": "Latency"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "fill",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 1,
+                                  "bottom": 0,
+                                  "left": 1
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              },
+                              "children": [
+                                {
+                                  "id": "g-lat",
+                                  "kind": "gauge",
+                                  "props": {
+                                    "label": "p99",
+                                    "value": 71
+                                  },
+                                  "layout": {
+                                    "placement": {
+                                      "mode": "flow"
+                                    },
+                                    "width": "fill",
+                                    "height": "fixed(1)",
+                                    "min_width": null,
+                                    "max_width": null,
+                                    "min_height": null,
+                                    "max_height": null,
+                                    "padding": {
+                                      "top": 0,
+                                      "right": 0,
+                                      "bottom": 0,
+                                      "left": 0
+                                    },
+                                    "margin": {
+                                      "top": 0,
+                                      "right": 0,
+                                      "bottom": 0,
+                                      "left": 0
+                                    },
+                                    "container": {
+                                      "direction": "vertical",
+                                      "gap": 0,
+                                      "columns": 0,
+                                      "align": "stretch"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "id": "traffic",
+                          "kind": "panel",
+                          "props": {
+                            "title": "Requests / min"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fixed(9)",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 1,
+                              "bottom": 0,
+                              "left": 1
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "rps",
+                              "kind": "linechart",
+                              "props": {
+                                "axis": true,
+                                "bind": "requests",
+                                "color": "info"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "fill",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "deploys",
+                          "kind": "panel",
+                          "props": {
+                            "title": "Recent deploys"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 1,
+                              "bottom": 0,
+                              "left": 1
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "deploy-table",
+                              "kind": "table",
+                              "props": {
+                                "bind": "deploys",
+                                "selected": 0,
+                                "striped": true
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "fill",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "right",
+                      "kind": "group",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fixed(38)",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 1,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "builds",
+                          "kind": "panel",
+                          "props": {
+                            "title": "Pipelines"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fixed(8)",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 1,
+                              "bottom": 0,
+                              "left": 1
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "build-list",
+                              "kind": "list",
+                              "props": {
+                                "items": [
+                                  "✓ #4821 main · 3m 12s",
+                                  "✓ #4820 main · 3m 40s",
+                                  "✗ #4819 feat/cart · 1m 02s",
+                                  "✓ #4818 main · 3m 09s",
+                                  "⠋ #4822 feat/tax · running"
+                                ],
+                                "selected": 2
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "fill",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "logs",
+                          "kind": "panel",
+                          "props": {
+                            "title": "Live log"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 1,
+                              "bottom": 0,
+                              "left": 1
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "log",
+                              "kind": "log",
+                              "props": {
+                                "text": "09:41:02 INFO  deploy v2.31.0 started\n09:41:19 INFO  canary 5% healthy\n09:42:03 WARN  p99 above 400 ms (eu-west)\n09:42:31 ERROR payment-gw timeout x3\n09:42:32 INFO  rollback armed"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "fill",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "hints",
+                  "kind": "keyhint",
+                  "props": {
+                    "items": [
+                      "d|deploy",
+                      "r|rollback",
+                      "l|logs",
+                      "/|filter",
+                      "q|quit"
+                    ]
+                  },
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fill",
+                    "height": "fixed(1)",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "vertical",
+                      "gap": 0,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

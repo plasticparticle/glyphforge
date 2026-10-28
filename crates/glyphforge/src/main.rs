@@ -10,6 +10,7 @@ mod image;
 mod input;
 mod omarchy;
 mod render;
+mod templates;
 mod terminal;
 mod ui;
 

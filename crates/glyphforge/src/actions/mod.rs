@@ -226,6 +226,7 @@ pub enum Action {
     CheckDesign,
     TogglePrototype,
     ScreenOverview,
+    NewFromTemplate,
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,
@@ -403,6 +404,7 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("check-design", "Check Design", Application, Action::CheckDesign, keys: ["f5"], kw: ["validate", "lint", "problems", "contrast", "suggestions", "advice"], aliases: ["validate"], implemented: true),
             desc!("review", "Review Agent Changes", Application, Action::Review, keys: ["f9"], kw: ["agent", "proposal", "accept", "reject", "revert", "ai", "patch"], aliases: ["proposals"], implemented: true),
             desc!("new-document", "New Document", File, Action::NewDocument, keys: ["ctrl+n"], kw: ["create", "canvas"], aliases: ["new"], implemented: true),
+            desc!("new-from-template", "New From Template", File, Action::NewFromTemplate, keys: [], kw: ["template", "example", "starter", "dashboard", "git", "settings", "database"], aliases: ["template"], implemented: true),
             desc!("open-document", "Open Document", File, Action::OpenDocument, keys: ["ctrl+o"], kw: ["load", "file"], aliases: ["open"], implemented: true),
             desc!("save-document", "Save Document", File, Action::SaveDocument, keys: ["ctrl+s"], kw: ["write", "file"], aliases: ["save"], implemented: true),
             desc!("save-document-as", "Save Document As", File, Action::SaveDocumentAs, keys: ["ctrl+shift+s"], kw: ["write", "file", "rename"], aliases: ["save as"], implemented: true),

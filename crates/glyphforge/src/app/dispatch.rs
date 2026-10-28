@@ -268,6 +268,7 @@ impl App {
             Action::CheckDesign => self.check_design(),
             Action::TogglePrototype => self.toggle_prototype(),
             Action::ScreenOverview => self.open_overview(),
+            Action::NewFromTemplate => self.open_template_prompt(),
             Action::SetDocTheme(id) => {
                 self.menu = None;
                 self.set_document_theme(&id);

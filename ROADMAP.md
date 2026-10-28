@@ -275,11 +275,15 @@ with stable codes.
       files (E9), templates in P4
 - [x] Glyph palettes in the document as extra brush pages (`set_palette`)
 
-### P4 — Templates and showcase examples  `[ ]`
-Starter templates and at least six polished examples (system monitor,
-developer dashboard, Git client, AI coding assistant, database explorer,
-settings application), each with a distinct aesthetic; the shipped
-`examples/dashboard.glyph` is the first.
+### P4 — Templates and showcase examples  `[x]`
+- [x] Six examples with distinct themes: system monitor, developer
+      dashboard, Git client, AI coding assistant, database explorer,
+      settings application (built reproducibly by
+      `scripts/build_examples.py`)
+- [x] Templates compiled into the binary: `glyphforge templates`,
+      `new --template [--theme]`, New From Template in the editor
+- [x] Test: every template loads, has no validation errors, is stored
+      canonically and renders at its size and at 80×24
 
 ### P5 — Multi-screen prototypes and overview  `[x]`
 - [x] `on_activate` actions: goto, open, close, toggle, select, back,

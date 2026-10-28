@@ -123,7 +123,7 @@ impl ComponentRenderer for Modal {
             let text = format!("[ {label} ]");
             x = x.saturating_sub(painter::text_width(&text) + 1);
             let style = if i + 1 == buttons.len() {
-                kit::style(ctx, "selection-foreground", "primary")
+                kit::on(ctx, "primary")
             } else {
                 kit::style(ctx, "foreground", "surface-alt")
             };
@@ -272,9 +272,8 @@ impl ComponentRenderer for Pill {
     ) {
         let style = match self.0 {
             "tag" => kit::style(ctx, "foreground", "surface-alt"),
-            _ => kit::bold(kit::style(
+            _ => kit::bold(kit::on(
                 ctx,
-                "selection-foreground",
                 kit::level_token(kit::str_or(c, "level", "info")),
             )),
         };

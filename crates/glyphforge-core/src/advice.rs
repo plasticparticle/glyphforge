@@ -116,7 +116,20 @@ fn spacing(c: &Component, result: &layout::LayoutResult, report: &mut dyn FnMut(
         .iter()
         .filter(|k| k.layout.placement == Placement::Flow)
         .collect();
-    if flow.len() < 3 || c.layout.container.gap > 0 {
+    // Empty groups that grow are spacers: deliberate, uneven space.
+    let spacer = |k: &Component| {
+        k.kind == "group"
+            && k.children.is_empty()
+            && matches!(
+                k.layout.width,
+                layout::Dimension::Fill | layout::Dimension::Flex(_)
+            )
+            && matches!(
+                k.layout.height,
+                layout::Dimension::Fill | layout::Dimension::Flex(_)
+            )
+    };
+    if flow.len() < 3 || c.layout.container.gap > 0 || flow.iter().any(|k| spacer(k)) {
         return;
     }
     let vertical = c.layout.container.direction == layout::Direction::Vertical;

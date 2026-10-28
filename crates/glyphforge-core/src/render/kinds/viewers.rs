@@ -310,6 +310,32 @@ impl Markdown {
     }
 }
 
+impl Markdown {
+    /// Joins consecutive plain lines into paragraphs, as Markdown does;
+    /// a bullet or quote continues on the plain lines after it. Headings,
+    /// rules and blank lines stand alone.
+    fn paragraphs(lines: &[String]) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        let mut open = false;
+        for line in lines {
+            let t = line.trim_start();
+            let alone = t.is_empty() || t.starts_with('#') || t == "---" || t == "***";
+            let item = t.starts_with("- ") || t.starts_with("* ") || t.starts_with("> ");
+            match out.last_mut() {
+                Some(last) if open && !alone && !item => {
+                    last.push(' ');
+                    last.push_str(t);
+                }
+                _ => {
+                    out.push(line.clone());
+                    open = !alone;
+                }
+            }
+        }
+        out
+    }
+}
+
 impl ComponentRenderer for Markdown {
     fn kind(&self) -> &'static str {
         "markdown"
@@ -338,10 +364,13 @@ impl ComponentRenderer for Markdown {
         ctx: &RenderContext<'_>,
         canvas: &mut Canvas,
     ) {
-        let lines = text_lines(c, ctx);
+        let lines = Self::paragraphs(&text_lines(c, ctx));
         let base = kit::style(ctx, "foreground", "surface");
-        for (i, line) in lines.iter().enumerate().take(usize::from(inner.height)) {
-            let y = inner.y + i as u16;
+        let mut y = inner.y;
+        for line in &lines {
+            if u32::from(y) >= inner.bottom() {
+                break;
+            }
             let trimmed = line.trim_start();
             let (lead, lead_style, rest, style) = if let Some(h) = trimmed.strip_prefix("# ") {
                 (
@@ -382,13 +411,30 @@ impl ComponentRenderer for Markdown {
                     kit::style(ctx, "border-muted", "surface"),
                     inner,
                 );
+                y += 1;
                 continue;
             } else {
                 ("", base, trimmed, base)
             };
-            let mut x = inner.x + kit::put(canvas, inner.x, y, lead, lead_style, inner);
-            for (part, s) in Self::inline(rest, ctx, style) {
-                x += kit::put(canvas, x, y, &part, s, inner);
+            // Wrapped rows keep the lead's indent.
+            let indent = painter::text_width(lead);
+            for (i, row) in kit::wrap(rest, inner.width.saturating_sub(indent))
+                .iter()
+                .enumerate()
+            {
+                if u32::from(y) >= inner.bottom() {
+                    break;
+                }
+                let lead_text = if i == 0 {
+                    lead.to_owned()
+                } else {
+                    " ".repeat(usize::from(indent))
+                };
+                let mut x = inner.x + kit::put(canvas, inner.x, y, &lead_text, lead_style, inner);
+                for (part, s) in Self::inline(row, ctx, style) {
+                    x += kit::put(canvas, x, y, &part, s, inner);
+                }
+                y += 1;
             }
         }
     }

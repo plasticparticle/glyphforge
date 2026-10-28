@@ -1,0 +1,541 @@
+{
+  "format": "glyphforge",
+  "schema_version": 3,
+  "meta": {
+    "title": "",
+    "author": "",
+    "description": ""
+  },
+  "theme": {
+    "id": "verdant",
+    "name": "Verdant",
+    "colors": {
+      "background": "#0d1a12",
+      "border": "#2f5c3b",
+      "border-muted": "#1f3e29",
+      "error": "#e36a63",
+      "focus": "#6fcf72",
+      "foreground": "#d8ecd9",
+      "foreground-muted": "#8cb294",
+      "info": "#5fc0b0",
+      "primary": "#6fcf72",
+      "secondary": "#b7d96b",
+      "selection": "#27512f",
+      "selection-foreground": "#f2fff3",
+      "success": "#6fcf72",
+      "surface": "#13241a",
+      "surface-alt": "#1b3222",
+      "warning": "#e0b44a"
+    },
+    "border": "rounded",
+    "spacing": {
+      "padding": 1,
+      "gap": 1
+    }
+  },
+  "data": {
+    "commits": {
+      "columns": [
+        "Hash",
+        "Message",
+        "Author",
+        "Age"
+      ],
+      "rows": [
+        [
+          "e71b0d4",
+          "Prototype mode and screen graph",
+          "lars",
+          "1h"
+        ],
+        [
+          "a3f9c21",
+          "Octant glyph table from UnicodeData",
+          "lars",
+          "3h"
+        ],
+        [
+          "9c04e7a",
+          "OKLab gradients",
+          "mia",
+          "5h"
+        ],
+        [
+          "51de2b8",
+          "Command palette fuzzy scoring",
+          "lars",
+          "1d"
+        ],
+        [
+          "0bb93f1",
+          "Snap guides while dragging",
+          "jun",
+          "2d"
+        ],
+        [
+          "7d1aa60",
+          "Initial semantic model",
+          "lars",
+          "1w"
+        ]
+      ]
+    }
+  },
+  "screens": [
+    {
+      "id": "main",
+      "name": "Main",
+      "size": {
+        "width": 100,
+        "height": 30
+      },
+      "layers": [
+        {
+          "id": "main-artwork",
+          "name": "Artwork",
+          "visible": true,
+          "locked": false,
+          "kind": "artwork",
+          "cells": {
+            "width": 100,
+            "height": 30
+          }
+        },
+        {
+          "id": "main-ui",
+          "name": "UI",
+          "visible": true,
+          "locked": false,
+          "kind": "interface",
+          "components": [
+            {
+              "id": "app",
+              "kind": "group",
+              "layout": {
+                "placement": {
+                  "mode": "flow"
+                },
+                "width": "fill",
+                "height": "fill",
+                "min_width": null,
+                "max_width": null,
+                "min_height": null,
+                "max_height": null,
+                "padding": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "margin": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "container": {
+                  "direction": "vertical",
+                  "gap": 0,
+                  "columns": 0,
+                  "align": "stretch"
+                }
+              },
+              "children": [
+                {
+                  "id": "toolbar",
+                  "kind": "toolbar",
+                  "props": {
+                    "items": [
+                      "Fetch|f",
+                      "Pull|p",
+                      "Push|P",
+                      "|",
+                      "Commit|c",
+                      "Stash|s"
+                    ]
+                  },
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fill",
+                    "height": "fixed(1)",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "vertical",
+                      "gap": 0,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  }
+                },
+                {
+                  "id": "workspace",
+                  "kind": "group",
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fill",
+                    "height": "fill",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "horizontal",
+                      "gap": 1,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  },
+                  "children": [
+                    {
+                      "id": "refs",
+                      "kind": "panel",
+                      "props": {
+                        "title": "glyphforge"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fixed(26)",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 1,
+                          "bottom": 0,
+                          "left": 1
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "ref-tree",
+                          "kind": "tree",
+                          "props": {
+                            "items": [
+                              "Branches",
+                              "  ● main",
+                              "  feat/sextants",
+                              "  fix/wide-glyphs",
+                              "Remotes",
+                              "  origin",
+                              "    main",
+                              "    release/0.2",
+                              "+Tags",
+                              "Stashes",
+                              "  WIP on main: palette"
+                            ],
+                            "selected": 1
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "history",
+                      "kind": "group",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 1,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "commits",
+                          "kind": "panel",
+                          "props": {
+                            "title": "History · main"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fixed(11)",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 1,
+                              "bottom": 0,
+                              "left": 1
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "commit-table",
+                              "kind": "table",
+                              "props": {
+                                "bind": "commits",
+                                "selected": 1
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "fill",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "changes",
+                          "kind": "panel",
+                          "props": {
+                            "title": "a3f9c21 · Octant glyph table"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 1,
+                              "bottom": 0,
+                              "left": 1
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "diff",
+                              "kind": "diff",
+                              "props": {
+                                "text": "@@ -41,7 +41,9 @@ fn encode_block(\n     let mask = inks.iter().enumerate()\n-        .fold(0u8, |m, (i, p)| m | bit(i, p));\n+        .fold(0u8, |m, (i, p)| {\n+            if *p == a { m | (1 << i) } else { m }\n+        });\n     let glyph = block_glyph(mode, mask)?;"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "fill",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "status",
+                  "kind": "statusbar",
+                  "props": {
+                    "items": [
+                      "main",
+                      "↑2 ↓0",
+                      "3 changed"
+                    ],
+                    "right": "clean · signed"
+                  },
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fill",
+                    "height": "fixed(1)",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "vertical",
+                      "gap": 0,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

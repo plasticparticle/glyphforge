@@ -39,6 +39,10 @@ pub enum HeadlessError {
     Format(String),
     #[error("unknown component kind {0:?}; `glyphforge kinds` lists them")]
     Kind(String),
+    #[error("unknown template {0:?}; `glyphforge templates` lists them")]
+    Template(String),
+    #[error("unknown theme {0:?}")]
+    Theme(String),
     #[error("{0} already exists")]
     Exists(String),
     #[error(transparent)]
@@ -211,17 +215,61 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
             file,
             width,
             height,
-        } => {
-            if file.exists() {
-                return Err(HeadlessError::Exists(file.display().to_string()));
+            theme,
+            template,
+        } => new_document(
+            &file,
+            Size::new(width, height),
+            theme.as_deref(),
+            template.as_deref(),
+            out,
+        ),
+        Command::Templates => {
+            for (name, description, _) in crate::templates::TEMPLATES {
+                writeln!(out, "{name:<22} {description}")
+                    .map_err(write_err(Path::new("stdout")))?;
             }
-            let mut session = Session::new(Document::new(Size::new(width, height))?);
-            session.save_as(&file)?;
-            writeln!(out, "created {} ({width}×{height})", file.display())
-                .map_err(write_err(&file))?;
             Ok(0)
         }
     }
+}
+
+/// `glyphforge new`: an empty document, or a template, optionally with a
+/// built-in theme.
+fn new_document(
+    file: &Path,
+    size: Size,
+    theme: Option<&str>,
+    template: Option<&str>,
+    out: &mut dyn Write,
+) -> Result<u8, HeadlessError> {
+    if file.exists() {
+        return Err(HeadlessError::Exists(file.display().to_string()));
+    }
+    let mut doc = match template {
+        Some(name) => {
+            let json = crate::templates::template(name)
+                .ok_or_else(|| HeadlessError::Template(name.to_owned()))?;
+            glyphforge_core::project::from_json(json).map_err(ApiError::from)?
+        }
+        None => Document::new(size)?,
+    };
+    if let Some(id) = theme {
+        doc.theme = glyphforge_core::Theme::builtin_by_id(id)
+            .ok_or_else(|| HeadlessError::Theme(id.to_owned()))?;
+    }
+    let size = doc.first_screen().size();
+    let mut session = Session::new(doc);
+    session.save_as(file)?;
+    writeln!(
+        out,
+        "created {} ({}×{})",
+        file.display(),
+        size.width,
+        size.height
+    )
+    .map_err(write_err(file))?;
+    Ok(0)
 }
 
 fn propose(
@@ -477,6 +525,8 @@ mod tests {
             file: file.clone(),
             width: 30,
             height: 6,
+            theme: None,
+            template: None,
         });
         assert_eq!(code, 0);
         assert!(text.contains("created"));
@@ -485,7 +535,9 @@ mod tests {
                 Command::New {
                     file: file.clone(),
                     width: 1,
-                    height: 1
+                    height: 1,
+                    theme: None,
+                    template: None,
                 },
                 &mut Vec::new()
             ),
@@ -634,6 +686,8 @@ mod tests {
             file: file.clone(),
             width: 30,
             height: 6,
+            theme: None,
+            template: None,
         });
         let patch = dir.join("p.json");
         std::fs::write(
@@ -682,6 +736,8 @@ mod tests {
             file: file.clone(),
             width: 20,
             height: 8,
+            theme: None,
+            template: None,
         });
         let png = dir.join("logo.png");
         crate::image::tests::write_png(&png, 8, 8);
@@ -720,6 +776,8 @@ mod tests {
                 file: f.clone(),
                 width: 20,
                 height: 5,
+                theme: None,
+                template: None,
             });
         }
         let patch = dir.join("p.json");
@@ -763,6 +821,8 @@ mod tests {
             file: file.clone(),
             width: 20,
             height: 4,
+            theme: None,
+            template: None,
         });
         let art = dir.join("logo.ans");
         std::fs::write(&art, "\x1b[31mHI\x1b[0m there\n").unwrap();

@@ -333,6 +333,37 @@ impl App {
         }
     }
 
+    /// Prompt for a template to start a new document from.
+    pub fn open_template_prompt(&mut self) {
+        let title = if self.dirty() {
+            "New from template (unsaved changes will be lost)"
+        } else {
+            "New from template"
+        };
+        let candidates = crate::templates::TEMPLATES
+            .iter()
+            .map(|(name, description, _)| format!("{name} · {description}"))
+            .collect();
+        self.prompt = Some(Prompt::new(PromptKind::Template, title, candidates));
+    }
+
+    pub(super) fn submit_template(&mut self, value: &str) {
+        let name = value.split(" · ").next().unwrap_or("").trim();
+        let Some(json) = crate::templates::template(name) else {
+            return self.set_status(StatusKind::Warning, format!("No template {name:?}"));
+        };
+        match glyphforge_core::project::from_json(json) {
+            Ok(doc) => {
+                self.replace_session(glyphforge_core::api::Session::new(doc));
+                self.set_status(
+                    StatusKind::Info,
+                    format!("New document from {name}; Save As (Ctrl+Shift+S) to keep it"),
+                );
+            }
+            Err(e) => self.report_error(&e),
+        }
+    }
+
     /// Prompt for a glyph palette: `Name: glyph glyph glyph`.
     pub fn open_palette_prompt(&mut self) {
         let candidates = self

@@ -1,0 +1,837 @@
+{
+  "format": "glyphforge",
+  "schema_version": 3,
+  "meta": {
+    "title": "",
+    "author": "",
+    "description": ""
+  },
+  "theme": {
+    "id": "amber-crt",
+    "name": "Amber CRT",
+    "colors": {
+      "background": "#140c02",
+      "border": "#7a4f12",
+      "border-muted": "#4a3008",
+      "error": "#ff6a3d",
+      "focus": "#ffcc33",
+      "foreground": "#ffb000",
+      "foreground-muted": "#bb7f08",
+      "info": "#ffd480",
+      "primary": "#ffcc33",
+      "secondary": "#ff8c1a",
+      "selection": "#5c3c0a",
+      "selection-foreground": "#ffe9b0",
+      "success": "#ffb000",
+      "surface": "#1c1205",
+      "surface-alt": "#26190a",
+      "warning": "#ffcc33"
+    },
+    "border": "double",
+    "spacing": {
+      "padding": 1,
+      "gap": 1
+    }
+  },
+  "data": {
+    "orders": {
+      "columns": [
+        "id",
+        "name",
+        "total",
+        "status"
+      ],
+      "rows": [
+        [
+          "98121",
+          "Kowalski & Co",
+          "4,980.00",
+          "paid"
+        ],
+        [
+          "98117",
+          "Ostrander GmbH",
+          "3,214.50",
+          "paid"
+        ],
+        [
+          "98130",
+          "Hallström AB",
+          "2,870.00",
+          "pending"
+        ],
+        [
+          "98109",
+          "Nakamura KK",
+          "2,402.75",
+          "refunded"
+        ],
+        [
+          "98126",
+          "Duarte Lda",
+          "1,990.10",
+          "paid"
+        ]
+      ]
+    }
+  },
+  "screens": [
+    {
+      "id": "main",
+      "name": "Main",
+      "size": {
+        "width": 100,
+        "height": 30
+      },
+      "layers": [
+        {
+          "id": "main-artwork",
+          "name": "Artwork",
+          "visible": true,
+          "locked": false,
+          "kind": "artwork",
+          "cells": {
+            "width": 100,
+            "height": 30
+          }
+        },
+        {
+          "id": "main-ui",
+          "name": "UI",
+          "visible": true,
+          "locked": false,
+          "kind": "interface",
+          "components": [
+            {
+              "id": "app",
+              "kind": "group",
+              "layout": {
+                "placement": {
+                  "mode": "flow"
+                },
+                "width": "fill",
+                "height": "fill",
+                "min_width": null,
+                "max_width": null,
+                "min_height": null,
+                "max_height": null,
+                "padding": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "margin": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "container": {
+                  "direction": "vertical",
+                  "gap": 0,
+                  "columns": 0,
+                  "align": "stretch"
+                }
+              },
+              "children": [
+                {
+                  "id": "header",
+                  "kind": "group",
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fill",
+                    "height": "fixed(1)",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "horizontal",
+                      "gap": 2,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  },
+                  "children": [
+                    {
+                      "id": "db-title",
+                      "kind": "heading",
+                      "props": {
+                        "text": "pgx://analytics@db-01"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "content",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "conn",
+                      "kind": "tag",
+                      "props": {
+                        "text": "read-only"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "content",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "hdr-space",
+                      "kind": "group",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "latency",
+                      "kind": "label",
+                      "props": {
+                        "color": "foreground-muted",
+                        "text": "12 ms"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "content",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "workspace",
+                  "kind": "group",
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fill",
+                    "height": "fill",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "horizontal",
+                      "gap": 1,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  },
+                  "children": [
+                    {
+                      "id": "schema",
+                      "kind": "panel",
+                      "props": {
+                        "title": "Schemas"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fixed(26)",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 1,
+                          "bottom": 0,
+                          "left": 1
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "schema-tree",
+                          "kind": "tree",
+                          "props": {
+                            "items": [
+                              "public",
+                              "  orders",
+                              "  order_items",
+                              "  customers",
+                              "  products",
+                              "analytics",
+                              "  daily_revenue",
+                              "  cohorts",
+                              "+pg_catalog"
+                            ],
+                            "selected": 1
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "work",
+                      "kind": "group",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 1,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "editor",
+                          "kind": "panel",
+                          "props": {
+                            "title": "Query 1"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fixed(7)",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 1,
+                              "bottom": 0,
+                              "left": 1
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "sql",
+                              "kind": "code",
+                              "props": {
+                                "line_numbers": true,
+                                "text": "select o.id, c.name, o.total, o.status\n  from orders o\n  join customers c on c.id = o.customer_id\n where o.created_at > now() - interval '1 day'\n order by o.total desc limit 50;"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "fill",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "results",
+                          "kind": "panel",
+                          "props": {
+                            "title": "Results · 5 of 142 rows"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 1,
+                              "bottom": 0,
+                              "left": 1
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "grid",
+                              "kind": "datagrid",
+                              "props": {
+                                "bind": "orders"
+                              },
+                              "layout": {
+                                "placement": {
+                                  "mode": "flow"
+                                },
+                                "width": "fill",
+                                "height": "fill",
+                                "min_width": null,
+                                "max_width": null,
+                                "min_height": null,
+                                "max_height": null,
+                                "padding": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "margin": {
+                                  "top": 0,
+                                  "right": 0,
+                                  "bottom": 0,
+                                  "left": 0
+                                },
+                                "container": {
+                                  "direction": "vertical",
+                                  "gap": 0,
+                                  "columns": 0,
+                                  "align": "stretch"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "details",
+                      "kind": "panel",
+                      "props": {
+                        "title": "orders"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fixed(28)",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 1,
+                          "bottom": 0,
+                          "left": 1
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "table-props",
+                          "kind": "propertygrid",
+                          "props": {
+                            "items": [
+                              "Table=orders",
+                              "Rows=1 284 033",
+                              "Size=412 MB",
+                              "Indexes=4",
+                              "Vacuumed=2 h ago"
+                            ]
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fixed(6)",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        },
+                        {
+                          "id": "rev-title",
+                          "kind": "label",
+                          "props": {
+                            "color": "foreground-muted",
+                            "text": "Revenue, 14 days"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fixed(1)",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        },
+                        {
+                          "id": "revenue",
+                          "kind": "barchart",
+                          "props": {
+                            "labels": [],
+                            "style": "block",
+                            "values": [
+                              4,
+                              6,
+                              5,
+                              7,
+                              9,
+                              8,
+                              10,
+                              12,
+                              9,
+                              11,
+                              13,
+                              12,
+                              14,
+                              16
+                            ]
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fixed(6)",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "status",
+                  "kind": "statusbar",
+                  "props": {
+                    "items": [
+                      "NORMAL",
+                      "analytics",
+                      "UTF8"
+                    ],
+                    "right": "F5 run · F6 explain"
+                  },
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fill",
+                    "height": "fixed(1)",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "vertical",
+                      "gap": 0,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -650,6 +650,7 @@ impl App {
             PromptKind::InsertSymbol => self.submit_insert_symbol(&value),
             PromptKind::Recover => self.submit_recover(&value),
             PromptKind::Export => self.submit_export(&value),
+            PromptKind::Template => self.submit_template(&value),
             PromptKind::OpenDocument => {
                 let path = std::path::PathBuf::from(prompt.input.trim());
                 match glyphforge_core::api::Session::open(&path) {

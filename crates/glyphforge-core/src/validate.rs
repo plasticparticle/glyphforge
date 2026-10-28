@@ -206,12 +206,16 @@ pub fn validate_screen(
                     }
                 }
             }
-            // Truncated text.
+            // Truncated text (single-line kinds; viewers wrap or scroll).
+            let multiline = matches!(
+                c.kind.as_str(),
+                "markdown" | "code" | "log" | "diff" | "textarea" | "dialog" | "notification"
+            );
             let text = c
                 .prop_str("title")
                 .or_else(|| c.prop_str("text"))
                 .or_else(|| c.prop_str("label"));
-            if let Some(text) = text.filter(|t| !t.is_empty()) {
+            if let Some(text) = text.filter(|t| !t.is_empty() && !multiline) {
                 let available = if c.kind == "panel" {
                     rect.width.saturating_sub(4)
                 } else if c.kind == "button" {

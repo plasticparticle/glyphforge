@@ -85,6 +85,7 @@ main.rs, cli.rs  argument parsing; TUI by default, subcommands headless
 headless.rs      inspect / render / validate / apply / propose / import /
                  export / kinds / new
 image.rs         PNG decoding and the import patch
+templates.rs     the examples compiled in as templates
 app/             App state, dispatch (behaviour), run loop, viewport,
                  interface (selection), inspector (editable rows),
                  arrange (align, distribute, snapping),
@@ -434,6 +435,9 @@ glyphforge import   FILE IMAGE.png|ART.txt|ART.ans [--mode M] [--x X --y Y]
 glyphforge new      FILE [--width W --height H]
 glyphforge propose  FILE PATCH.json [--agent NAME] [-m MESSAGE]
 glyphforge kinds    [KIND] [--json]
+glyphforge templates
+glyphforge new      FILE --template NAME [--theme ID]
+glyphforge library  export|import ...
 ```
 
 `propose` validates the patch against the file, then writes it to

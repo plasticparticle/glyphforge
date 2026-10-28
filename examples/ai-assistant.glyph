@@ -1,0 +1,821 @@
+{
+  "format": "glyphforge",
+  "schema_version": 3,
+  "meta": {
+    "title": "",
+    "author": "",
+    "description": ""
+  },
+  "theme": {
+    "id": "nebula",
+    "name": "Nebula",
+    "colors": {
+      "background": "#120a1f",
+      "border": "#5a3d8c",
+      "border-muted": "#35235a",
+      "error": "#ff5d8f",
+      "focus": "#ff6ec7",
+      "foreground": "#ece6ff",
+      "foreground-muted": "#a594d1",
+      "frame-from": "#7aa2ff",
+      "frame-to": "#ff6ec7",
+      "info": "#7aa2ff",
+      "primary": "#c77dff",
+      "secondary": "#ff6ec7",
+      "selection": "#3b2566",
+      "selection-foreground": "#ffffff",
+      "success": "#5eead4",
+      "surface": "#1a0f2b",
+      "surface-alt": "#241739",
+      "warning": "#ffd166"
+    },
+    "border": "rounded",
+    "spacing": {
+      "padding": 1,
+      "gap": 1
+    }
+  },
+  "screens": [
+    {
+      "id": "main",
+      "name": "Main",
+      "size": {
+        "width": 100,
+        "height": 30
+      },
+      "layers": [
+        {
+          "id": "main-artwork",
+          "name": "Artwork",
+          "visible": true,
+          "locked": false,
+          "kind": "artwork",
+          "cells": {
+            "width": 100,
+            "height": 30
+          }
+        },
+        {
+          "id": "main-ui",
+          "name": "UI",
+          "visible": true,
+          "locked": false,
+          "kind": "interface",
+          "components": [
+            {
+              "id": "app",
+              "kind": "group",
+              "layout": {
+                "placement": {
+                  "mode": "flow"
+                },
+                "width": "fill",
+                "height": "fill",
+                "min_width": null,
+                "max_width": null,
+                "min_height": null,
+                "max_height": null,
+                "padding": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "margin": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "container": {
+                  "direction": "horizontal",
+                  "gap": 1,
+                  "columns": 0,
+                  "align": "stretch"
+                }
+              },
+              "children": [
+                {
+                  "id": "threads",
+                  "kind": "panel",
+                  "props": {
+                    "title": "Conversations"
+                  },
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fixed(24)",
+                    "height": "fill",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 1,
+                      "bottom": 0,
+                      "left": 1
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "vertical",
+                      "gap": 0,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  },
+                  "children": [
+                    {
+                      "id": "thread-list",
+                      "kind": "list",
+                      "props": {
+                        "items": [
+                          "Fix flaky test",
+                          "Add octant mode",
+                          "Refactor dispatch",
+                          "Explain OKLab",
+                          "Write README"
+                        ],
+                        "selected": 0
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "new-chat",
+                      "kind": "button",
+                      "props": {
+                        "label": "New chat",
+                        "primary": true
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fixed(1)",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "chat",
+                  "kind": "group",
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fill",
+                    "height": "fill",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "vertical",
+                      "gap": 1,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  },
+                  "children": [
+                    {
+                      "id": "transcript",
+                      "kind": "panel",
+                      "props": {
+                        "title": "Chat"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 1,
+                          "bottom": 0,
+                          "left": 1
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "conversation",
+                          "kind": "markdown",
+                          "props": {
+                            "text": "## Fix flaky test\n**You** the snap test fails on CI about one run in ten\n\n**Assistant** Two tests share `glyphforge-omarchy-<pid>`\nas a temp directory and run in parallel; one deletes it\nwhile the other writes. Give each test its own name:"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        },
+                        {
+                          "id": "snippet",
+                          "kind": "code",
+                          "props": {
+                            "line_numbers": true,
+                            "start": 239,
+                            "text": "let dir = std::env::temp_dir()\n    .join(format!(\"glyphforge-theme-poll-{}\", pid));"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fixed(4)",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        },
+                        {
+                          "id": "thinking",
+                          "kind": "spinner",
+                          "props": {
+                            "frame": 3,
+                            "label": "Running the test suite…"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fixed(1)",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "composer",
+                      "kind": "group",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fixed(3)",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "horizontal",
+                          "gap": 1,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "prompt",
+                          "kind": "textarea",
+                          "props": {
+                            "placeholder": "Ask about the code…  (Ctrl+Enter sends)",
+                            "state": "focused"
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fill",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        },
+                        {
+                          "id": "send",
+                          "kind": "button",
+                          "props": {
+                            "label": "Send",
+                            "on_activate": "open:sent",
+                            "primary": true
+                          },
+                          "layout": {
+                            "placement": {
+                              "mode": "flow"
+                            },
+                            "width": "fixed(10)",
+                            "height": "fill",
+                            "min_width": null,
+                            "max_width": null,
+                            "min_height": null,
+                            "max_height": null,
+                            "padding": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "margin": {
+                              "top": 0,
+                              "right": 0,
+                              "bottom": 0,
+                              "left": 0
+                            },
+                            "container": {
+                              "direction": "vertical",
+                              "gap": 0,
+                              "columns": 0,
+                              "align": "stretch"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "context",
+                  "kind": "panel",
+                  "props": {
+                    "title": "Context"
+                  },
+                  "layout": {
+                    "placement": {
+                      "mode": "flow"
+                    },
+                    "width": "fixed(26)",
+                    "height": "fill",
+                    "min_width": null,
+                    "max_width": null,
+                    "min_height": null,
+                    "max_height": null,
+                    "padding": {
+                      "top": 0,
+                      "right": 1,
+                      "bottom": 0,
+                      "left": 1
+                    },
+                    "margin": {
+                      "top": 0,
+                      "right": 0,
+                      "bottom": 0,
+                      "left": 0
+                    },
+                    "container": {
+                      "direction": "vertical",
+                      "gap": 0,
+                      "columns": 0,
+                      "align": "stretch"
+                    }
+                  },
+                  "children": [
+                    {
+                      "id": "ctx-files",
+                      "kind": "list",
+                      "props": {
+                        "items": [
+                          "app/autosave.rs",
+                          "omarchy/mod.rs",
+                          "Cargo.toml"
+                        ],
+                        "marker": "◆"
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fixed(5)",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "ctx-div",
+                      "kind": "divider",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fixed(1)",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "tokens",
+                      "kind": "gauge",
+                      "props": {
+                        "critical": 90,
+                        "label": "Context",
+                        "value": 38,
+                        "warn": 70
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fixed(1)",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "model",
+                      "kind": "keyvalue",
+                      "props": {
+                        "items": [
+                          "Model=opus",
+                          "Mode=plan",
+                          "Cost=$0.42"
+                        ]
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fixed(3)",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "ctx-space",
+                      "kind": "group",
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fill",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    },
+                    {
+                      "id": "hint",
+                      "kind": "keyhint",
+                      "props": {
+                        "items": [
+                          "⏎|send",
+                          "↑|edit",
+                          "esc|stop"
+                        ]
+                      },
+                      "layout": {
+                        "placement": {
+                          "mode": "flow"
+                        },
+                        "width": "fill",
+                        "height": "fixed(1)",
+                        "min_width": null,
+                        "max_width": null,
+                        "min_height": null,
+                        "max_height": null,
+                        "padding": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "margin": {
+                          "top": 0,
+                          "right": 0,
+                          "bottom": 0,
+                          "left": 0
+                        },
+                        "container": {
+                          "direction": "vertical",
+                          "gap": 0,
+                          "columns": 0,
+                          "align": "stretch"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "sent",
+              "kind": "toast",
+              "props": {
+                "hidden": true,
+                "level": "success",
+                "text": "Message sent"
+              },
+              "layout": {
+                "placement": {
+                  "mode": "absolute",
+                  "x": 60,
+                  "y": 26
+                },
+                "width": "fixed(24)",
+                "height": "fixed(1)",
+                "min_width": null,
+                "max_width": null,
+                "min_height": null,
+                "max_height": null,
+                "padding": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "margin": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "container": {
+                  "direction": "vertical",
+                  "gap": 0,
+                  "columns": 0,
+                  "align": "stretch"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

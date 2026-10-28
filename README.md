@@ -98,6 +98,27 @@ document; it appears as an extra brush page.
 An `artwork` component places a region of an artwork layer by layout, so
 a logo can sit inside a sidebar and disappear with it on narrow terminals.
 
+## Templates and examples
+
+Six designs in `examples/`, each with its own theme, double as templates:
+
+| Template | Shows |
+|----------|-------|
+| `system-monitor` | sparklines, panels, a service list (minimal dark) |
+| `developer-dashboard` | breadcrumbs, tabs, gauges, a Braille line chart, a bound table, a log (cobalt) |
+| `git-client` | toolbar, a branch tree, commit history, a diff, status bar (verdant) |
+| `ai-assistant` | Markdown chat, code, a composer, context gauge, a toast the Send button opens (nebula) |
+| `database-explorer` | schema tree, SQL with line numbers, a data grid, property grid, bar chart (amber CRT) |
+| `settings` | a menu and a form with every control, a notification on save (paper, light) |
+
+```sh
+glyphforge templates
+glyphforge new mine.glyph --template git-client [--theme ember]
+```
+
+In the editor, **New From Template** (command palette) does the same.
+`scripts/build_examples.py` rebuilds the examples through the CLI.
+
 ## Try it
 
 ```sh
