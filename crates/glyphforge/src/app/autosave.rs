@@ -49,8 +49,15 @@ impl App {
         use crate::config::ThemeSource;
         let follows = self.ui_theme_choice.is_none()
             && self.is_omarchy
-            && matches!(self.config.theme.source, ThemeSource::Auto | ThemeSource::Omarchy);
-        if !follows || self.last_theme_poll.is_some_and(|t| t.elapsed() < THEME_POLL) {
+            && matches!(
+                self.config.theme.source,
+                ThemeSource::Auto | ThemeSource::Omarchy
+            );
+        if !follows
+            || self
+                .last_theme_poll
+                .is_some_and(|t| t.elapsed() < THEME_POLL)
+        {
             return false;
         }
         self.last_theme_poll = Some(Instant::now());
@@ -231,7 +238,8 @@ mod tests {
 
     #[test]
     fn omarchy_theme_changes_are_picked_up() {
-        let dir = std::env::temp_dir().join(format!("glyphforge-omarchy-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("glyphforge-theme-poll-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let theme_dir = dir.join("config/current/theme");
         std::fs::create_dir_all(&theme_dir).unwrap();
@@ -239,7 +247,17 @@ mod tests {
         let colors = |accent: &str| {
             format!(
                 "accent = \"{accent}\"\nforeground = \"#cccccc\"\nbackground = \"#111111\"\n{}",
-                (0..16).map(|i| format!("color{i} = \"#{:02x}{:02x}{:02x}\"\n", i * 10, i * 9, i * 8)).collect::<String>()
+                (0..16).fold(String::new(), |mut out, i| {
+                    use std::fmt::Write as _;
+                    let _ = writeln!(
+                        out,
+                        "color{i} = \"#{:02x}{:02x}{:02x}\"",
+                        i * 10,
+                        i * 9,
+                        i * 8
+                    );
+                    out
+                })
             )
         };
         std::fs::write(theme_dir.join("colors.toml"), colors("#ff0000")).unwrap();
@@ -252,12 +270,18 @@ mod tests {
         app.config.theme.source = crate::config::ThemeSource::Omarchy;
         app.state_dir = Some(dir.join("state"));
         app.load_ui_theme();
-        assert!(!app.poll_omarchy_theme(), "first poll only records the stamp");
+        assert!(
+            !app.poll_omarchy_theme(),
+            "first poll only records the stamp"
+        );
         std::thread::sleep(Duration::from_millis(30));
         std::fs::write(theme_dir.join("colors.toml"), colors("#00ff00")).unwrap();
         app.last_theme_poll = None;
         assert!(app.poll_omarchy_theme(), "a change reloads");
-        assert_eq!(app.ui_theme.color("primary"), glyphforge_core::Color::Rgb(0, 255, 0));
+        assert_eq!(
+            app.ui_theme.color("primary"),
+            glyphforge_core::Color::Rgb(0, 255, 0)
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
