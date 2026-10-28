@@ -166,6 +166,43 @@ impl App {
                 });
             }
         }
+        if let Some(c) = self.selection().and_then(|id| self.doc().component(id)) {
+            let d = self.session.registry().descriptor(&c.kind);
+            for spec in d.iter().flat_map(|d| d.props.iter()) {
+                let name = spec.name;
+                match spec.kind {
+                    glyphforge_core::render::PropKind::List => {
+                        context_entries.push(Command {
+                            title: format!("Add To {name}…"),
+                            group: c.kind.clone(),
+                            key: String::new(),
+                            words: format!("{name} append item row column tab option"),
+                            action: Action::ListAdd(name.to_owned()),
+                        });
+                        context_entries.push(Command {
+                            title: format!("Remove Last From {name}"),
+                            group: c.kind.clone(),
+                            key: String::new(),
+                            words: format!("{name} delete pop item row column tab option"),
+                            action: Action::ListPop(name.to_owned()),
+                        });
+                    }
+                    glyphforge_core::render::PropKind::Index => {
+                        for (title, step) in [("Select Next Item", 1), ("Select Previous Item", -1)]
+                        {
+                            context_entries.push(Command {
+                                title: title.to_owned(),
+                                group: c.kind.clone(),
+                                key: String::new(),
+                                words: "selected tab row item highlight".to_owned(),
+                                action: Action::StepSelected(step),
+                            });
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
         if self.design_mode() == DesignMode::Interface {
             for d in self.session.registry().descriptors() {
                 let words = format!(
@@ -394,6 +431,93 @@ impl App {
             )
     }
 
+    /// The list property `name` of the primary selection as values.
+    fn list_prop(&self, name: &str) -> Option<(ObjectId, Vec<Value>)> {
+        let c = self.selection().and_then(|id| self.doc().component(id))?;
+        let items = match c.prop(name) {
+            Some(Value::List(items)) => items.clone(),
+            Some(Value::Str(s)) => s.split(',').map(|p| Value::from(p.trim())).collect(),
+            _ => Vec::new(),
+        };
+        Some((c.id.clone(), items))
+    }
+
+    pub fn open_list_add(&mut self, name: &str) {
+        self.prompt = Some(Prompt::new(
+            PromptKind::ListAdd(name.to_owned()),
+            format!("Add to {name}: text, or JSON for a row ([\"a\", \"b\"])"),
+            vec![],
+        ));
+    }
+
+    pub(super) fn submit_list_add(&mut self, name: &str, text: &str) {
+        let Some((id, mut items)) = self.list_prop(name) else {
+            return;
+        };
+        let text = text.trim();
+        if text.is_empty() {
+            return;
+        }
+        items.push(serde_json::from_str(text).unwrap_or_else(|_| Value::from(text)));
+        self.set_list(&id, name, items, "Add item");
+    }
+
+    pub fn list_pop(&mut self, name: &str) {
+        let Some((id, mut items)) = self.list_prop(name) else {
+            return;
+        };
+        if items.pop().is_none() {
+            return self.set_status(StatusKind::Info, format!("{name} is empty"));
+        }
+        self.set_list(&id, name, items, "Remove item");
+    }
+
+    fn set_list(&mut self, id: &ObjectId, name: &str, items: Vec<Value>, label: &str) {
+        let n = items.len();
+        if self.apply(
+            Patch::single(Operation::SetProperty {
+                target: id.clone(),
+                property: name.to_owned(),
+                value: Value::List(items),
+            }),
+            label,
+        ) {
+            self.set_status(StatusKind::Info, format!("{name}: {n} item(s)"));
+        }
+    }
+
+    /// Moves `selected` by `step`, wrapping within the component's items.
+    pub fn step_selected(&mut self, step: i64) {
+        let Some(c) = self
+            .selection()
+            .and_then(|id| self.doc().component(id))
+            .cloned()
+        else {
+            return;
+        };
+        let count = ["items", "rows", "options"]
+            .iter()
+            .find_map(|k| match c.prop(k) {
+                Some(Value::List(l)) => Some(l.len()),
+                _ => None,
+            })
+            .unwrap_or(1)
+            .max(1);
+        let count = i64::try_from(count).unwrap_or(1);
+        let current = c.prop_int("selected").unwrap_or(0);
+        let next = (current + step).rem_euclid(count);
+        if self.apply(
+            Patch::single(Operation::SetProperty {
+                target: c.id.clone(),
+                property: "selected".into(),
+                value: Value::Int(next),
+            }),
+            "Select item",
+        ) {
+            self.set_status(StatusKind::Info, format!("selected = {next}"));
+        }
+    }
+
     /// Prompt for a data fixture: `key = JSON` (an empty value removes it).
     pub fn open_edit_data(&mut self) {
         let candidates = self
@@ -528,5 +652,57 @@ mod tests {
         app.mark_edited();
         let rendered = app.session.render_text(&app.editor.screen, None).unwrap();
         assert!(rendered.starts_with("▁▄█▃"), "{rendered:?}");
+    }
+
+    #[test]
+    fn component_specific_commands_edit_lists_and_selection() {
+        let mut app = test_app(Size::new(40, 6));
+        app.dispatch(Action::LayerNext);
+        let layer = app.editor.layer.clone();
+        let id = app
+            .session
+            .add_component("tabs", Some("tabs"), 0, 0, None, Some(layer))
+            .unwrap();
+        app.mark_edited();
+        app.select(Some(id.clone()));
+        app.dispatch(Action::CommandPalette);
+        let titles: Vec<String> = app
+            .palette_matches()
+            .iter()
+            .map(|c| c.title.clone())
+            .collect();
+        assert!(titles.contains(&"Add To items…".to_owned()), "{titles:?}");
+        assert!(titles.contains(&"Select Next Item".to_owned()));
+        app.palette = None;
+        app.dispatch(Action::ListAdd("items".into()));
+        app.prompt.as_mut().unwrap().input = "Metrics".into();
+        app.dispatch(Action::PromptSubmit);
+        let items = app
+            .doc()
+            .component(&id)
+            .unwrap()
+            .prop("items")
+            .unwrap()
+            .as_list()
+            .unwrap()
+            .len();
+        assert_eq!(items, 4);
+        app.dispatch(Action::StepSelected(-1));
+        assert_eq!(
+            app.doc().component(&id).unwrap().prop_int("selected"),
+            Some(3)
+        );
+        app.dispatch(Action::ListPop("items".into()));
+        assert_eq!(
+            app.doc()
+                .component(&id)
+                .unwrap()
+                .prop("items")
+                .unwrap()
+                .as_list()
+                .unwrap()
+                .len(),
+            3
+        );
     }
 }

@@ -277,7 +277,10 @@ Toggle All Panels), recently used commands first. It also lists what the
 moment offers: component kinds to add on interface layers, layers to
 switch to, editor themes, and for a cell selection Flip Horizontally /
 Vertically, Swap Colours and Make Component From Selection (an `artwork`
-component showing those cells, placed where they are).
+component showing those cells, placed where they are). With a component
+selected it offers that kind's own actions: add to or remove from its
+lists (tabs, items, columns, rows, options) and select the next or
+previous item.
 
 All bindings are configurable. The mode follows the active layer: an
 interface layer puts the editor in INTERFACE mode, an artwork layer in

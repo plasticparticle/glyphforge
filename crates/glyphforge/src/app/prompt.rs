@@ -40,6 +40,8 @@ pub enum PromptKind {
     Export,
     /// A template for a new document.
     Template,
+    /// An item to append to a list property.
+    ListAdd(String),
     /// Restore or discard an autosave found on start.
     Recover,
     ImportLibrary,

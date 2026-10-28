@@ -213,8 +213,9 @@ with stable codes.
 - [x] Cell selection: flip horizontally/vertically (box glyphs mirrored
       through their arms, arrows and blocks through pair tables), swap
       colours, make an `artwork` component from the selection
-- [ ] Component-specific actions (table columns, tab pages) arrive with
-      those kinds in P1
+- [x] Component-specific actions from the descriptor: add to / remove
+      from any list property (tabs, items, columns, rows, options),
+      select next/previous item
 
 ### E6 — Layers and screens UI  `[x]`
 - [x] Interactive layer list with its own focus: activate, show/hide,

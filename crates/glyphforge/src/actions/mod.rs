@@ -227,6 +227,11 @@ pub enum Action {
     TogglePrototype,
     ScreenOverview,
     NewFromTemplate,
+    /// Appends to a list property of the selection (prompt).
+    ListAdd(String),
+    ListPop(String),
+    /// Moves `selected` of the selection by this many items.
+    StepSelected(i64),
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,

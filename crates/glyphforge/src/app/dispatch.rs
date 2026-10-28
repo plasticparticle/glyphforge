@@ -269,6 +269,9 @@ impl App {
             Action::TogglePrototype => self.toggle_prototype(),
             Action::ScreenOverview => self.open_overview(),
             Action::NewFromTemplate => self.open_template_prompt(),
+            Action::ListAdd(name) => self.open_list_add(&name),
+            Action::ListPop(name) => self.list_pop(&name),
+            Action::StepSelected(step) => self.step_selected(step),
             Action::SetDocTheme(id) => {
                 self.menu = None;
                 self.set_document_theme(&id);
