@@ -16,6 +16,7 @@ mod pixel_select;
 mod pixels;
 mod problems;
 mod prompt;
+mod prototype;
 mod review;
 mod run;
 mod selection;
@@ -203,6 +204,8 @@ pub struct App {
     pub themes_dir: Option<std::path::PathBuf>,
     /// The open gradient editor.
     pub gradient_editor: Option<gradient_editor::GradientEditor>,
+    /// Prototype mode, when running.
+    pub prototype: Option<prototype::Prototype>,
     /// The open "Check Design" panel.
     pub problems: Option<problems::Problems>,
     /// The open review of agent changes.
@@ -319,6 +322,7 @@ impl App {
             custom_themes: Vec::new(),
             themes_dir: init.themes_dir,
             gradient_editor: None,
+            prototype: None,
             problems: None,
             review: None,
             pending_proposals: 0,
@@ -478,6 +482,9 @@ impl App {
 
     /// The rendered active screen, recomputed only after edits.
     pub fn composite(&mut self) -> &Canvas {
+        if self.composite_cache.is_none() && self.prototype.is_some() {
+            self.composite_cache = self.prototype_canvas();
+        }
         if self.composite_cache.is_none() {
             let rendered = match self
                 .session

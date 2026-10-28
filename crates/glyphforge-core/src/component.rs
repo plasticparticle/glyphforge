@@ -135,6 +135,11 @@ impl Component {
                 out.layout = layout;
             }
         }
+        // `hidden` (often a closed modal) keeps it out of layout and render;
+        // prototypes open it by clearing the property.
+        if out.prop_bool("hidden") == Some(true) {
+            return None;
+        }
         out.responsive.clear();
         out.children = self
             .children

@@ -67,6 +67,15 @@ pub fn validate(doc: &Document, registry: &Registry) -> Vec<Diagnostic> {
             ),
         });
     }
+    for (link, action) in crate::prototype::broken_links(doc) {
+        out.push(Diagnostic {
+            severity: Severity::Warning,
+            code: "broken-link",
+            screen: Some(link.screen),
+            target: Some(link.component),
+            message: format!("on_activate: {} points at nothing", action.describe()),
+        });
+    }
     for screen in doc.screens() {
         out.extend(validate_props(screen, registry));
         out.extend(validate_screen(screen, &doc.theme, registry, screen.size()));

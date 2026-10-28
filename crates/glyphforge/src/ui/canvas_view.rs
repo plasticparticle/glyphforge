@@ -210,6 +210,27 @@ fn draw_overlays(app: &App, buf: &mut ratatui::buffer::Buffer, canvas_area: Rect
         }
     }
 
+    // Prototype: the live component with keyboard focus.
+    if let Some(proto) = &app.prototype {
+        let live = app.live_components();
+        if let Some((_, rect)) = live.get(proto.focus.min(live.len().saturating_sub(1))) {
+            let style = styles::accent(app).add_modifier(Modifier::REVERSED);
+            for pos in rect.positions().filter(|p| viewport.contains(*p)) {
+                if pos.y == rect.y
+                    || u32::from(pos.y) + 1 == rect.bottom()
+                    || pos.x == rect.x
+                    || u32::from(pos.x) + 1 == rect.right()
+                {
+                    let sx = canvas_area.x + (pos.x - viewport.x);
+                    let sy = canvas_area.y + (pos.y - viewport.y);
+                    if let Some(cell) = buf.cell_mut((sx, sy)) {
+                        cell.set_style(style);
+                    }
+                }
+            }
+        }
+    }
+
     // Snap guides while dragging: dotted lines in the accent colour.
     let guide_style = styles::accent(app);
     for guide in app.active_guides() {

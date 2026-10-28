@@ -50,6 +50,18 @@ or series under a key, and a component's `bind` property points at it.
 A fixture can be a list, or a map with several fields (`columns` and
 `rows` for a table).
 
+## Prototypes
+
+Give components an `on_activate` action and press **F12** to click
+through the design: `goto:settings` shows another screen,
+`open:about-dialog`, `close:…` and `toggle:…` show and hide components
+(start a modal with `hidden: true`), `select:tabs=2` selects a tab or list
+item, `back` returns; chain with `;` (`close:confirm;goto:main`). Tab and
+Enter work without a mouse, Backspace goes back, F12 or Esc stops. What
+the prototype opens is never written to the document. **Screen Graph**
+(command palette) lists every screen with its incoming and outgoing
+links, and validation reports links that point at nothing.
+
 ## Symbols and libraries
 
 Select a component and run **Make Symbol** (Ctrl+K): it becomes a symbol

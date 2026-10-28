@@ -70,6 +70,7 @@ validate.rs      deterministic diagnostics with stable codes
 project.rs       .glyph envelope, schema_version, migration chain, atomic save
 proposal.rs      agent proposals stored beside a file for review
 symbol.rs        symbols, instance expansion, glyph palettes, libraries
+prototype.rs     navigation actions, links, screen graph
 export/          ansi (export at three depths, SGR import), handoff
                  (YAML), codegen (Exporter: ratatui, textual, bubbletea,
                  ink)
@@ -600,6 +601,13 @@ drag opens one transaction and
   editor state: `doc_size()`, the composite and the layout use it, so
   responsive rules, selection and hit-testing follow while the document
   keeps its size.
+- **Prototype mode.** `Prototype` holds the hidden/selected overrides
+  the actions made and a back stack. While it runs, the composite is the
+  active screen cloned with those overrides applied as properties
+  (`hidden`, `selected`) and rendered normally; hit-testing solves the
+  same clone. Keys and clicks only navigate. `Registry::descriptor` adds
+  `on_activate` to clickable kinds and `hidden` to containers and
+  feedback kinds, so every renderer gets them without code.
 - **Mouse.** Resize handles are computed from the solved rect
   (`mouse::handle_at`); a drag moves the grabbed edges, snaps the moving
   corner cell and records `move` + `resize` into the open transaction.

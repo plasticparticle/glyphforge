@@ -224,6 +224,8 @@ pub enum Action {
     EditPalette,
     Export,
     CheckDesign,
+    TogglePrototype,
+    ScreenOverview,
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,
@@ -396,6 +398,8 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("import-library", "Import Library", File, Action::ImportLibrary, keys: [], kw: ["library", "symbols", "shared", "kit", "design system"], aliases: [], implemented: true),
             desc!("export-library", "Export Library", File, Action::ExportLibrary, keys: [], kw: ["library", "symbols", "share", "kit", "design system"], aliases: [], implemented: true),
             desc!("edit-palette", "Edit Glyph Palette", Paint, Action::EditPalette, keys: [], kw: ["palette", "glyphs", "characters", "brushes", "library"], aliases: [], implemented: true),
+            desc!("prototype", "Run Prototype", View, Action::TogglePrototype, keys: ["f12"], kw: ["play", "preview", "click through", "navigate", "demo"], aliases: ["play"], implemented: true),
+            desc!("screen-overview", "Screen Graph", View, Action::ScreenOverview, keys: [], kw: ["screens", "links", "navigation", "flow", "overview", "map"], aliases: ["flow"], implemented: true),
             desc!("check-design", "Check Design", Application, Action::CheckDesign, keys: ["f5"], kw: ["validate", "lint", "problems", "contrast", "suggestions", "advice"], aliases: ["validate"], implemented: true),
             desc!("review", "Review Agent Changes", Application, Action::Review, keys: ["f9"], kw: ["agent", "proposal", "accept", "reject", "revert", "ai", "patch"], aliases: ["proposals"], implemented: true),
             desc!("new-document", "New Document", File, Action::NewDocument, keys: ["ctrl+n"], kw: ["create", "canvas"], aliases: ["new"], implemented: true),

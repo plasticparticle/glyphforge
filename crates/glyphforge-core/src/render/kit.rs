@@ -73,6 +73,25 @@ pub fn state_prop() -> PropSpec {
     .default("normal")
 }
 
+/// The `on_activate` property spec: prototype navigation.
+pub fn action_prop() -> PropSpec {
+    PropSpec::new(
+        "on_activate",
+        PropKind::Text,
+        "prototype action: goto:<screen>, open:/close:/toggle:<id>, select:<id>=<n>, back",
+    )
+}
+
+/// The `hidden` property spec: kept out of layout until a prototype
+/// action opens it.
+pub fn hidden_prop() -> PropSpec {
+    PropSpec::new(
+        "hidden",
+        PropKind::Bool,
+        "hidden until opened (modals, dialogs)",
+    )
+}
+
 /// The `bind` property spec: read data from the document's fixtures.
 pub fn bind_prop() -> PropSpec {
     PropSpec::new(

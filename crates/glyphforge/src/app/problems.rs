@@ -17,6 +17,7 @@ pub struct Problem {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Problems {
+    pub title: String,
     pub items: Vec<Problem>,
     pub selected: usize,
 }
@@ -67,7 +68,11 @@ impl App {
                 items.len()
             ),
         );
-        self.problems = Some(Problems { items, selected: 0 });
+        self.problems = Some(Problems {
+            title: "Check design · ⏎ go to component  ↑↓ choose  Esc close".to_owned(),
+            items,
+            selected: 0,
+        });
     }
 
     pub fn problems_move(&mut self, down: bool) {

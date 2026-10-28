@@ -19,6 +19,7 @@ pub mod paint;
 pub mod patch;
 pub mod project;
 pub mod proposal;
+pub mod prototype;
 pub mod raster;
 pub mod render;
 pub mod stamp;

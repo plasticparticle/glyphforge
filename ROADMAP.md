@@ -281,9 +281,13 @@ developer dashboard, Git client, AI coding assistant, database explorer,
 settings application), each with a distinct aesthetic; the shipped
 `examples/dashboard.glyph` is the first.
 
-### P5 — Multi-screen prototypes and overview  `[ ]`
-Navigation actions (open dialog, switch tab, go to screen, close modal),
-prototype mode, screen graph overview.
+### P5 — Multi-screen prototypes and overview  `[x]`
+- [x] `on_activate` actions: goto, open, close, toggle, select, back,
+      chained with `;`; `hidden` property honoured by layout and render
+- [x] Prototype mode (F12): mouse and keyboard, back stack, overrides as
+      editor state applied to a copy of the screen
+- [x] Screen graph (incoming/outgoing links, jump to the link) and the
+      `broken-link` diagnostic
 
 ### P6 — Import and export  `[x]`
 - [x] Plain text and ANSI (SGR) import as artwork layers (CLI, editor)

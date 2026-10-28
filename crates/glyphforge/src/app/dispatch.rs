@@ -266,6 +266,8 @@ impl App {
             Action::EditPalette => self.open_palette_prompt(),
             Action::Export => self.open_export(),
             Action::CheckDesign => self.check_design(),
+            Action::TogglePrototype => self.toggle_prototype(),
+            Action::ScreenOverview => self.open_overview(),
             Action::SetDocTheme(id) => {
                 self.menu = None;
                 self.set_document_theme(&id);

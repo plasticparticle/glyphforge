@@ -55,7 +55,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(styles::border(app, true))
-        .title(" Check design · ⏎ go to component  ↑↓ choose  Esc close ")
+        .title(format!(" {} ", problems.title))
         .title_style(styles::accent(app))
         .style(styles::text(app));
     frame.render_widget(Paragraph::new(lines).block(block), popup);

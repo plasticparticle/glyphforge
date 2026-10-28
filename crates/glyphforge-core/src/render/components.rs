@@ -98,16 +98,60 @@ impl Registry {
         self.renderers.keys().copied()
     }
 
+    /// A renderer's descriptor plus the properties every kind of its sort
+    /// shares: `on_activate` for things people click, `hidden` for
+    /// surfaces a prototype opens.
+    fn full_descriptor(renderer: &dyn ComponentRenderer) -> Descriptor {
+        const CLICKABLE: &[&str] = &[
+            "button",
+            "list",
+            "menu",
+            "tabs",
+            "toolbar",
+            "label",
+            "heading",
+            "tree",
+            "table",
+            "datagrid",
+            "checkbox",
+            "radio",
+            "toggle",
+            "select",
+            "breadcrumbs",
+            "keyhint",
+            "instance",
+            "artwork",
+            "badge",
+            "tag",
+        ];
+        let mut d = renderer.descriptor();
+        if CLICKABLE.contains(&d.kind) && d.prop_spec("on_activate").is_none() {
+            d = d.prop(super::kit::action_prop());
+        }
+        if (d.container || matches!(d.category, Category::Feedback))
+            && d.prop_spec("hidden").is_none()
+        {
+            d = d.prop(super::kit::hidden_prop());
+        }
+        d
+    }
+
     /// Descriptors of every registered kind, by category then title.
     pub fn descriptors(&self) -> Vec<Descriptor> {
-        let mut all: Vec<Descriptor> = self.renderers.values().map(|r| r.descriptor()).collect();
+        let mut all: Vec<Descriptor> = self
+            .renderers
+            .values()
+            .map(|r| Self::full_descriptor(r.as_ref()))
+            .collect();
         all.sort_by(|a, b| a.category.cmp(&b.category).then(a.title.cmp(b.title)));
         all
     }
 
     /// The descriptor of a registered kind.
     pub fn descriptor(&self, kind: &str) -> Option<Descriptor> {
-        self.renderers.get(kind).map(|r| r.descriptor())
+        self.renderers
+            .get(kind)
+            .map(|r| Self::full_descriptor(r.as_ref()))
     }
 
     /// The renderer for `kind`, or the placeholder for unknown kinds.

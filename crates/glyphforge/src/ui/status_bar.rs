@@ -17,24 +17,28 @@ pub fn render(app: &App, frame: &mut Frame<'_>, area: Rect) {
             format!(" {} ({}/{}) ", l.name, idx, app.screen().layers().len())
         },
     );
-    let mode = match app.design_mode() {
-        crate::app::DesignMode::Interface => app.design_mode().title().to_owned(),
-        crate::app::DesignMode::Pixel => format!(
-            "{} {} {}",
-            app.design_mode().title(),
-            app.paint.tool.title().to_ascii_uppercase(),
-            app.raster().map_or("", |r| r.mode.name())
-        ),
-        crate::app::DesignMode::Subcell => match app.paint.tool {
-            crate::app::Tool::Text => {
-                format!("{} {}", app.design_mode().title(), app.editor.mode.title())
-            }
-            tool => format!(
-                "{} {}",
+    let mode = if app.prototype.is_some() {
+        "PROTOTYPE".to_owned()
+    } else {
+        match app.design_mode() {
+            crate::app::DesignMode::Interface => app.design_mode().title().to_owned(),
+            crate::app::DesignMode::Pixel => format!(
+                "{} {} {}",
                 app.design_mode().title(),
-                tool.title().to_ascii_uppercase()
+                app.paint.tool.title().to_ascii_uppercase(),
+                app.raster().map_or("", |r| r.mode.name())
             ),
-        },
+            crate::app::DesignMode::Subcell => match app.paint.tool {
+                crate::app::Tool::Text => {
+                    format!("{} {}", app.design_mode().title(), app.editor.mode.title())
+                }
+                tool => format!(
+                    "{} {}",
+                    app.design_mode().title(),
+                    tool.title().to_ascii_uppercase()
+                ),
+            },
+        }
     };
     let mut spans = vec![
         Span::styled(format!(" {mode} "), styles::accent(app)),

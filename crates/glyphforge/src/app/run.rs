@@ -96,6 +96,27 @@ pub(crate) fn handle_key(app: &mut App, key: Key) {
     if popup_key(app, key) {
         return;
     }
+    if app.prototype.is_some() && app.prompt.is_none() && app.menu.is_none() {
+        match key.code {
+            KeyCode::Tab => app.prototype_focus(true),
+            KeyCode::BackTab => app.prototype_focus(false),
+            KeyCode::Enter | KeyCode::Char(' ') => app.prototype_enter(),
+            KeyCode::Backspace => app.prototype_back(),
+            KeyCode::Esc | KeyCode::F(12) => app.toggle_prototype(),
+            _ => {
+                // Global keys (quit, help, palette) still work.
+                if let Some(action) = app.keymap.lookup(key.chord(), Context::Global).cloned() {
+                    if matches!(
+                        action,
+                        Action::Quit | Action::ToggleHelp | Action::CommandPalette
+                    ) {
+                        app.dispatch(action);
+                    }
+                }
+            }
+        }
+        return;
+    }
     if app.prompt.is_none() && app.picker.is_none() && app.theme_editor.is_some() {
         theme_editor_key(app, key);
         return;
@@ -487,6 +508,12 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
         {
             if let Some(target) = ui::canvas_view::minimap_hit(app, layout.canvas, cell) {
                 app.center_view_on(target);
+            }
+            true
+        }
+        MouseEventKind::Down(MouseButton::Left) if app.prototype.is_some() => {
+            if let Some(pos) = doc_pos {
+                app.prototype_click(pos);
             }
             true
         }
