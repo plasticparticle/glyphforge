@@ -157,7 +157,11 @@ Interface mode:
 | Ctrl+F | Find a component, screen, layer or text (jumps there) |
 | Arrows | Nudge the selection (or move the cursor when nothing is selected) |
 | Shift+Arrows | Resize the selection |
-| Mouse drag | Move; dragging the `◆` corner resizes; edges and centres snap to other components (dotted guides) |
+| Mouse drag | Move; the `◆` corners and `◇` edge handles resize from that side; edges and centres snap to other components (dotted guides) |
+| Drag on empty space | Rubber band: selects the components fully inside |
+| Double click | Edit the component's text (`text`, `label` or `title`) |
+| Right click | Context menu: edit, duplicate, copy, cut, move into, z-order, align, delete |
+| Shift+Home / End, Shift+PgUp / PgDn | Bring to front / send to back, forward / backward |
 | `a` | Add a component at the cursor (inside the selection if any): `kind [name]` |
 | Enter | Edit a property of the selection: `key=value` (empty value removes) |
 | `i`, Tab, click | Focus the inspector |
@@ -191,6 +195,7 @@ to show or hide it, the lock column to lock it. With the list focused
 | `n`, `r`, `d`, `m`, Delete | New, rename, duplicate, merge down, delete |
 | Left / Right, Shift+N / R / S | Previous / next screen; new, rename, resize screen |
 
+A right click on a layer opens its menu. Shift+wheel scrolls sideways.
 Alt+PgUp/PgDn switch screens anywhere; screen and layer operations are
 also in the command palette. F7 previews the screen at 60×20, 80×24,
 100×30, 120×40 and 160×50 (responsive rules and layout follow; the screen
@@ -241,7 +246,7 @@ to an artwork layer, adding a "Paint" layer if the screen has none visible.
 | Alt+Shift+B / I / U / K | Toggle bold, italic, underline, strikethrough on the brush (all six attributes are clickable under the box styles) |
 | Click, drag | Apply the tool: strokes, shapes from press to release, fill, pick |
 | Space | Apply at the cursor (shapes: first Space sets the corner, second draws) |
-| Right click on the canvas | Pick glyph and colours from a cell |
+| Right click on the canvas | Pick glyph and colours from a cell (inside a selection: the selection menu) |
 | Any other character | Becomes the brush glyph (painting tools) |
 | C / Shift+C (Alt+C / Alt+Shift+C) | Colour picker for foreground / background |
 | S / D (Alt+S / Alt+D) | Swap colours / reset to the terminal default |

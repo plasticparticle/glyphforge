@@ -78,6 +78,7 @@ app/             App state, dispatch (behaviour), run loop, viewport,
                  selection (Select tool, clipboard),
                  commands (command palette, context actions),
                  layers (layer list, screens, preview size, find),
+                 mouse (handles, rubber band, context menus, z-order),
                  paint (tools, brush, colours),
                  pixels (raster tools), menu (Esc menu, theme choice)
 actions/         Action enum + descriptors (names, keywords, default keys)
@@ -511,6 +512,15 @@ drag opens one transaction and
   editor state: `doc_size()`, the composite and the layout use it, so
   responsive rules, selection and hit-testing follow while the document
   keeps its size.
+- **Mouse.** Resize handles are computed from the solved rect
+  (`mouse::handle_at`); a drag moves the grabbed edges, snaps the moving
+  corner cell and records `move` + `resize` into the open transaction.
+  Empty space starts a rubber band (editor state) that selects fully
+  contained components on release. Double clicks are detected in the run
+  loop (same cell within 400 ms) and become `Action::DoubleClick`.
+  Context menus are lists of `(title, Action)` built for what was
+  clicked, so they add no behaviour of their own. Z-order is `reparent`
+  to the same parent at another index.
 - **Command palette.** `app/commands.rs` builds the entries when the
   palette opens: implemented action descriptors that apply in the current
   key context (cursor steps excluded), then context entries (component

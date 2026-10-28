@@ -26,7 +26,8 @@ fn describe(ids: &[ObjectId]) -> String {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DragMode {
     Move,
-    Resize,
+    /// Resizing by a handle: the edges it moves.
+    Resize(super::mouse::Edges),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -437,15 +438,15 @@ impl App {
         let Some((offset, size)) = self.geometry(&id) else {
             return false;
         };
-        let corner = Position::new((rect.right() - 1) as u16, (rect.bottom() - 1) as u16);
-        let mode = if pos == corner && rect.width > 1 && rect.height > 1 {
-            DragMode::Resize
+        let edges = super::mouse::handle_at(rect, pos);
+        let mode = if edges.any() {
+            DragMode::Resize(edges)
         } else {
             DragMode::Move
         };
         let label = match mode {
             DragMode::Move => "Move component",
-            DragMode::Resize => "Resize component",
+            DragMode::Resize(_) => "Resize component",
         };
         if let Err(e) = self.session.begin(label) {
             self.report_error(&e);
@@ -472,10 +473,6 @@ impl App {
             (i32::from(drag.start_offset.0) + dx).max(0) as u16,
             (i32::from(drag.start_offset.1) + dy).max(0) as u16,
         );
-        let (w, h) = (
-            (i32::from(drag.start_size.0) + dx).max(1) as u16,
-            (i32::from(drag.start_size.1) + dy).max(1) as u16,
-        );
         let op = match drag.mode {
             DragMode::Move => {
                 let rect = Rect::new(
@@ -491,16 +488,57 @@ impl App {
                     y: snapped.y.saturating_sub(inner.y),
                 }
             }
-            DragMode::Resize => {
-                // Snap the corner cell, then size up to it.
-                let x0 = inner.x.saturating_add(drag.start_offset.0);
-                let y0 = inner.y.saturating_add(drag.start_offset.1);
-                let corner = Rect::new(x0 + w - 1, y0 + h - 1, 1, 1);
-                let snapped = self.snap_drag(&drag.target, corner);
+            DragMode::Resize(edges) => {
+                // Move the dragged edges, snap the moving corner cell,
+                // then express the rect as an offset and a size.
+                let x0 = i32::from(inner.x) + i32::from(drag.start_offset.0);
+                let y0 = i32::from(inner.y) + i32::from(drag.start_offset.1);
+                let (w0, h0) = (i32::from(drag.start_size.0), i32::from(drag.start_size.1));
+                let (mut left, mut top) = (x0, y0);
+                let (mut right, mut bottom) = (x0 + w0 - 1, y0 + h0 - 1);
+                if edges.left {
+                    left = (x0 + dx).min(right).max(0);
+                }
+                if edges.right {
+                    right = (right + dx).max(left);
+                }
+                if edges.top {
+                    top = (y0 + dy).min(bottom).max(0);
+                }
+                if edges.bottom {
+                    bottom = (bottom + dy).max(top);
+                }
+                let cx = if edges.left { left } else { right };
+                let cy = if edges.top { top } else { bottom };
+                let snapped = self.snap_drag(
+                    &drag.target,
+                    Rect::new(cx.max(0) as u16, cy.max(0) as u16, 1, 1),
+                );
+                if edges.left {
+                    left = i32::from(snapped.x).min(right);
+                } else if edges.right {
+                    right = i32::from(snapped.x).max(left);
+                }
+                if edges.top {
+                    top = i32::from(snapped.y).min(bottom);
+                } else if edges.bottom {
+                    bottom = i32::from(snapped.y).max(top);
+                }
+                if edges.left || edges.top {
+                    let moved = Operation::Move {
+                        target: drag.target.clone(),
+                        x: (left - i32::from(inner.x)).max(0) as u16,
+                        y: (top - i32::from(inner.y)).max(0) as u16,
+                    };
+                    if let Err(e) = self.session.record(moved) {
+                        self.report_error(&e);
+                        return;
+                    }
+                }
                 Operation::Resize {
                     target: drag.target.clone(),
-                    width: (snapped.x + 1).saturating_sub(x0).max(1),
-                    height: (snapped.y + 1).saturating_sub(y0).max(1),
+                    width: (right - left + 1).max(1) as u16,
+                    height: (bottom - top + 1).max(1) as u16,
                 }
             }
         };

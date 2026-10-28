@@ -60,6 +60,25 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
         draw_cells(&cells, viewport, canvas_area, buf, depth, paper);
     }
 
+    draw_overlays(app, buf, canvas_area);
+
+    if focused && !app.ui.help_open && app.prompt.is_none() && app.menu.is_none() {
+        let c = app.editor.cursor;
+        if viewport.contains(c) {
+            let sx = canvas_area.x + (c.x - viewport.x);
+            let sy = canvas_area.y + (c.y - viewport.y);
+            frame.set_cursor_position(RPosition::new(sx, sy));
+        }
+    }
+}
+
+/// Everything drawn over the design: shape and move previews, the cell
+/// marquee, component selection with handles, the rubber band, snap
+/// guides and the minimap.
+fn draw_overlays(app: &App, buf: &mut ratatui::buffer::Buffer, canvas_area: Rect) {
+    let depth = app.canvas_depth();
+    let paper = styles::paper(app);
+    let viewport = app.editor.viewport.rect();
     // Shape preview: the line, rectangle or box that Space or releasing the
     // mouse button will draw.
     if let Some(anchor) = app.paint.anchor {
@@ -88,6 +107,8 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
             continue;
         };
         let is_primary = primary.as_ref() == Some(&id);
+        let handles = crate::app::resize_handles(rect);
+        let corners: Vec<Position> = handles.iter().take(4).copied().collect();
         let sel = if is_primary {
             styles::selection(app)
         } else {
@@ -105,10 +126,8 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
             let sy = canvas_area.y + (pos.y - viewport.y);
             if let Some(cell) = buf.cell_mut((sx, sy)) {
                 cell.set_style(sel);
-                let is_corner =
-                    u32::from(pos.x) + 1 == rect.right() && u32::from(pos.y) + 1 == rect.bottom();
-                if is_primary && is_corner && rect.width > 1 && rect.height > 1 {
-                    cell.set_symbol("◆");
+                if is_primary && handles.contains(&pos) {
+                    cell.set_symbol(if corners.contains(&pos) { "◆" } else { "◇" });
                 }
             }
         }
@@ -159,6 +178,25 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
         }
     }
 
+    // Rubber band: its outline in the accent colour.
+    if let Some(band) = app.band_rect() {
+        let style = styles::accent(app);
+        for pos in band.positions() {
+            let edge = pos.x == band.x
+                || pos.y == band.y
+                || u32::from(pos.x) + 1 == band.right()
+                || u32::from(pos.y) + 1 == band.bottom();
+            if edge {
+                let symbol = if pos.y == band.y || u32::from(pos.y) + 1 == band.bottom() {
+                    "┈"
+                } else {
+                    "┊"
+                };
+                put(buf, pos, symbol, style);
+            }
+        }
+    }
+
     // Snap guides while dragging: dotted lines in the accent colour.
     let guide_style = styles::accent(app);
     for guide in app.active_guides() {
@@ -179,15 +217,6 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
 
     if let Some(m) = minimap_geometry(app, canvas_area) {
         draw_minimap(app, buf, &m);
-    }
-
-    if focused && !app.ui.help_open && app.prompt.is_none() && app.menu.is_none() {
-        let c = app.editor.cursor;
-        if viewport.contains(c) {
-            let sx = canvas_area.x + (c.x - viewport.x);
-            let sy = canvas_area.y + (c.y - viewport.y);
-            frame.set_cursor_position(RPosition::new(sx, sy));
-        }
     }
 }
 

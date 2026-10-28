@@ -90,6 +90,16 @@ fn handle_event(app: &mut App, ev: &Event) -> bool {
 /// Routes a key: help overlay first, then the keymap, then Vim navigation,
 /// then text insertion.
 pub(crate) fn handle_key(app: &mut App, key: Key) {
+    if app.context_menu.is_some() {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('q') => app.context_menu = None,
+            KeyCode::Enter | KeyCode::Char(' ') => app.context_run(None),
+            KeyCode::Up | KeyCode::Char('k') => app.context_move(false),
+            KeyCode::Down | KeyCode::Char('j') | KeyCode::Tab => app.context_move(true),
+            _ => {}
+        }
+        return;
+    }
     if app.palette.is_some() {
         match key.code {
             KeyCode::Esc => app.dispatch(Action::Cancel),
@@ -321,6 +331,9 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
     if app.palette.is_some() {
         return handle_palette_mouse(app, m);
     }
+    if app.context_menu.is_some() {
+        return handle_context_mouse(app, m);
+    }
     if app.menu.is_some() {
         return handle_menu_mouse(app, m);
     }
@@ -348,20 +361,7 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
             }
             true
         }
-        MouseEventKind::Down(MouseButton::Right) => match doc_pos {
-            Some(pos) if app.on_raster_layer() => {
-                app.ui.focus = Focus::Canvas;
-                let (p, _) = pixel_at(app, pos, sub);
-                app.dispatch(Action::Pixel(PixelAction::Pick(p)));
-                true
-            }
-            Some(pos) if app.on_artwork_layer() => {
-                app.ui.focus = Focus::Canvas;
-                app.dispatch(Action::PickAt(pos));
-                true
-            }
-            _ => false,
-        },
+        MouseEventKind::Down(MouseButton::Right) => right_click(app, &layout, doc_pos, sub, cell),
         MouseEventKind::Down(MouseButton::Left)
             if ui::canvas_view::minimap_hit(app, layout.canvas, cell).is_some() =>
         {
@@ -381,10 +381,15 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
                     app.dispatch(Action::ToolPress(pos));
                 } else if m.modifiers.contains(crossterm::event::KeyModifiers::SHIFT) {
                     app.dispatch(Action::ToggleSelectAt(pos));
+                } else if is_double_click(app, cell) {
+                    app.dispatch(Action::DoubleClick(pos));
                 } else if !app.begin_drag(pos) {
                     app.dispatch(Action::SelectAt(pos));
-                    // A fresh selection can be dragged right away.
-                    app.begin_drag(pos);
+                    // A fresh selection can be dragged right away; empty
+                    // space starts a rubber band.
+                    if !app.begin_drag(pos) && app.selection().is_none() {
+                        app.begin_band(pos);
+                    }
                 }
             } else if let Some(right) = layout.right.filter(|r| r.contains(cell.into())) {
                 click_right_panel(app, right, cell);
@@ -402,6 +407,8 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
             } else if app.drag.is_some() {
                 app.drag_to(pos);
                 true
+            } else if app.band_to(pos) {
+                true
             } else if app.paint.stroke.is_some() || app.paint.anchor.is_some() {
                 app.dispatch(Action::ToolDrag(pos));
                 true
@@ -416,6 +423,8 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
             }
             if app.drag.is_some() {
                 app.end_drag();
+                true
+            } else if app.end_band() {
                 true
             } else if app.paint.stroke.is_some() || app.paint.anchor.is_some() {
                 app.dispatch(Action::ToolRelease);
@@ -437,12 +446,18 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
             });
             true
         }
-        MouseEventKind::ScrollUp => {
-            app.dispatch(Action::ScrollView(Direction::Up));
-            true
-        }
-        MouseEventKind::ScrollDown => {
-            app.dispatch(Action::ScrollView(Direction::Down));
+        MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
+            let up = m.kind == MouseEventKind::ScrollUp;
+            let dir = match (
+                m.modifiers.contains(crossterm::event::KeyModifiers::SHIFT),
+                up,
+            ) {
+                (true, true) => Direction::Left,
+                (true, false) => Direction::Right,
+                (false, true) => Direction::Up,
+                (false, false) => Direction::Down,
+            };
+            app.dispatch(Action::ScrollView(dir));
             true
         }
         MouseEventKind::ScrollLeft => {
@@ -455,6 +470,69 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
         }
         _ => false,
     }
+}
+
+/// Right button: picks on pixel layers, otherwise opens the context menu
+/// for the canvas or a layer row.
+fn right_click(
+    app: &mut App,
+    layout: &ui::layout::ScreenLayout,
+    doc_pos: Option<glyphforge_core::Position>,
+    sub: Option<(f32, f32)>,
+    cell: (u16, u16),
+) -> bool {
+    match doc_pos {
+        Some(pos) if app.on_raster_layer() => {
+            app.ui.focus = Focus::Canvas;
+            let (p, _) = pixel_at(app, pos, sub);
+            app.dispatch(Action::Pixel(PixelAction::Pick(p)));
+            true
+        }
+        Some(pos) => {
+            app.ui.focus = Focus::Canvas;
+            app.open_context_menu(crate::app::ContextTarget::Canvas(pos), cell);
+            true
+        }
+        None => match layout
+            .right
+            .and_then(|right| ui::panels::layers_hit(app, right, cell))
+        {
+            Some(ui::panels::LayerHit::Activate(id)) => {
+                app.ui.focus = Focus::Layers;
+                app.open_context_menu(crate::app::ContextTarget::Layer(id), cell);
+                true
+            }
+            _ => false,
+        },
+    }
+}
+
+/// Whether a left click at `cell` completes a double click, and records
+/// it for the next one.
+fn is_double_click(app: &mut App, cell: (u16, u16)) -> bool {
+    const WINDOW: Duration = Duration::from_millis(400);
+    let now = std::time::Instant::now();
+    let double = app
+        .last_click
+        .is_some_and(|(at, c)| c == cell && now.duration_since(at) <= WINDOW);
+    app.last_click = if double { None } else { Some((now, cell)) };
+    double
+}
+
+/// While a context menu is open it owns the mouse: a click runs an
+/// entry, a click outside closes it, the wheel moves the selection.
+fn handle_context_mouse(app: &mut App, m: MouseEvent) -> bool {
+    let area = app.last_frame_area();
+    match m.kind {
+        MouseEventKind::ScrollUp => app.context_move(false),
+        MouseEventKind::ScrollDown => app.context_move(true),
+        MouseEventKind::Down(_) => match ui::context_menu::hit(app, area, (m.column, m.row)) {
+            Some(i) => app.context_run(Some(i)),
+            None => app.context_menu = None,
+        },
+        _ => return false,
+    }
+    true
 }
 
 /// A left click in the right panel: the layer list, else the inspector.

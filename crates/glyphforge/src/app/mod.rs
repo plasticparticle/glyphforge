@@ -8,6 +8,7 @@ mod inspector;
 mod interface;
 mod layers;
 mod menu;
+mod mouse;
 mod paint;
 mod pixels;
 mod prompt;
@@ -28,9 +29,11 @@ use crate::terminal::{ColorDepth, TerminalCapabilities};
 #[cfg(test)]
 pub use brushes::BRUSH_PAGES;
 pub use brushes::{BOX_STYLES, BrushKind, PaletteEntry};
+pub use inspector::FieldKey;
 pub use interface::Drag;
 pub use layers::{LayerAction, ScreenAction};
 pub use menu::{Menu, MenuEntry};
+pub use mouse::{ContextMenu, ContextTarget, ZOrder, handles as resize_handles};
 #[cfg(test)]
 pub use paint::picker_rows;
 pub use paint::{ColorPicker, ColorTarget, PaintState, Tool, color_label, is_light};
@@ -192,6 +195,12 @@ pub struct App {
     pub state_dir: Option<std::path::PathBuf>,
     pub picker: Option<ColorPicker>,
     pub drag: Option<Drag>,
+    /// Rubber-band selection: where it started and where the pointer is.
+    pub band: Option<(Position, Position)>,
+    /// The open right-click menu.
+    pub context_menu: Option<ContextMenu>,
+    /// Time and cell of the last left click, for double clicks.
+    pub last_click: Option<(std::time::Instant, (u16, u16))>,
     /// What Copy and Cut put aside (cells or components).
     pub clipboard: Option<selection::Clipboard>,
     /// Text waiting to be sent to the system clipboard.
@@ -283,6 +292,9 @@ impl App {
             state_dir: init.state_dir,
             picker: None,
             drag: None,
+            band: None,
+            context_menu: None,
+            last_click: None,
             clipboard: None,
             system_clipboard: None,
             find_targets: Vec::new(),

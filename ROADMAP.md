@@ -219,9 +219,16 @@ with stable codes.
 - [x] Minimap (F8) with click-to-jump
 - [x] Find (Ctrl+F) over components, screens, layers and artwork text
 
-### E7 — Mouse workflow  `[ ]`
-Drag, resize handles, multi-select, double click, context menus where the
-terminal permits, wheel, palette and layer interaction.
+### E7 — Mouse workflow  `[x]`
+- [x] Eight resize handles (corners and edge middles) with snapping; a
+      left or top handle moves and resizes in one transaction
+- [x] Rubber-band selection, Shift+click toggling
+- [x] Double click edits a component's text; layer list clicks
+- [x] Context menus for components, empty interface space, cell
+      selections and layers (keyboard and mouse)
+- [x] Z-order (front, back, forward, backward) through `reparent`
+- [x] Shift+wheel scrolls horizontally; minimap, palette and inspector
+      clicks
 
 ---
 

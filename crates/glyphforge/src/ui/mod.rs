@@ -3,6 +3,7 @@
 pub mod canvas_view;
 pub mod color_picker;
 pub mod commands;
+pub mod context_menu;
 pub mod header;
 pub mod help;
 pub mod layout;
@@ -48,6 +49,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>) {
     menu::render(app, frame, area);
     prompt::render(app, frame, area);
     commands::render(app, frame, area);
+    context_menu::render(app, frame, area);
 }
 
 /// Glyphs a frame is drawn with; other cells on the border (titles) keep

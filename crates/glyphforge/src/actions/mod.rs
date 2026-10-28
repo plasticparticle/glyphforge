@@ -8,7 +8,7 @@ use glyphforge_core::boxdraw::BorderFamily;
 use glyphforge_core::raster::{Dither, GradientShape, GradientStyle, PaletteLimit, RasterMode};
 use glyphforge_core::{Color, ObjectId, Position};
 
-use crate::app::{BrushKind, ColorTarget, LayerAction, ScreenAction, Tool};
+use crate::app::{BrushKind, ColorTarget, LayerAction, ScreenAction, Tool, ZOrder};
 
 /// Direction for cursor and viewport movement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -200,6 +200,10 @@ pub enum Action {
     InvertSelection,
     /// Places an artwork component showing the selected cells.
     SelectionToComponent,
+    /// A double click at a document position.
+    DoubleClick(Position),
+    /// Moves the selection among its siblings.
+    ZOrder(ZOrder),
     // Paint and colour (Subcell Mode)
     SelectTool(Tool),
     ApplyTool,
@@ -395,6 +399,10 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("equal-size", "Equal Size", Interface, Interface, Action::EqualSize { width: true, height: true }, keys: ["shift+z"], kw: ["size", "match", "same"], aliases: [], implemented: true),
             desc!("toggle-snap", "Toggle Snapping", Interface, Interface, Action::ToggleSnap, keys: ["shift+s"], kw: ["snap", "guides", "magnet"], aliases: ["snap"], implemented: true),
             desc!("cycle-snap-grid", "Cycle Snap Grid", Interface, Interface, Action::CycleSnapGrid, keys: ["shift+g"], kw: ["snap", "grid", "spacing"], aliases: ["grid"], implemented: true),
+            desc!("bring-to-front", "Bring To Front", Interface, Interface, Action::ZOrder(ZOrder::Front), keys: ["shift+home"], kw: ["z-order", "stack", "top", "raise"], aliases: [], implemented: true),
+            desc!("send-to-back", "Send To Back", Interface, Interface, Action::ZOrder(ZOrder::Back), keys: ["shift+end"], kw: ["z-order", "stack", "bottom", "lower"], aliases: [], implemented: true),
+            desc!("bring-forward", "Bring Forward", Interface, Interface, Action::ZOrder(ZOrder::Forward), keys: ["shift+pageup"], kw: ["z-order", "stack", "raise"], aliases: [], implemented: true),
+            desc!("send-backward", "Send Backward", Interface, Interface, Action::ZOrder(ZOrder::Backward), keys: ["shift+pagedown"], kw: ["z-order", "stack", "lower"], aliases: [], implemented: true),
             desc!("delete-component", "Delete Component", Interface, Interface, Action::DeleteSelection, keys: ["delete", "backspace"], kw: ["remove"], aliases: [], implemented: true),
             desc!("move-selection-up", "Move Selection Up", Interface, Interface, Action::MoveSelection(Direction::Up), keys: ["up"], kw: ["nudge"], aliases: [], implemented: true),
             desc!("move-selection-down", "Move Selection Down", Interface, Interface, Action::MoveSelection(Direction::Down), keys: ["down"], kw: ["nudge"], aliases: [], implemented: true),
