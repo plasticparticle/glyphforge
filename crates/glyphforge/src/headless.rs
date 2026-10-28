@@ -44,6 +44,10 @@ pub enum HeadlessError {
     Document(#[from] glyphforge_core::DocumentError),
     #[error(transparent)]
     Proposal(#[from] glyphforge_core::proposal::ProposalError),
+    #[error(transparent)]
+    Image(#[from] crate::image::ImageError),
+    #[error("unknown pixel mode {0:?}; use half, quadrant, sextant, braille or octant")]
+    Mode(String),
 }
 
 fn parse_id(s: &str) -> Result<ObjectId, HeadlessError> {
@@ -149,28 +153,7 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
             patch: patch_path,
             agent,
             message,
-        } => {
-            let mut session = Session::open(&file)?;
-            let patch = read_patch(&patch_path)?;
-            let count = patch.operations.len();
-            // Validate against the file now, so the agent learns about
-            // errors here rather than the reviewer later.
-            session.apply_patch(patch.clone(), "Check proposal", Origin::User)?;
-            let proposal = glyphforge_core::proposal::Proposal {
-                agent,
-                message,
-                created: glyphforge_core::proposal::now(),
-                patch,
-            };
-            let path = glyphforge_core::proposal::submit(&file, &proposal)?;
-            writeln!(
-                out,
-                "proposed {count} operation(s) for review: {}",
-                path.display()
-            )
-            .map_err(write_err(&file))?;
-            Ok(0)
-        }
+        } => propose(&file, &patch_path, agent, message, out),
         Command::Export {
             file,
             format,
@@ -189,23 +172,31 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
             }
             Ok(0)
         }
-        Command::Kinds { kind, json } => {
-            let registry = glyphforge_core::render::Registry::builtin();
-            let mut descriptors = registry.descriptors();
-            if let Some(kind) = &kind {
-                descriptors.retain(|d| d.kind == kind);
-                if descriptors.is_empty() {
-                    return Err(HeadlessError::Kind(kind.clone()));
-                }
-            }
-            let text = if json {
-                serde_json::to_string_pretty(&descriptors).unwrap_or_default()
-            } else {
-                kinds_text(&descriptors)
-            };
-            writeln!(out, "{text}").map_err(write_err(Path::new("stdout")))?;
-            Ok(0)
-        }
+        Command::Import {
+            file,
+            image,
+            screen,
+            mode,
+            name,
+            x,
+            y,
+            cols,
+            rows,
+        } => import(
+            ImportArgs {
+                file,
+                image,
+                screen,
+                mode,
+                name,
+                x,
+                y,
+                cols,
+                rows,
+            },
+            out,
+        ),
+        Command::Kinds { kind, json } => kinds(kind.as_deref(), json, out),
         Command::New {
             file,
             width,
@@ -221,6 +212,108 @@ pub fn run(command: Command, out: &mut dyn Write) -> Result<u8, HeadlessError> {
             Ok(0)
         }
     }
+}
+
+fn propose(
+    file: &Path,
+    patch_path: &Path,
+    agent: String,
+    message: String,
+    out: &mut dyn Write,
+) -> Result<u8, HeadlessError> {
+    let mut session = Session::open(file)?;
+    let patch = read_patch(patch_path)?;
+    let count = patch.operations.len();
+    // Validate against the file now, so the agent learns about
+    // errors here rather than the reviewer later.
+    session.apply_patch(patch.clone(), "Check proposal", Origin::User)?;
+    let proposal = glyphforge_core::proposal::Proposal {
+        agent,
+        message,
+        created: glyphforge_core::proposal::now(),
+        patch,
+    };
+    let path = glyphforge_core::proposal::submit(file, &proposal)?;
+    writeln!(
+        out,
+        "proposed {count} operation(s) for review: {}",
+        path.display()
+    )
+    .map_err(write_err(file))?;
+    Ok(0)
+}
+
+/// Arguments of `glyphforge import`.
+struct ImportArgs {
+    file: std::path::PathBuf,
+    image: std::path::PathBuf,
+    screen: Option<String>,
+    mode: String,
+    name: Option<String>,
+    x: u16,
+    y: u16,
+    cols: Option<u16>,
+    rows: Option<u16>,
+}
+
+fn import(args: ImportArgs, out: &mut dyn Write) -> Result<u8, HeadlessError> {
+    let ImportArgs {
+        file,
+        image,
+        screen,
+        mode,
+        name,
+        x,
+        y,
+        cols,
+        rows,
+    } = args;
+    let mode = glyphforge_core::raster::RasterMode::parse(&mode)
+        .ok_or_else(|| HeadlessError::Mode(mode.clone()))?;
+    let mut session = Session::open(&file)?;
+    let screen = screen_id(&session, screen.as_deref())?;
+    let pixels = crate::image::load_png(&image)?;
+    let name = name.unwrap_or_else(|| {
+        image
+            .file_stem()
+            .map_or_else(|| "Image".to_owned(), |s| s.to_string_lossy().into_owned())
+    });
+    let options = crate::image::ImportOptions {
+        mode,
+        at: (x, y),
+        fit: size_arg(cols, rows),
+        name,
+    };
+    let (patch, id) = crate::image::import_patch(session.document(), &screen, &pixels, &options)?;
+    session.apply_patch(patch, "Import image", Origin::User)?;
+    session.save_as(&file)?;
+    writeln!(
+        out,
+        "imported {} ({}×{}) as pixel layer {id}",
+        image.display(),
+        pixels.width,
+        pixels.height
+    )
+    .map_err(write_err(&file))?;
+    Ok(0)
+}
+
+fn kinds(kind: Option<&str>, json: bool, out: &mut dyn Write) -> Result<u8, HeadlessError> {
+    let registry = glyphforge_core::render::Registry::builtin();
+    let mut descriptors = registry.descriptors();
+    if let Some(kind) = kind {
+        descriptors.retain(|d| d.kind == kind);
+        if descriptors.is_empty() {
+            return Err(HeadlessError::Kind(kind.to_owned()));
+        }
+    }
+    let text = if json {
+        serde_json::to_string_pretty(&descriptors).unwrap_or_default()
+    } else {
+        kinds_text(&descriptors)
+    };
+    writeln!(out, "{text}").map_err(write_err(Path::new("stdout")))?;
+    Ok(0)
 }
 
 fn read_patch(path: &Path) -> Result<Patch, HeadlessError> {
@@ -584,6 +677,41 @@ mod tests {
             .is_err()
         );
         assert_eq!(glyphforge_core::proposal::list(&file).len(), 1);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn import_adds_a_pixel_layer() {
+        let dir = temp_dir("import");
+        let file = dir.join("d.glyph");
+        run_str(Command::New {
+            file: file.clone(),
+            width: 20,
+            height: 8,
+        });
+        let png = dir.join("logo.png");
+        crate::image::tests::write_png(&png, 8, 8);
+        let (code, text) = run_str(Command::Import {
+            file: file.clone(),
+            image: png,
+            screen: None,
+            mode: "braille".into(),
+            name: None,
+            x: 2,
+            y: 1,
+            cols: Some(4),
+            rows: Some(2),
+        });
+        assert_eq!(code, 0, "{text}");
+        assert!(text.contains("pixel layer logo"), "{text}");
+        let session = Session::open(&file).unwrap();
+        let rendered = session
+            .render_text(&session.document().first_screen().id, None)
+            .unwrap();
+        assert!(
+            rendered.contains("⣤⣤") && rendered.contains("⠛⠛"),
+            "{rendered}"
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

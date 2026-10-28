@@ -94,6 +94,7 @@ impl App {
     pub(super) fn dispatch_pixel(&mut self, action: PixelAction) {
         match action {
             PixelAction::NewLayer => self.open_new_pixel_layer(),
+            PixelAction::ImportImage => self.open_import_image(),
             PixelAction::Settings => self.open_pixel_settings(),
             PixelAction::CycleMode => {
                 if let Some(mode) = self.raster().map(|r| r.mode) {
@@ -130,7 +131,7 @@ impl App {
             PixelAction::SizeUp => self.set_pixel_size(self.paint.pixel_size.saturating_add(1)),
             PixelAction::SizeDown => self.set_pixel_size(self.paint.pixel_size.saturating_sub(1)),
             PixelAction::Cursor(dir) => self.move_pixel_cursor(dir),
-            PixelAction::EditGradient => self.open_gradient_prompt(),
+            PixelAction::EditGradient => self.open_gradient_editor(),
             PixelAction::CycleGradientStyle => {
                 let next = match self.paint.gradient_style {
                     GradientStyle::Smooth => GradientStyle::Hard(5),
@@ -297,6 +298,54 @@ impl App {
         ));
     }
 
+    /// Prompt for a PNG file to import as a pixel layer at the cursor.
+    pub fn open_import_image(&mut self) {
+        self.prompt = Some(Prompt::new(
+            PromptKind::ImportImage,
+            "Import PNG at the cursor: path [half|quadrant|sextant|braille|octant]",
+            vec![],
+        ));
+    }
+
+    pub(super) fn submit_import_image(&mut self, value: &str) {
+        let value = value.trim();
+        let (path, mode) = match value.rsplit_once(' ') {
+            Some((p, m)) if RasterMode::parse(m).is_some() => (p.trim(), RasterMode::parse(m)),
+            _ => (value, None),
+        };
+        if path.is_empty() {
+            return;
+        }
+        let path = std::path::Path::new(path);
+        let image = match crate::image::load_png(path) {
+            Ok(i) => i,
+            Err(e) => return self.report_error(&e),
+        };
+        let name = path
+            .file_stem()
+            .map_or_else(|| "Image".to_owned(), |s| s.to_string_lossy().into_owned());
+        let cursor = self.editor.cursor;
+        let options = crate::image::ImportOptions {
+            mode: mode.unwrap_or_default(),
+            at: (cursor.x, cursor.y),
+            fit: None,
+            name,
+        };
+        let screen = self.editor.screen.clone();
+        match crate::image::import_patch(self.doc(), &screen, &image, &options) {
+            Ok((patch, id)) => {
+                if self.apply(patch, "Import image") {
+                    self.activate_layer(&id);
+                    self.set_status(
+                        StatusKind::Info,
+                        format!("Imported {}×{} pixels as {id}", image.width, image.height),
+                    );
+                }
+            }
+            Err(e) => self.report_error(&e),
+        }
+    }
+
     pub fn submit_new_pixel_layer(&mut self, value: &str) {
         let Some(mode) = RasterMode::parse(value.trim()) else {
             self.set_status(StatusKind::Warning, format!("Unknown pixel mode {value:?}"));
@@ -319,7 +368,7 @@ impl App {
     // --- settings ------------------------------------------------------------------
 
     /// Whether the active layer is a raster layer that accepts edits.
-    fn editable_raster(&mut self) -> bool {
+    pub(super) fn editable_raster(&mut self) -> bool {
         match self.active_layer() {
             Some(l) if l.locked => {
                 let name = l.name.clone();
@@ -517,7 +566,7 @@ impl App {
         self.set_status(StatusKind::Info, format!("Gradient style: {name}"));
     }
 
-    fn open_gradient_prompt(&mut self) {
+    pub(super) fn open_gradient_prompt(&mut self) {
         let current = self
             .current_gradient()
             .map(|g| format!("{}: {}", g.name, g.stops_text()))
@@ -635,10 +684,8 @@ impl App {
             }
             Tool::Fill => self.fill_pixels(p),
             Tool::Picker => self.pick_pixel(p),
-            Tool::Text | Tool::Select => self.set_status(
-                StatusKind::Warning,
-                format!("{} works on artwork layers", self.paint.tool.title()),
-            ),
+            Tool::Select => self.pixel_select_press(p),
+            Tool::Text => self.set_status(StatusKind::Warning, "Text works on artwork layers"),
         }
     }
 
@@ -649,6 +696,9 @@ impl App {
     }
 
     pub fn pixel_drag(&mut self, p: Position) {
+        if self.pixel_select_drag(p) {
+            return;
+        }
         if let Some(last) = self.paint.pixel_stroke {
             if last == p {
                 return;
@@ -670,6 +720,9 @@ impl App {
     }
 
     pub fn pixel_release(&mut self) {
+        if self.paint.tool == Tool::Select && self.pixel_select_release() {
+            return;
+        }
         if self.paint.pixel_stroke.take().is_some() {
             self.commit_edits();
         } else if let Some(anchor) = self.paint.pixel_anchor.take() {
@@ -853,6 +906,12 @@ impl App {
     /// The screen as it will look after the shape being dragged, for the
     /// canvas preview.
     pub fn pixel_preview(&self) -> Option<Canvas> {
+        if self.paint.pixel_moving.is_some() {
+            return self.pixel_move_preview();
+        }
+        if self.paint.tool == Tool::Select {
+            return None;
+        }
         let anchor = self.paint.pixel_anchor?;
         let end = self.paint.pixel_end.unwrap_or(anchor);
         let (writes, _) = self.pixel_shape(anchor, end);
@@ -1017,6 +1076,8 @@ mod tests {
         );
 
         app.dispatch(pixel(PixelAction::EditGradient));
+        assert!(app.gradient_editor.is_some());
+        app.edit_gradient_as_text();
         app.prompt.as_mut().unwrap().input = "Candy: #ff00ff 0, #00ffff 100".into();
         app.dispatch(Action::PromptSubmit);
         assert_eq!(app.current_gradient().unwrap().name, "Candy");

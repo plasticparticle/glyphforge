@@ -48,6 +48,7 @@ impl CellClip {
 pub enum Clipboard {
     Cells(CellClip),
     Components(Vec<Component>),
+    Pixels(super::pixel_select::PixelClip),
 }
 
 /// An in-progress drag of the selected cells.
@@ -271,10 +272,7 @@ impl App {
                 }
                 self.set_status(StatusKind::Info, format!("{verb} {n} component(s)"));
             }
-            DesignMode::Pixel => self.set_status(
-                StatusKind::Info,
-                "Copy and paste work on artwork and interface layers",
-            ),
+            DesignMode::Pixel => self.copy_pixels(cut),
         }
     }
 
@@ -300,6 +298,11 @@ impl App {
             (Some(Clipboard::Components(trees)), DesignMode::Interface) => {
                 self.paste_components(&trees, "Paste");
             }
+            (Some(Clipboard::Pixels(clip)), DesignMode::Pixel) => self.paste_pixels(&clip),
+            (Some(Clipboard::Pixels(_)), _) => self.set_status(
+                StatusKind::Info,
+                "The clipboard holds pixels: paste them on a pixel layer",
+            ),
             (Some(Clipboard::Cells(_)), _) => self.set_status(
                 StatusKind::Info,
                 "The clipboard holds cells: paste them on an artwork layer",
@@ -367,6 +370,9 @@ impl App {
 
     /// The marquee being drawn or set, for the overlay.
     pub fn marquee_preview(&self) -> Option<Rect> {
+        if self.on_raster_layer() {
+            return self.pixel_marquee_cells();
+        }
         if self.paint.tool != Tool::Select || !self.on_artwork_layer() {
             return None;
         }

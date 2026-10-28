@@ -15,12 +15,35 @@ pub struct GradientStop {
     pub color: Color,
 }
 
+/// The colour space stops are blended in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ColorSpace {
+    /// Straight sRGB blending (what most tools do).
+    #[default]
+    Rgb,
+    /// Perceptual `OKLab` blending: even lightness, no muddy middles.
+    Oklab,
+}
+
+impl ColorSpace {
+    #[allow(
+        clippy::trivially_copy_pass_by_ref,
+        reason = "serde's skip_serializing_if passes a reference"
+    )]
+    const fn is_rgb(&self) -> bool {
+        matches!(self, Self::Rgb)
+    }
+}
+
 /// A named, reusable gradient.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Gradient {
     pub id: ObjectId,
     pub name: String,
     pub stops: Vec<GradientStop>,
+    #[serde(default, skip_serializing_if = "ColorSpace::is_rgb")]
+    pub space: ColorSpace,
 }
 
 /// Errors from the textual stop list.
@@ -50,7 +73,14 @@ impl Gradient {
             id,
             name: name.into(),
             stops,
+            space: ColorSpace::Rgb,
         })
+    }
+
+    #[must_use]
+    pub const fn with_space(mut self, space: ColorSpace) -> Self {
+        self.space = space;
+        self
     }
 
     /// Parses `"#ff5f6d 0, #ffc371 100"`. Stops without a position are
@@ -114,10 +144,71 @@ impl Gradient {
         (last.color, last.color, 0.0)
     }
 
-    /// The colour at `t`, blended in RGB.
+    /// The colour at `t`, blended in the gradient's colour space.
     pub fn sample(&self, t: f32) -> Color {
         let (a, b, u) = self.segment(t);
-        mix(a, b, u)
+        match self.space {
+            ColorSpace::Rgb => mix(a, b, u),
+            ColorSpace::Oklab => mix_oklab(a, b, u),
+        }
+    }
+}
+
+fn to_linear(v: u8) -> f32 {
+    let c = f32::from(v) / 255.0;
+    if c <= 0.040_45 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+fn from_linear(v: f32) -> u8 {
+    let c = if v <= 0.003_130_8 {
+        v * 12.92
+    } else {
+        1.055 * v.powf(1.0 / 2.4) - 0.055
+    };
+    (c * 255.0).round().clamp(0.0, 255.0) as u8
+}
+
+/// sRGB to `OKLab` (Björn Ottosson's matrices).
+#[allow(clippy::many_single_char_names, reason = "the published notation")]
+pub fn oklab((r, g, b): (u8, u8, u8)) -> [f32; 3] {
+    let (r, g, b) = (to_linear(r), to_linear(g), to_linear(b));
+    let l = (0.412_221_47 * r + 0.536_332_55 * g + 0.051_445_99 * b).cbrt();
+    let m = (0.211_903_5 * r + 0.680_699_5 * g + 0.107_396_96 * b).cbrt();
+    let s = (0.088_302_46 * r + 0.281_718_85 * g + 0.629_978_7 * b).cbrt();
+    [
+        0.210_454_26 * l + 0.793_617_8 * m - 0.004_072_047 * s,
+        1.977_998_5 * l - 2.428_592_2 * m + 0.450_593_7 * s,
+        0.025_904_037 * l + 0.782_771_77 * m - 0.808_675_77 * s,
+    ]
+}
+
+/// `OKLab` back to sRGB, clamped to the gamut.
+#[allow(clippy::many_single_char_names, reason = "the published notation")]
+pub fn from_oklab([l, a, b]: [f32; 3]) -> (u8, u8, u8) {
+    let l_ = (l + 0.396_337_78 * a + 0.215_803_76 * b).powi(3);
+    let m_ = (l - 0.105_561_346 * a - 0.063_854_17 * b).powi(3);
+    let s_ = (l - 0.089_484_18 * a - 1.291_485_5 * b).powi(3);
+    (
+        from_linear(4.076_741_7 * l_ - 3.307_711_6 * m_ + 0.230_969_94 * s_),
+        from_linear(-1.268_438 * l_ + 2.609_757_4 * m_ - 0.341_319_38 * s_),
+        from_linear(-0.004_196_086_3 * l_ - 0.703_418_6 * m_ + 1.707_614_7 * s_),
+    )
+}
+
+fn mix_oklab(from: Color, to: Color, amount: f32) -> Color {
+    match (from.to_rgb(), to.to_rgb()) {
+        (Some(start), Some(end)) => {
+            let (from_lab, to_lab) = (oklab(start), oklab(end));
+            let share = amount.clamp(0.0, 1.0);
+            let lerp = |i: usize| from_lab[i] + (to_lab[i] - from_lab[i]) * share;
+            let (red, green, blue) = from_oklab([lerp(0), lerp(1), lerp(2)]);
+            Color::Rgb(red, green, blue)
+        }
+        _ => mix(from, to, amount),
     }
 }
 
@@ -322,6 +413,50 @@ mod tests {
             out[2].1,
             Pixel::Solid(B),
             "3 pixels down = 2 units = radius"
+        );
+    }
+
+    #[test]
+    fn oklab_round_trips_and_blends_brighter_than_rgb() {
+        for c in [
+            (255, 0, 0),
+            (0, 128, 255),
+            (12, 200, 90),
+            (0, 0, 0),
+            (255, 255, 255),
+        ] {
+            let back = from_oklab(oklab(c));
+            assert!(
+                back.0.abs_diff(c.0) <= 1 && back.1.abs_diff(c.1) <= 1 && back.2.abs_diff(c.2) <= 1,
+                "{c:?} -> {back:?}"
+            );
+        }
+        let stops = vec![
+            GradientStop {
+                at: 0,
+                color: Color::Rgb(255, 0, 0),
+            },
+            GradientStop {
+                at: 100,
+                color: Color::Rgb(0, 255, 0),
+            },
+        ];
+        let rgb = Gradient::new(ObjectId::slugify("g"), "g", stops).unwrap();
+        let ok = rgb.clone().with_space(ColorSpace::Oklab);
+        let lum = |c: Color| {
+            let (r, g, b) = c.to_rgb().unwrap();
+            u32::from(r) * 299 + u32::from(g) * 587 + u32::from(b) * 114
+        };
+        assert!(
+            lum(ok.sample(0.5)) > lum(rgb.sample(0.5)),
+            "no muddy middle"
+        );
+        let json = serde_json::to_string(&rgb).unwrap();
+        assert!(!json.contains("space"), "rgb is the default and omitted");
+        assert!(
+            serde_json::to_string(&ok)
+                .unwrap()
+                .contains("\"space\":\"oklab\"")
         );
     }
 }

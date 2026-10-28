@@ -146,7 +146,8 @@ impl App {
         let kind = words.next().unwrap_or("artwork");
         let rest = words.collect::<Vec<_>>().join(" ");
         if kind == "pixel" {
-            return self.submit_new_pixel_layer(&rest);
+            let mode = rest.split_whitespace().next().unwrap_or("sextant");
+            return self.submit_new_pixel_layer(mode);
         }
         let name = if rest.is_empty() {
             match kind {

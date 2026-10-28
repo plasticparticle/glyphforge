@@ -104,6 +104,7 @@ pub enum InspectorAction {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PixelAction {
     NewLayer,
+    ImportImage,
     Settings,
     CycleMode,
     CycleDither,
@@ -426,6 +427,7 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("tool-select", "Select Tool", Paint, Action::SelectTool(Tool::Select), keys: ["alt+v", "paint:v"], kw: ["marquee", "rectangle", "selection", "move", "copy", "tool", "palette"], aliases: ["select"], implemented: true),
             desc!("tool-gradient", "Gradient Tool", Paint, Action::SelectTool(Tool::Gradient), keys: ["alt+a", "paint:a"], kw: ["gradient", "fill", "pixel", "tool", "palette"], aliases: ["gradient"], implemented: true),
             desc!("new-pixel-layer", "New Pixel Layer", Paint, Action::Pixel(PixelAction::NewLayer), keys: ["alt+p"], kw: ["raster", "sub-cell", "sextant", "braille", "layer"], aliases: ["pixels"], implemented: true),
+            desc!("import-image", "Import Image", Paint, Action::Pixel(PixelAction::ImportImage), keys: [], kw: ["png", "picture", "photo", "raster", "pixels", "logo"], aliases: ["import"], implemented: true),
             desc!("pixel-settings", "Pixel Layer Settings", Paint, Action::Pixel(PixelAction::Settings), keys: ["alt+o", "paint:o"], kw: ["raster", "mode", "dither", "palette", "shadow"], aliases: [], implemented: true),
             desc!("cycle-pixel-mode", "Cycle Pixel Mode", Paint, Action::Pixel(PixelAction::CycleMode), keys: ["alt+m", "paint:m"], kw: ["half", "quadrant", "sextant", "braille", "resolution"], aliases: [], implemented: true),
             desc!("cycle-dither", "Cycle Dithering", Paint, Action::Pixel(PixelAction::CycleDither), keys: ["alt+shift+d", "paint:shift+d"], kw: ["dither", "ordered", "shade", "bayer"], aliases: [], implemented: true),

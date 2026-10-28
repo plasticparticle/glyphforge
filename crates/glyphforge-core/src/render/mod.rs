@@ -80,11 +80,19 @@ impl<'a> RenderContext<'a> {
         }
     }
 
-    /// The cells of an artwork layer of the current screen, if any.
-    pub fn artwork(&self, layer: &crate::id::ObjectId) -> Option<&'a Canvas> {
-        self.screen
-            .and_then(|s| s.layer(layer))
-            .and_then(crate::document::Layer::cells)
+    /// The cells of an artwork layer of the current screen, or a pixel
+    /// layer encoded on its own (transparent where it has no pixels).
+    pub fn artwork(&self, layer: &crate::id::ObjectId) -> Option<std::borrow::Cow<'a, Canvas>> {
+        let l = self.screen.and_then(|s| s.layer(layer))?;
+        if let Some(cells) = l.cells() {
+            return Some(std::borrow::Cow::Borrowed(cells));
+        }
+        let raster = l.raster()?;
+        let size = raster.cells();
+        let empty = Canvas::new(size).ok()?;
+        Some(std::borrow::Cow::Owned(crate::raster::encode(
+            raster, &empty, size,
+        )))
     }
 }
 

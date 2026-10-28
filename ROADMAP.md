@@ -162,7 +162,7 @@ with stable codes.
       theme tokens, suggest them when edited and show a resolved swatch
 - [x] Colour-depth preview of the canvas (F6: 256, 16, terminal)
 
-### E8 — Pixel Mode  `[~]`
+### E8 — Pixel Mode  `[x]`
 - [x] Raster layers (`LayerContent::Raster`) with half, quadrant, sextant
       and Braille modes; schema v2 with migration; row-coded storage
 - [x] Encoder: two best colours per cell, glyph tables, transparency over
@@ -180,11 +180,13 @@ with stable codes.
 - [x] Patch operations `set_pixels`, `update_raster`, `replace_raster`,
       `set_gradient`, `delete_gradient`; `inspect` lists rasters and
       gradients
-- [ ] Octant mode (2×4 blocks, Unicode 16) once fonts support it
-- [ ] Error-diffusion dithering (Floyd–Steinberg, Atkinson) as an option
-- [ ] Gradient editor with draggable stops; OKLab interpolation
-- [ ] Pixel selection, move and copy; image import (PNG → raster)
-- [ ] `artwork` component referencing a raster layer region
+- [x] Octant mode (2×4 blocks, Unicode 16), table generated from
+      `UnicodeData.txt` including the 26 patterns older blocks cover
+- [x] Error-diffusion dithering (Floyd–Steinberg, Atkinson)
+- [x] Gradient editor with draggable stops; OKLab interpolation
+- [x] Pixel selection, move, copy, cut, paste; PNG import (CLI and
+      editor) with aspect-correct fitting per mode
+- [x] `artwork` component showing a raster layer region
 
 ### E9 — Menu and themes  `[~]`
 - [x] Esc menu (btop style): resume, theme, help, save, save as, new

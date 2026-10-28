@@ -109,7 +109,9 @@ impl DropShadow {
                             Pixel::Clear
                         }
                     }
-                    Dither::Ordered => {
+                    // Diffusion needs colours; a shadow mask is
+                    // thresholded with the ordered pattern instead.
+                    Dither::Ordered | Dither::FloydSteinberg | Dither::Atkinson => {
                         if strength > bayer(x, y) {
                             solid
                         } else {

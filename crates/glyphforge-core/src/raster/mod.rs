@@ -10,6 +10,8 @@
 pub mod draw;
 mod encode;
 pub mod gradient;
+pub mod import;
+pub mod octant;
 mod repr;
 mod shadow;
 
@@ -19,7 +21,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 pub use encode::{encode, shade_glyph};
-pub use gradient::{Gradient, GradientShape, GradientStop, GradientStyle};
+pub use gradient::{ColorSpace, Gradient, GradientShape, GradientStop, GradientStyle};
 pub use shadow::DropShadow;
 
 use crate::document::{Color, Size};
@@ -169,10 +171,19 @@ pub enum RasterMode {
     Sextant,
     /// 2×4 pixels per cell with Braille dots: one colour per cell.
     Braille,
+    /// 2×4 pixels per cell with octant blocks (Unicode 16): two full
+    /// colours per cell at Braille resolution, where fonts have them.
+    Octant,
 }
 
 impl RasterMode {
-    pub const ALL: [Self; 4] = [Self::Half, Self::Quadrant, Self::Sextant, Self::Braille];
+    pub const ALL: [Self; 5] = [
+        Self::Half,
+        Self::Quadrant,
+        Self::Sextant,
+        Self::Braille,
+        Self::Octant,
+    ];
 
     /// Pixels per cell, horizontally and vertically.
     pub const fn cell_px(self) -> (u16, u16) {
@@ -180,7 +191,7 @@ impl RasterMode {
             Self::Half => (1, 2),
             Self::Quadrant => (2, 2),
             Self::Sextant => (2, 3),
-            Self::Braille => (2, 4),
+            Self::Braille | Self::Octant => (2, 4),
         }
     }
 
@@ -190,6 +201,7 @@ impl RasterMode {
             Self::Quadrant => "quadrant",
             Self::Sextant => "sextant",
             Self::Braille => "braille",
+            Self::Octant => "octant",
         }
     }
 
@@ -204,6 +216,7 @@ impl RasterMode {
             Self::Quadrant => "▚",
             Self::Sextant => "🬗",
             Self::Braille => "⣿",
+            Self::Octant => "\u{1CD3A}",
         }
     }
 }
@@ -221,10 +234,22 @@ pub enum Dither {
     Shade,
     /// Shade glyphs, with ordered patterns choosing between shade levels.
     OrderedShade,
+    /// Error diffusion (Floyd–Steinberg): smooth gradients, organic grain.
+    FloydSteinberg,
+    /// Error diffusion (Atkinson): spreads 3/4 of the error, so highlights
+    /// and shadows stay crisp.
+    Atkinson,
 }
 
 impl Dither {
-    pub const ALL: [Self; 4] = [Self::None, Self::Ordered, Self::Shade, Self::OrderedShade];
+    pub const ALL: [Self; 6] = [
+        Self::None,
+        Self::Ordered,
+        Self::Shade,
+        Self::OrderedShade,
+        Self::FloydSteinberg,
+        Self::Atkinson,
+    ];
 
     pub const fn name(self) -> &'static str {
         match self {
@@ -232,6 +257,8 @@ impl Dither {
             Self::Ordered => "ordered",
             Self::Shade => "shade",
             Self::OrderedShade => "ordered-shade",
+            Self::FloydSteinberg => "floyd-steinberg",
+            Self::Atkinson => "atkinson",
         }
     }
 
@@ -245,6 +272,11 @@ impl Dither {
 
     pub const fn shade(self) -> bool {
         matches!(self, Self::Shade | Self::OrderedShade)
+    }
+
+    /// Whether the error of each reduced pixel spreads to its neighbours.
+    pub const fn diffuses(self) -> bool {
+        matches!(self, Self::FloydSteinberg | Self::Atkinson)
     }
 }
 

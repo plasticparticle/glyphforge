@@ -4,6 +4,7 @@ pub mod canvas_view;
 pub mod color_picker;
 pub mod commands;
 pub mod context_menu;
+pub mod gradient_editor;
 pub mod header;
 pub mod help;
 pub mod layout;
@@ -48,6 +49,7 @@ pub fn render(app: &App, frame: &mut Frame<'_>) {
     }
     color_picker::render(app, frame, area);
     menu::render(app, frame, area);
+    gradient_editor::render(app, frame, area);
     prompt::render(app, frame, area);
     review::render(app, frame, area);
     commands::render(app, frame, area);

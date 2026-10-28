@@ -127,6 +127,13 @@ pub fn encode(layer: &RasterLayer, backdrop: &Canvas, size: Size) -> Canvas {
     let Ok(mut out) = Canvas::new(size) else {
         return backdrop.clone();
     };
+    let diffused;
+    let layer = if layer.dither.diffuses() && layer.palette != PaletteLimit::Truecolor {
+        diffused = diffuse(layer);
+        &diffused
+    } else {
+        layer
+    };
     let shadow = layer
         .shadow
         .map(|s| s.render(&layer.pixels, layer.mode, layer.dither));
@@ -154,6 +161,80 @@ pub fn encode(layer: &RasterLayer, backdrop: &Canvas, size: Size) -> Canvas {
                 .map_or(Color::Default, |c| c.style.bg);
             if let Some(cell) = encode_cell(layer, &px, back, (cx * cw, cy * ch)) {
                 let _ = out.put(pos, cell);
+            }
+        }
+    }
+    out
+}
+
+/// Reduces every solid pixel to the palette in reading order, spreading
+/// each pixel's error to its not-yet-visited solid neighbours
+/// (Floyd–Steinberg 7/3/5/1 sixteenths, or Atkinson's six eighths).
+/// Transparent and shade pixels neither take nor pass on error.
+#[allow(clippy::many_single_char_names, reason = "pixel and channel indices")]
+fn diffuse(layer: &RasterLayer) -> RasterLayer {
+    use super::Dither;
+    const FLOYD: &[(i32, i32, f32)] = &[
+        (1, 0, 7.0 / 16.0),
+        (-1, 1, 3.0 / 16.0),
+        (0, 1, 5.0 / 16.0),
+        (1, 1, 1.0 / 16.0),
+    ];
+    const ATKINSON: &[(i32, i32, f32)] = &[
+        (1, 0, 0.125),
+        (2, 0, 0.125),
+        (-1, 1, 0.125),
+        (0, 1, 0.125),
+        (1, 1, 0.125),
+        (0, 2, 0.125),
+    ];
+    let kernel = if layer.dither == Dither::Atkinson {
+        ATKINSON
+    } else {
+        FLOYD
+    };
+    let palette = palette_colors(layer.palette);
+    let (w, h) = (layer.pixels.width(), layer.pixels.height());
+    let mut error = vec![[0.0f32; 3]; usize::from(w) * usize::from(h)];
+    let mut out = layer.clone();
+    out.dither = Dither::None;
+    for y in 0..h {
+        for x in 0..w {
+            let Some(Pixel::Solid(c)) = layer.pixels.get(x, y) else {
+                continue;
+            };
+            if c == Color::Default {
+                continue;
+            }
+            let i = usize::from(y) * usize::from(w) + usize::from(x);
+            let (r, g, b) = rgb(c);
+            let want = [
+                f32::from(r) + error[i][0],
+                f32::from(g) + error[i][1],
+                f32::from(b) + error[i][2],
+            ];
+            let clamp = |v: f32| v.round().clamp(0.0, 255.0) as u8;
+            let chosen = nearest((clamp(want[0]), clamp(want[1]), clamp(want[2])), palette);
+            let got = rgb(chosen);
+            let diff = [
+                want[0] - f32::from(got.0),
+                want[1] - f32::from(got.1),
+                want[2] - f32::from(got.2),
+            ];
+            out.pixels.set(x, y, Pixel::Solid(chosen));
+            for &(dx, dy, share) in kernel {
+                let (nx, ny) = (i32::from(x) + dx, i32::from(y) + dy);
+                if nx < 0 || ny < 0 || nx >= i32::from(w) || ny >= i32::from(h) {
+                    continue;
+                }
+                let (nx, ny) = (nx as u16, ny as u16);
+                if !matches!(layer.pixels.get(nx, ny), Some(Pixel::Solid(_))) {
+                    continue;
+                }
+                let j = usize::from(ny) * usize::from(w) + usize::from(nx);
+                for k in 0..3 {
+                    error[j][k] += diff[k] * share;
+                }
             }
         }
     }
@@ -233,6 +314,7 @@ fn block_glyph(mode: RasterMode, mask: u8) -> Option<String> {
                 char::from_u32(0x1FB00 + u32::from(m) - 1 - skip)?.to_string()
             }
         },
+        RasterMode::Octant => super::octant::octant(mask)?.to_string(),
         RasterMode::Braille => return None,
     })
 }
@@ -479,5 +561,34 @@ mod tests {
         let shadow = at(&out, 1, 1);
         assert_eq!(shadow.as_glyph().unwrap().as_str(), "█");
         assert_eq!(shadow.style.fg, BLUE);
+    }
+
+    #[test]
+    fn error_diffusion_mixes_palette_colours_for_in_between_shades() {
+        use super::super::Dither;
+        // A mid grey over 16 colours: nearest alone gives one colour,
+        // diffusion alternates between neighbours of the grey.
+        let mut l = layer(RasterMode::Quadrant, Size::new(4, 4));
+        l.palette = PaletteLimit::Ansi16;
+        for y in 0..8 {
+            for x in 0..8 {
+                l.pixels.set(x, y, Pixel::Solid(Color::Rgb(100, 100, 100)));
+            }
+        }
+        let back = Canvas::new(Size::new(4, 4)).unwrap();
+        let count = |l: &RasterLayer| {
+            let mut colours = std::collections::BTreeSet::new();
+            let out = encode(l, &back, Size::new(4, 4));
+            for p in out.bounds().positions() {
+                let c = out.get(p).unwrap();
+                colours.insert(format!("{}{}", c.style.fg, c.style.bg));
+            }
+            colours.len()
+        };
+        let flat = count(&l);
+        for d in [Dither::FloydSteinberg, Dither::Atkinson] {
+            l.dither = d;
+            assert!(count(&l) > flat, "{d:?} varies the cells");
+        }
     }
 }

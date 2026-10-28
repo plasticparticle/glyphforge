@@ -135,6 +135,10 @@ pub(crate) fn handle_key(app: &mut App, key: Key) {
         }
         return;
     }
+    if app.prompt.is_none() && app.gradient_editor.is_some() {
+        gradient_editor_key(app, key);
+        return;
+    }
     if app.prompt.is_some() {
         let action = match key.code {
             KeyCode::Esc => Action::PromptCancel,
@@ -269,6 +273,66 @@ fn inspector_key(app: &App, key: Key) -> Option<InspectorAction> {
     })
 }
 
+/// Keys of the gradient editor: arrows choose a stop, Shift+arrows (or
+/// `<` `>` by ten) move it, Enter sets its colour.
+fn gradient_editor_key(app: &mut App, key: Key) {
+    let shift = key.mods == crate::input::Modifiers::SHIFT;
+    match key.code {
+        KeyCode::Esc => app.dispatch(Action::Cancel),
+        KeyCode::Char('s') => app.save_gradient_editor(),
+        KeyCode::Enter | KeyCode::Char('c') => app.edit_gradient_stop_color(),
+        KeyCode::Char('t') => app.edit_gradient_as_text(),
+        _ => {
+            let Some(e) = app.gradient_editor.as_mut() else {
+                return;
+            };
+            match key.code {
+                KeyCode::Left if shift => e.nudge(-1),
+                KeyCode::Right if shift => e.nudge(1),
+                KeyCode::Char('H') => e.nudge(-1),
+                KeyCode::Char('L') => e.nudge(1),
+                KeyCode::Char('<') => e.nudge(-10),
+                KeyCode::Char('>') => e.nudge(10),
+                KeyCode::Left | KeyCode::Char('h') => e.select(false),
+                KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => e.select(true),
+                KeyCode::Char('a' | '+') => e.add(),
+                KeyCode::Char('x' | '-') | KeyCode::Delete => {
+                    e.remove();
+                }
+                KeyCode::Char('o') => e.toggle_space(),
+                KeyCode::Char('r') => e.reverse(),
+                _ => {}
+            }
+        }
+    }
+}
+
+/// While the gradient editor is open it owns the mouse: pressing on the
+/// bar picks the nearest stop, dragging moves it.
+fn handle_gradient_mouse(app: &mut App, m: MouseEvent) -> bool {
+    let area = app.last_frame_area();
+    let Some(g) = ui::gradient_editor::geometry(app, area) else {
+        return false;
+    };
+    let at = ui::gradient_editor::percent_at(&g, m.column);
+    let Some(e) = app.gradient_editor.as_mut() else {
+        return false;
+    };
+    match m.kind {
+        MouseEventKind::Down(MouseButton::Left) if g.track.contains((m.column, m.row).into()) => {
+            e.selected = e.nearest(at);
+            e.dragging = true;
+        }
+        MouseEventKind::Drag(MouseButton::Left) if e.dragging => e.place(at),
+        MouseEventKind::Up(MouseButton::Left) => e.dragging = false,
+        MouseEventKind::Down(_) if !g.popup.contains((m.column, m.row).into()) => {
+            app.dispatch(Action::Cancel);
+        }
+        _ => return false,
+    }
+    true
+}
+
 /// While the layer list has focus, plain keys manage layers and screens;
 /// everything else (Tab, Ctrl+Z, ...) falls through to the keymap.
 fn layers_key(app: &App, key: Key) -> Option<Action> {
@@ -348,6 +412,9 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
     if app.context_menu.is_some() {
         return handle_context_mouse(app, m);
     }
+    if app.gradient_editor.is_some() && app.prompt.is_none() {
+        return handle_gradient_mouse(app, m);
+    }
     if app.menu.is_some() {
         return handle_menu_mouse(app, m);
     }
@@ -414,7 +481,10 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
         }
         MouseEventKind::Drag(MouseButton::Left) => {
             let Some(pos) = doc_pos else { return false };
-            if app.paint.pixel_stroke.is_some() || app.paint.pixel_anchor.is_some() {
+            if app.paint.pixel_stroke.is_some()
+                || app.paint.pixel_anchor.is_some()
+                || app.paint.pixel_moving.is_some()
+            {
                 let (p, _) = pixel_at(app, pos, sub);
                 app.dispatch(Action::Pixel(PixelAction::Drag(p)));
                 true
@@ -431,7 +501,10 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
             }
         }
         MouseEventKind::Up(MouseButton::Left) => {
-            if app.paint.pixel_stroke.is_some() || app.paint.pixel_anchor.is_some() {
+            if app.paint.pixel_stroke.is_some()
+                || app.paint.pixel_anchor.is_some()
+                || app.paint.pixel_moving.is_some()
+            {
                 app.dispatch(Action::Pixel(PixelAction::Release));
                 return true;
             }

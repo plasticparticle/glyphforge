@@ -281,6 +281,7 @@ impl App {
                 self.toggle_select_at(pos);
             }
             Action::SelectAll if self.on_artwork_layer() => self.select_all_cells(),
+            Action::SelectAll if self.on_raster_layer() => self.select_all_pixels(),
             Action::SelectAll => self.select_all(),
             Action::SelectParent => self.select_parent(),
             Action::SelectFirstChild => self.select_first_child(),
@@ -410,6 +411,9 @@ impl App {
             self.context_menu = None;
         } else if self.review.is_some() {
             self.review = None;
+        } else if self.gradient_editor.is_some() {
+            self.gradient_editor = None;
+            self.set_status(StatusKind::Info, "Gradient edit cancelled");
         } else if self.prompt.is_some() {
             self.prompt = None;
         } else if self.picker.is_some() {
@@ -417,7 +421,11 @@ impl App {
         } else if self.paint.anchor.take().is_some() || self.paint.pixel_anchor.take().is_some() {
             self.paint.pixel_end = None;
             self.set_status(StatusKind::Info, "Shape cancelled");
-        } else if self.paint.moving.take().is_some() || self.paint.marquee.take().is_some() {
+        } else if self.paint.moving.take().is_some()
+            || self.paint.marquee.take().is_some()
+            || self.paint.pixel_moving.take().is_some()
+            || self.paint.pixel_marquee.take().is_some()
+        {
             self.set_status(StatusKind::Info, "Selection cleared");
         } else if self.ui.help_open {
             self.ui.help_open = false;
@@ -637,7 +645,7 @@ impl App {
     }
 
     fn delete_forward(&mut self) {
-        if self.clear_marquee() {
+        if self.clear_marquee() || (self.on_raster_layer() && self.clear_pixel_marquee()) {
             return;
         }
         if !self.editable_cells_layer() {

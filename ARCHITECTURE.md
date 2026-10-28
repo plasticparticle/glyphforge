@@ -72,7 +72,9 @@ Application module map (`crates/glyphforge/src`):
 
 ```
 main.rs, cli.rs  argument parsing; TUI by default, subcommands headless
-headless.rs      inspect / render / validate / apply / export / new
+headless.rs      inspect / render / validate / apply / propose / import /
+                 export / kinds / new
+image.rs         PNG decoding and the import patch
 app/             App state, dispatch (behaviour), run loop, viewport,
                  interface (selection), inspector (editable rows),
                  arrange (align, distribute, snapping),
@@ -150,7 +152,7 @@ cell model: they live in raster layers (3.3) and *produce* cells.
 
 A `RasterLayer` is `{ mode, dither, palette, shadow, pixels }`. The pixel
 grid has `mode.cell_px()` pixels per cell (half 1×2, quadrant 2×2, sextant
-2×3, braille 2×4). A `Pixel` is `Clear`, `Solid(Color)` or
+2×3, braille and octant 2×4). A `Pixel` is `Clear`, `Solid(Color)` or
 `Shade { fg, bg, level }` (a `░▒▓` mix; `bg: None` mixes over whatever is
 beneath, used by soft shadows). The pixels are the document; everything
 else is derived at render time, so switching mode, dithering, palette
@@ -176,7 +178,21 @@ centre) and its inverse patch restores the previous raster exactly.
    pixel mask up in the half, quadrant or sextant table (sextant code
    points are computed from the mask, skipping the masks that are `▌▐`).
 
-Gradients (`raster::gradient`) have sorted stops and sample in RGB. A fill
+Before the per-cell pass, error-diffusion dithering (Floyd–Steinberg,
+Atkinson) reduces every solid pixel to the palette in reading order and
+spreads the error to solid neighbours; shadows threshold their alpha with
+the ordered pattern instead. Octant glyphs come from a 256-entry table
+generated from `UnicodeData.txt` (230 octants plus the 26 patterns that
+older blocks, quadrants and quarter blocks already cover).
+
+Gradients (`raster::gradient`) have sorted stops and sample in RGB or, with
+`space: "oklab"`, in OKLab. `raster::import` fits RGBA images into a
+screen area keeping their physical proportions (each mode's pixels have
+their own shape on 1:2 cells) and box-filters them, alpha-weighted, with
+transparent pixels below half coverage; PNG decoding lives in the
+application (`image.rs`, the `png` crate). `RenderContext::artwork`
+encodes a pixel layer on its own when an `artwork` component references
+one. A fill
 takes a region (the flood region at the start point), a shape (linear or
 radial, measured in cell-proportional units so circles stay round) and a
 style: smooth, hard bands, ordered dither between the two stops around

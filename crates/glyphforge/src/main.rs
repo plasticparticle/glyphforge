@@ -6,6 +6,7 @@ mod app;
 mod cli;
 mod config;
 mod headless;
+mod image;
 mod input;
 mod omarchy;
 mod render;

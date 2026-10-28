@@ -134,7 +134,7 @@ pub fn hit(app: &App, area: Rect, cell: (u16, u16)) -> Option<PaletteHit> {
         let tool_rows = Tool::ALL.len().div_ceil(2) as u16;
         if y == tool_rows && app.on_raster_layer() {
             return match x / SWATCH_WIDTH {
-                i @ 0..=3 => RasterMode::ALL
+                i @ 0..=4 => RasterMode::ALL
                     .get(usize::from(i))
                     .copied()
                     .map(PaletteHit::PixelMode),

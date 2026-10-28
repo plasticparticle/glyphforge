@@ -291,6 +291,10 @@ pub struct PaintState {
     pub moving: Option<super::selection::CellMove>,
     /// Brush size on artwork layers: a square of this many cells.
     pub size: u8,
+    /// Selected pixels on a pixel layer (pixel coordinates).
+    pub pixel_marquee: Option<glyphforge_core::Rect>,
+    /// The selected pixels being dragged.
+    pub pixel_moving: Option<super::pixel_select::PixelMove>,
 }
 
 impl Default for PaintState {
@@ -320,6 +324,8 @@ impl Default for PaintState {
             marquee: None,
             moving: None,
             size: 1,
+            pixel_marquee: None,
+            pixel_moving: None,
         }
     }
 }
@@ -422,6 +428,7 @@ impl App {
         self.paint.pixel_anchor = None;
         if tool != Tool::Select {
             self.paint.marquee = None;
+            self.paint.pixel_marquee = None;
         }
         if tool == Tool::Picker && self.paint.tool != Tool::Picker {
             self.paint.previous_tool = self.paint.tool;

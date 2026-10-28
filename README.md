@@ -292,6 +292,7 @@ glyph and the two colours that show them best, over whatever lies beneath.
 | quadrant | 2×2 | `▘ ▚ ▟ …` |
 | sextant (default) | 2×3 | `🬀`–`🬻` |
 | braille | 2×4 | `⣿`, one colour per cell |
+| octant | 2×4 | Unicode 16 octants, two colours per cell (needs a recent font) |
 
 - **Tools**: Brush and Eraser (brush size Alt+= / Alt+-), Line, Rect, Box
   (filled rectangle), Fill, Pick and Gradient all work on pixels.
@@ -301,7 +302,8 @@ glyph and the two colours that show them best, over whatever lies beneath.
   Shift+arrows move a pixel cursor and Space paints at it.
 - **Settings** (palette page "Dither", `O` for all of them as text): mode,
   dithering (`none`, `ordered` Bayer patterns across sub-cell pixels,
-  `shade` glyphs `░▒▓`, or both), palette limit (truecolor, 256, 16 colours).
+  `shade` glyphs `░▒▓`, both, or error diffusion with `floyd-steinberg`
+  or `atkinson`), palette limit (truecolor, 256, 16 colours).
   Changing the mode resamples the pixels and is undoable losslessly.
 - **Drop shadow** (page "Shadow", `Shift+S`): a live effect computed from
   the painted pixels: offset, blur, opacity and colour. Its soft edges use
@@ -309,9 +311,18 @@ glyph and the two colours that show them best, over whatever lies beneath.
 - **Gradients** (Gradient tool, pages "Gradient" and "Gradients"): drag
   from start to end; the fill covers the connected area you pressed in.
   Linear or radial; smooth, hard bands, dithered sub-cells or shade glyphs.
-  Gradients are saved in the document with their stops; `Shift+G` edits or
-  creates one (`Sunset: #ff5f6d 0, #ffc371 100`). Six presets are offered
-  and copied into the document when used.
+  Gradients are saved in the document with their stops. `Shift+G` opens
+  the gradient editor: the bar with its stops, drag a stop or move it with
+  Shift+arrows, Enter sets its colour, `a`/`x` add and remove stops, `o`
+  blends in OKLab instead of RGB (even lightness, no muddy middles), `r`
+  reverses, `t` edits it as text (`Sunset: #ff5f6d 0, #ffc371 100`), `s`
+  saves. Six presets are offered and copied into the document when used.
+- **Selection** (Select tool `V`): a pixel-precise marquee; drag inside to
+  move, Ctrl+C / X / V copy, cut and paste pixels, Delete clears.
+- **Images**: "Import Image" in the command palette (or
+  `glyphforge import design.glyph logo.png --mode braille --cols 30 --rows 10`)
+  fits a PNG at the cursor as a new pixel layer, keeping its proportions in
+  every mode. An `artwork` component can show a pixel layer too.
 
 | Key (pixel layers) | Action |
 |-----|--------|

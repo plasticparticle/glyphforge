@@ -4,12 +4,14 @@ mod arrange;
 mod brushes;
 mod commands;
 mod dispatch;
+mod gradient_editor;
 mod inspector;
 mod interface;
 mod layers;
 mod menu;
 mod mouse;
 mod paint;
+mod pixel_select;
 mod pixels;
 mod prompt;
 mod review;
@@ -187,6 +189,8 @@ pub struct App {
     pub is_omarchy: bool,
     pub prompt: Option<Prompt>,
     pub menu: Option<Menu>,
+    /// The open gradient editor.
+    pub gradient_editor: Option<gradient_editor::GradientEditor>,
     /// The open review of agent changes.
     pub review: Option<review::Review>,
     /// Proposals waiting next to the file, as last counted.
@@ -293,6 +297,7 @@ impl App {
             is_omarchy,
             prompt: None,
             menu: None,
+            gradient_editor: None,
             review: None,
             pending_proposals: 0,
             last_proposal_poll: None,

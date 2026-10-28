@@ -28,6 +28,10 @@ pub enum PromptKind {
     ResizeScreen,
     /// Components, screens, layers and text across the document.
     Find,
+    /// The colour of the gradient editor's selected stop.
+    GradientStopColor,
+    /// A PNG file to import as a pixel layer.
+    ImportImage,
     /// An inspector row of the selection.
     Inspector(FieldKey),
 }

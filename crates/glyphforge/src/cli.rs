@@ -108,6 +108,30 @@ pub enum Command {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Import a PNG image as a pixel layer on top of a screen.
+    Import {
+        file: PathBuf,
+        image: PathBuf,
+        /// Screen id (default: the first screen).
+        #[arg(long)]
+        screen: Option<String>,
+        /// Pixel mode: half, quadrant, sextant, braille or octant.
+        #[arg(long, default_value = "sextant")]
+        mode: String,
+        /// Layer name (default: the image file name).
+        #[arg(long)]
+        name: Option<String>,
+        /// Top-left cell of the image.
+        #[arg(long, default_value_t = 0)]
+        x: u16,
+        #[arg(long, default_value_t = 0)]
+        y: u16,
+        /// Fit into this many columns (with --rows).
+        #[arg(long, requires = "rows")]
+        cols: Option<u16>,
+        #[arg(long, requires = "cols")]
+        rows: Option<u16>,
+    },
     /// List the component kinds with their properties.
     Kinds {
         /// Only this kind.

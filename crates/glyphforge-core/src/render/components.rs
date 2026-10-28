@@ -652,4 +652,34 @@ mod tests {
         assert_eq!(lines[0], "╭ Nav ─╮╭ Main ────╮");
         assert_eq!(lines[2], "╰──────╯╰──────────╯");
     }
+
+    #[test]
+    fn artwork_component_shows_a_pixel_layer() {
+        use crate::document::{Layer, Screen};
+        use crate::raster::{Pixel, RasterMode};
+        let mut screen = Screen::new(id!("s"), "S", Size::new(6, 2)).unwrap();
+        let mut px = Layer::raster_layer(id!("px"), "Px", Size::new(3, 1), RasterMode::Half);
+        px.visible = false;
+        px.raster_mut()
+            .unwrap()
+            .pixels
+            .set(0, 0, Pixel::Solid(Color::Rgb(255, 0, 0)));
+        screen.layers_mut().push(px);
+        let theme = crate::theme::Theme::terminal();
+        let ctx = RenderContext {
+            theme: &theme,
+            screen: Some(&screen),
+        };
+        let art = Component::new(id!("logo"), "artwork")
+            .with_prop("layer", "px")
+            .with_layout(Layout::absolute(2, 0, 3, 1));
+        let (canvas, _) =
+            render_components(&[art], Size::new(6, 2), &ctx, &Registry::builtin()).unwrap();
+        let cell = canvas.get(crate::document::Position::new(2, 0)).unwrap();
+        assert_eq!(
+            cell.as_glyph().map(crate::document::Grapheme::as_str),
+            Some("▀")
+        );
+        assert_eq!(cell.style.fg, Color::Rgb(255, 0, 0));
+    }
 }

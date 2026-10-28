@@ -637,6 +637,8 @@ impl App {
             PromptKind::RenameScreen => self.submit_rename_screen(&prompt.input),
             PromptKind::ResizeScreen => self.submit_resize_screen(&value),
             PromptKind::Find => self.submit_find(&prompt),
+            PromptKind::GradientStopColor => self.submit_gradient_stop_color(&value),
+            PromptKind::ImportImage => self.submit_import_image(&prompt.input),
             PromptKind::Inspector(key) => self.submit_inspector(&key, &prompt.input),
             PromptKind::SaveAs => {
                 if value.is_empty() {
