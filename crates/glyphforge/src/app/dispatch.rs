@@ -108,7 +108,12 @@ impl App {
             | Action::FocusPrev
             | Action::ScrollView(_)
             | Action::LayerNext
-            | Action::LayerPrev) => self.dispatch_view(&action),
+            | Action::LayerPrev
+            | Action::CyclePreviewSize
+            | Action::ToggleMinimap
+            | Action::FocusLayers) => self.dispatch_view(&action),
+            Action::Layer(layer) => self.dispatch_layer(layer),
+            Action::Screen(screen) => self.dispatch_screen(screen),
             Action::CursorMove(dir) => self.move_cursor(dir),
             Action::CursorLineStart => {
                 self.set_cursor(Position::new(0, self.editor.cursor.y), None);
@@ -217,6 +222,12 @@ impl App {
             }
             Action::LayerNext => self.cycle_layer(true),
             Action::LayerPrev => self.cycle_layer(false),
+            Action::CyclePreviewSize => self.cycle_preview_size(),
+            Action::ToggleMinimap => self.toggle_minimap(),
+            Action::FocusLayers => {
+                self.ui.show_right_panel = true;
+                self.ui.focus = Focus::Layers;
+            }
             _ => {}
         }
     }
@@ -243,7 +254,7 @@ impl App {
         match *action {
             Action::SelectNext => self.select_step(true),
             Action::SelectPrev => self.select_step(false),
-            Action::SelectById => self.open_select_by_id(),
+            Action::SelectById => self.open_find(),
             Action::SelectAt(pos) => {
                 self.ui.focus = Focus::Canvas;
                 self.set_cursor(pos, None);
@@ -425,7 +436,7 @@ impl App {
     fn refocus_if_hidden(&mut self) {
         let hidden = match self.ui.focus {
             Focus::LeftPanel => !self.ui.show_left_panel,
-            Focus::RightPanel => !self.ui.show_right_panel,
+            Focus::RightPanel | Focus::Layers => !self.ui.show_right_panel,
             Focus::Canvas => false,
         };
         if hidden {
@@ -439,6 +450,7 @@ impl App {
             regions.insert(0, Focus::LeftPanel);
         }
         if self.ui.show_right_panel {
+            regions.push(Focus::Layers);
             regions.push(Focus::RightPanel);
         }
         let n = regions.len();
@@ -766,6 +778,8 @@ mod tests {
     #[test]
     fn focus_cycles_over_visible_regions() {
         let mut app = app(5, 1);
+        app.dispatch(Action::FocusNext);
+        assert_eq!(app.ui.focus, Focus::Layers);
         app.dispatch(Action::FocusNext);
         assert_eq!(app.ui.focus, Focus::RightPanel);
         app.dispatch(Action::FocusNext);

@@ -207,10 +207,17 @@ with stable codes.
 - [ ] Component-specific actions (table columns, tab pages) arrive with
       those kinds in P1
 
-### E6 — Layers and screens UI  `[ ]`
-Interactive layer list (create, rename, duplicate, reorder, lock, hide,
-isolate, merge), screen switcher, responsive size presets with instant
-preview, minimap for large canvases, find component/screen/text.
+### E6 — Layers and screens UI  `[x]`
+- [x] Interactive layer list with its own focus: activate, show/hide,
+      lock, isolate/restore, reorder, new (artwork, interface, pixel),
+      rename, duplicate (fresh component ids), merge down (cells or
+      components), delete; mouse on eye, lock and name
+- [x] Screen operations `create_screen`, `delete_screen`, `update_screen`
+      (rename, resize with a lossless inverse), `replace_screen`; switcher
+      in the panel, Alt+PgUp/PgDn, new/rename/resize/duplicate/delete
+- [x] Responsive preview sizes (F7) without changing the document
+- [x] Minimap (F8) with click-to-jump
+- [x] Find (Ctrl+F) over components, screens, layers and artwork text
 
 ### E7 — Mouse workflow  `[ ]`
 Drag, resize handles, multi-select, double click, context menus where the

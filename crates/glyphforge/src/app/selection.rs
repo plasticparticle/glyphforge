@@ -390,7 +390,7 @@ impl App {
 }
 
 /// Gives `c` and its descendants ids not in `taken` (and records them).
-fn reid(c: &mut Component, taken: &mut Vec<glyphforge_core::ObjectId>) {
+pub(super) fn reid(c: &mut Component, taken: &mut Vec<glyphforge_core::ObjectId>) {
     let id = c.id.unique_among(|i| taken.contains(i));
     taken.push(id.clone());
     c.id = id;

@@ -77,6 +77,7 @@ app/             App state, dispatch (behaviour), run loop, viewport,
                  arrange (align, distribute, snapping),
                  selection (Select tool, clipboard),
                  commands (command palette, context actions),
+                 layers (layer list, screens, preview size, find),
                  paint (tools, brush, colours),
                  pixels (raster tools), menu (Esc menu, theme choice)
 actions/         Action enum + descriptors (names, keywords, default keys)
@@ -312,6 +313,7 @@ set_cells,
 set_pixels, update_raster, replace_raster,
 set_gradient, delete_gradient,
 create_layer, delete_layer, update_layer, reorder_layer,
+create_screen, delete_screen, update_screen, replace_screen,
 set_theme
 ```
 
@@ -498,6 +500,17 @@ drag opens one transaction and
   against the document. Copy also queues text for the system clipboard,
   which the run loop (the only owner of the terminal) sends as OSC 52 and
   pipes to `wl-copy`/`xclip`.
+- **Layers and screens.** The layer list is its own focus region (`Focus::Layers`)
+  between the canvas and the inspector; plain keys there manage layers,
+  everything else falls through to the keymap. Merging down paints the
+  upper artwork's cells onto the lower layer or reparents the upper
+  interface layer's roots, then deletes the upper layer, in one patch.
+  Isolate remembers the visibility it replaced as editor state. Resizing
+  a screen crops or extends every layer, so `update_screen` answers with
+  `replace_screen` holding the whole previous screen. The preview size is
+  editor state: `doc_size()`, the composite and the layout use it, so
+  responsive rules, selection and hit-testing follow while the document
+  keeps its size.
 - **Command palette.** `app/commands.rs` builds the entries when the
   palette opens: implemented action descriptors that apply in the current
   key context (cursor steps excluded), then context entries (component

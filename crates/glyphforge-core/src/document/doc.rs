@@ -24,6 +24,8 @@ pub enum DocumentError {
     },
     #[error("a screen needs at least one layer")]
     LastLayer,
+    #[error("a document needs at least one screen")]
+    LastScreen,
 }
 
 /// Free-form information about the document.

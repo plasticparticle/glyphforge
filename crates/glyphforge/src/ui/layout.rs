@@ -75,6 +75,7 @@ mod tests {
             help_open: false,
             focus: Focus::Canvas,
             vim_navigation: false,
+            minimap: false,
             inspector_row: 0,
         }
     }

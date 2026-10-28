@@ -78,7 +78,8 @@ A patch:
 ```
 
 Operations: `move`, `resize`, `set_property`, `set_layout`,
-`create_component`, `delete_component`, `reparent`, `set_cells`, `set_pixels`,
+`create_component`, `delete_component`, `reparent`, `set_cells`,
+`create_screen`, `delete_screen`, `update_screen`, `replace_screen`, `set_pixels`,
 `update_raster`, `replace_raster`, `set_gradient`, `delete_gradient`,
 `create_layer`, `delete_layer`, `update_layer`, `reorder_layer`,
 `set_theme`. The same
@@ -153,7 +154,7 @@ Interface mode:
 | Shift+click, Ctrl+A | Add to the selection / select everything on the layer; edits apply to all |
 | `u` / `d` (Alt+Up/Down) | Select the parent / first child |
 | `p` | Move the selection into another container (or to the top level) |
-| Ctrl+F | Select a component by id (jumps to its layer and screen) |
+| Ctrl+F | Find a component, screen, layer or text (jumps there) |
 | Arrows | Nudge the selection (or move the cursor when nothing is selected) |
 | Shift+Arrows | Resize the selection |
 | Mouse drag | Move; dragging the `◆` corner resizes; edges and centres snap to other components (dotted guides) |
@@ -176,6 +177,26 @@ and sizes (`content` → `fill` → `fixed` → `percent` → `flex`), Enter
 edits with suggestions (border families, colour tokens, layer ids),
 Delete resets to the default, Esc returns to the canvas. A click picks a
 row, a second click edits or cycles it.
+
+Layers and screens: the top of the right panel switches screens (`◂ ▸`)
+and lists the layers, top-most first. Click a layer to edit it, the `●`
+to show or hide it, the lock column to lock it. With the list focused
+(Alt+Y, Tab, or a click):
+
+| Key | Action |
+|-----|--------|
+| Up / Down | Activate the layer above / below |
+| Shift+Up / Down | Move the layer up / down the stack |
+| Space or `v`, `l`, `s` | Show/hide, lock/unlock, isolate (again restores) |
+| `n`, `r`, `d`, `m`, Delete | New, rename, duplicate, merge down, delete |
+| Left / Right, Shift+N / R / S | Previous / next screen; new, rename, resize screen |
+
+Alt+PgUp/PgDn switch screens anywhere; screen and layer operations are
+also in the command palette. F7 previews the screen at 60×20, 80×24,
+100×30, 120×40 and 160×50 (responsive rules and layout follow; the screen
+keeps its size), F8 shows a minimap (click it to jump), Ctrl+F finds
+components, screens, layers and text on artwork layers across the
+document.
 
 Subcell mode: the left panel is the palette. Click a tool, a box style
 (`┌ ╭ ╔ ┏ +` under the tools), a glyph or a colour swatch (left click =

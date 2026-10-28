@@ -172,6 +172,10 @@ pub(crate) fn handle_key(app: &mut App, key: Key) {
         app.dispatch(Action::Inspector(action));
         return;
     }
+    if let Some(action) = layers_key(app, key) {
+        app.dispatch(action);
+        return;
+    }
     let chord = key.chord();
     let context = app.key_context();
     let bound = app.keymap.lookup(chord, context).cloned();
@@ -237,6 +241,41 @@ fn inspector_key(app: &App, key: Key) -> Option<InspectorAction> {
         KeyCode::Char(' ' | 'l') | KeyCode::Right => InspectorAction::Cycle(true),
         KeyCode::Left | KeyCode::Char('h') => InspectorAction::Cycle(false),
         KeyCode::Delete | KeyCode::Backspace => InspectorAction::Clear,
+        _ => return None,
+    })
+}
+
+/// While the layer list has focus, plain keys manage layers and screens;
+/// everything else (Tab, Ctrl+Z, ...) falls through to the keymap.
+fn layers_key(app: &App, key: Key) -> Option<Action> {
+    use crate::app::{LayerAction, ScreenAction};
+    if app.ui.focus != Focus::Layers {
+        return None;
+    }
+    let shift = key.mods == crate::input::Modifiers::SHIFT;
+    if !(key.mods.is_none() || shift) {
+        return None;
+    }
+    Some(match key.code {
+        KeyCode::Up if shift => Action::Layer(LayerAction::Raise(true)),
+        KeyCode::Down if shift => Action::Layer(LayerAction::Raise(false)),
+        KeyCode::Char('K') => Action::Layer(LayerAction::Raise(true)),
+        KeyCode::Char('J') => Action::Layer(LayerAction::Raise(false)),
+        KeyCode::Up | KeyCode::Char('k') => Action::LayerNext,
+        KeyCode::Down | KeyCode::Char('j') => Action::LayerPrev,
+        KeyCode::Char(' ' | 'v') => Action::Layer(LayerAction::ToggleVisible(None)),
+        KeyCode::Char('l') => Action::Layer(LayerAction::ToggleLock(None)),
+        KeyCode::Char('s') => Action::Layer(LayerAction::Isolate),
+        KeyCode::Enter | KeyCode::Char('r') => Action::Layer(LayerAction::Rename),
+        KeyCode::Char('n') => Action::Layer(LayerAction::New),
+        KeyCode::Char('d') => Action::Layer(LayerAction::Duplicate),
+        KeyCode::Char('m') => Action::Layer(LayerAction::MergeDown),
+        KeyCode::Delete | KeyCode::Char('x') => Action::Layer(LayerAction::Delete),
+        KeyCode::Char('[') | KeyCode::Left => Action::Screen(ScreenAction::Step(false)),
+        KeyCode::Char(']') | KeyCode::Right => Action::Screen(ScreenAction::Step(true)),
+        KeyCode::Char('N') => Action::Screen(ScreenAction::New),
+        KeyCode::Char('R') => Action::Screen(ScreenAction::Rename),
+        KeyCode::Char('S') => Action::Screen(ScreenAction::Resize),
         _ => return None,
     })
 }
@@ -323,6 +362,14 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
             }
             _ => false,
         },
+        MouseEventKind::Down(MouseButton::Left)
+            if ui::canvas_view::minimap_hit(app, layout.canvas, cell).is_some() =>
+        {
+            if let Some(target) = ui::canvas_view::minimap_hit(app, layout.canvas, cell) {
+                app.center_view_on(target);
+            }
+            true
+        }
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(pos) = doc_pos {
                 if app.on_raster_layer() {
@@ -340,12 +387,7 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
                     app.begin_drag(pos);
                 }
             } else if let Some(right) = layout.right.filter(|r| r.contains(cell.into())) {
-                app.ui.focus = Focus::RightPanel;
-                if app.design_mode() == super::DesignMode::Interface {
-                    if let Some(row) = ui::panels::inspector_hit(app, right, cell) {
-                        app.dispatch(Action::Inspector(InspectorAction::Click(row)));
-                    }
-                }
+                click_right_panel(app, right, cell);
             } else if layout.canvas_block.contains(cell.into()) {
                 app.ui.focus = Focus::Canvas;
             }
@@ -412,6 +454,30 @@ fn handle_mouse(app: &mut App, m: MouseEvent) -> bool {
             true
         }
         _ => false,
+    }
+}
+
+/// A left click in the right panel: the layer list, else the inspector.
+fn click_right_panel(app: &mut App, right: ratatui::layout::Rect, cell: (u16, u16)) {
+    if let Some(hit) = ui::panels::layers_hit(app, right, cell) {
+        use crate::app::{LayerAction, ScreenAction};
+        use ui::panels::LayerHit;
+        app.ui.focus = Focus::Layers;
+        app.dispatch(match hit {
+            LayerHit::ScreenPrev => Action::Screen(ScreenAction::Step(false)),
+            LayerHit::ScreenNext => Action::Screen(ScreenAction::Step(true)),
+            LayerHit::Screen => Action::Screen(ScreenAction::Rename),
+            LayerHit::Activate(id) => Action::ActivateLayer(id),
+            LayerHit::Visibility(id) => Action::Layer(LayerAction::ToggleVisible(Some(id))),
+            LayerHit::Lock(id) => Action::Layer(LayerAction::ToggleLock(Some(id))),
+        });
+        return;
+    }
+    app.ui.focus = Focus::RightPanel;
+    if app.design_mode() == super::DesignMode::Interface {
+        if let Some(row) = ui::panels::inspector_hit(app, right, cell) {
+            app.dispatch(Action::Inspector(InspectorAction::Click(row)));
+        }
     }
 }
 
@@ -548,7 +614,8 @@ mod tests {
         let mut app = test_app(Size::new(10, 2));
         app.editor.viewport.size = Size::new(10, 2);
         handle_key(&mut app, Key::new(KeyCode::Char('f'), Modifiers::CTRL));
-        assert!(app.prompt.is_none(), "no components yet: prompt not opened");
+        assert!(app.prompt.is_some(), "Find lists screens and layers");
+        handle_key(&mut app, Key::new(KeyCode::Esc, Modifiers::NONE));
         app.dispatch(Action::SaveDocumentAs);
         assert!(app.prompt.is_some());
         handle_key(&mut app, key('x'));

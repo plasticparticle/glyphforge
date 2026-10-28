@@ -10,7 +10,6 @@ use super::inspector::FieldKey;
 /// What happens when the prompt is submitted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptKind {
-    SelectById,
     AddComponent,
     EditProperty,
     SaveAs,
@@ -22,6 +21,13 @@ pub enum PromptKind {
     Gradient,
     /// The new parent of the selection.
     Reparent,
+    NewLayer,
+    RenameLayer,
+    NewScreen,
+    RenameScreen,
+    ResizeScreen,
+    /// Components, screens, layers and text across the document.
+    Find,
     /// An inspector row of the selection.
     Inspector(FieldKey),
 }

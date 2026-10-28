@@ -177,12 +177,91 @@ pub fn render(app: &App, frame: &mut Frame<'_>, block_area: Rect, canvas_area: R
         }
     }
 
+    if let Some(m) = minimap_geometry(app, canvas_area) {
+        draw_minimap(app, buf, &m);
+    }
+
     if focused && !app.ui.help_open && app.prompt.is_none() && app.menu.is_none() {
         let c = app.editor.cursor;
         if viewport.contains(c) {
             let sx = canvas_area.x + (c.x - viewport.x);
             let sy = canvas_area.y + (c.y - viewport.y);
             frame.set_cursor_position(RPosition::new(sx, sy));
+        }
+    }
+}
+
+/// Where the minimap sits (bottom-right of the canvas) and how many
+/// document cells each of its cells covers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MinimapGeometry {
+    pub area: Rect,
+    pub scale_x: u16,
+    pub scale_y: u16,
+}
+
+pub fn minimap_geometry(app: &App, canvas_area: Rect) -> Option<MinimapGeometry> {
+    if !app.ui.minimap || canvas_area.width < 12 || canvas_area.height < 6 {
+        return None;
+    }
+    let doc = app.doc_size();
+    let max_w = (canvas_area.width / 3).clamp(4, 32);
+    let max_h = (canvas_area.height / 3).clamp(2, 12);
+    let scale_x = doc.width.div_ceil(max_w).max(1);
+    let scale_y = doc.height.div_ceil(max_h).max(1);
+    let w = doc.width.div_ceil(scale_x);
+    let h = doc.height.div_ceil(scale_y);
+    Some(MinimapGeometry {
+        area: Rect::new(
+            canvas_area.right() - w - 1,
+            canvas_area.bottom() - h - 1,
+            w,
+            h,
+        ),
+        scale_x,
+        scale_y,
+    })
+}
+
+/// The document position a click on the minimap points at.
+pub fn minimap_hit(app: &App, canvas_area: Rect, cell: (u16, u16)) -> Option<Position> {
+    let m = minimap_geometry(app, canvas_area)?;
+    m.area.contains(cell.into()).then(|| {
+        Position::new(
+            (cell.0 - m.area.x) * m.scale_x,
+            (cell.1 - m.area.y) * m.scale_y,
+        )
+    })
+}
+
+/// Each minimap cell shows the first visible glyph of its block in its
+/// colour (or a dot); the viewport is outlined in the selection colour.
+fn draw_minimap(app: &App, buf: &mut ratatui::buffer::Buffer, m: &MinimapGeometry) {
+    let Some(composite) = app.cached_composite() else {
+        return;
+    };
+    let depth = app.canvas_depth();
+    let viewport = app.editor.viewport.rect();
+    let paper = styles::paper(app);
+    for my in 0..m.area.height {
+        for mx in 0..m.area.width {
+            let block =
+                glyphforge_core::Rect::new(mx * m.scale_x, my * m.scale_y, m.scale_x, m.scale_y);
+            let sample = block.positions().find_map(|p| {
+                composite
+                    .get(p)
+                    .filter(|c| c.as_glyph().is_some_and(|g| g.as_str() != " "))
+            });
+            let (symbol, mut style) = match sample {
+                Some(c) => ("▪", to_ratatui_style(c.style, depth)),
+                None => ("·", paper),
+            };
+            if !block.intersection(viewport).is_empty() {
+                style = style.patch(styles::selection(app));
+            }
+            if let Some(cell) = buf.cell_mut((m.area.x + mx, m.area.y + my)) {
+                cell.set_symbol(symbol).set_style(style);
+            }
         }
     }
 }

@@ -99,9 +99,9 @@ pub fn render_left(app: &App, frame: &mut Frame<'_>, area: Rect) {
 pub fn right_areas(app: &App, area: Rect) -> [Rect; 2] {
     if app.on_artwork_layer() || app.on_raster_layer() {
         let props = if app.on_artwork_layer() { 9 } else { 10 };
-        return Layout::vertical([Constraint::Min(3), Constraint::Length(props)]).areas(area);
+        return Layout::vertical([Constraint::Min(4), Constraint::Length(props)]).areas(area);
     }
-    let layers = (app.screen().layers().len() as u16 + 2).clamp(4, (area.height / 3).max(4));
+    let layers = (app.screen().layers().len() as u16 + 3).clamp(5, (area.height / 3).max(5));
     Layout::vertical([Constraint::Length(layers), Constraint::Min(3)]).areas(area)
 }
 
@@ -147,44 +147,107 @@ pub fn inspector_hit(app: &App, right: Rect, cell: (u16, u16)) -> Option<usize> 
     (row < app.inspector_fields().len()).then_some(row)
 }
 
+/// What a click in the layer list refers to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LayerHit {
+    ScreenPrev,
+    ScreenNext,
+    Screen,
+    Activate(glyphforge_core::ObjectId),
+    Visibility(glyphforge_core::ObjectId),
+    Lock(glyphforge_core::ObjectId),
+}
+
+/// The layer list element under a terminal cell. Row 0 is the screen
+/// switcher, then the layers top-most first; column 1 is the eye, column 2
+/// the lock.
+pub fn layers_hit(app: &App, right: Rect, cell: (u16, u16)) -> Option<LayerHit> {
+    let [layers, _] = right_areas(app, right);
+    let inner = Rect::new(
+        layers.x + 1,
+        layers.y + 1,
+        layers.width.saturating_sub(2),
+        layers.height.saturating_sub(2),
+    );
+    if !inner.contains(cell.into()) {
+        return None;
+    }
+    let (x, y) = (cell.0 - inner.x, cell.1 - inner.y);
+    if y == 0 {
+        return Some(if x < 2 {
+            LayerHit::ScreenPrev
+        } else if x + 2 >= inner.width {
+            LayerHit::ScreenNext
+        } else {
+            LayerHit::Screen
+        });
+    }
+    let layer = app.screen().layers().iter().rev().nth(usize::from(y - 1))?;
+    let id = layer.id.clone();
+    Some(match x {
+        1 => LayerHit::Visibility(id),
+        2 => LayerHit::Lock(id),
+        _ => LayerHit::Activate(id),
+    })
+}
+
 pub fn render_right(app: &App, frame: &mut Frame<'_>, area: Rect) {
     let focused = app.ui.focus == Focus::RightPanel;
+    let layers_focused = app.ui.focus == Focus::Layers;
     let [layers_area, props_area] = right_areas(app, area);
 
-    // Layers of the active screen, top-most first.
-    let lines: Vec<Line<'_>> = app
-        .screen()
-        .layers()
+    // The screen switcher, then the layers of the active screen, top-most
+    // first.
+    let screens = app.doc().screens();
+    let index = screens
         .iter()
-        .rev()
-        .map(|layer| {
-            let active = layer.id == app.editor.layer;
-            let marker = if active { "▸" } else { " " };
-            let vis = if layer.visible { "●" } else { "○" };
-            let lock = if layer.locked { "L" } else { " " };
-            let kind = match layer.kind() {
-                LayerKind::Artwork => "art",
-                LayerKind::Interface => "ui ",
-                LayerKind::Raster => "px ",
-            };
-            let style = if active {
-                styles::accent(app)
-            } else {
-                styles::text(app)
-            };
-            Line::from(vec![
-                Span::styled(format!("{marker}{vis}{lock} "), styles::muted(app)),
-                Span::styled(format!("{kind} "), styles::muted(app)),
-                Span::styled(layer.name.clone(), style),
-            ])
-        })
-        .collect();
-    let title = format!("Layers · {}", app.screen().name);
+        .position(|s| s.id == app.editor.screen)
+        .unwrap_or(0);
+    let width = usize::from(layers_area.width.saturating_sub(2));
+    let name = format!("{} {}/{}", app.screen().name, index + 1, screens.len());
+    let mut lines: Vec<Line<'_>> = vec![Line::from(vec![
+        Span::styled("◂ ", styles::accent(app)),
+        Span::styled(
+            format!("{name:^w$}", w = width.saturating_sub(4)),
+            styles::text(app),
+        ),
+        Span::styled(" ▸", styles::accent(app)),
+    ])];
+    lines.extend(app.screen().layers().iter().rev().map(|layer| {
+        let active = layer.id == app.editor.layer;
+        let marker = if active { "▸" } else { " " };
+        let vis = if layer.visible { "●" } else { "○" };
+        let lock = if layer.locked { "L" } else { " " };
+        let kind = match layer.kind() {
+            LayerKind::Artwork => "art",
+            LayerKind::Interface => "ui ",
+            LayerKind::Raster => "px ",
+        };
+        let style = if active && layers_focused {
+            styles::selection(app)
+        } else if active {
+            styles::accent(app)
+        } else {
+            styles::text(app)
+        };
+        Line::from(vec![
+            Span::styled(marker, styles::accent(app)),
+            Span::styled(vis, styles::muted(app)),
+            Span::styled(format!("{lock} "), styles::warning(app)),
+            Span::styled(format!("{kind} "), styles::muted(app)),
+            Span::styled(layer.name.clone(), style),
+        ])
+    }));
+    let title = if layers_focused {
+        "Layers · ␣ show l lock s solo n new d dup m merge"
+    } else {
+        "Screens · Layers"
+    };
     frame.render_widget(
-        Paragraph::new(lines).block(block(app, &title, focused)),
+        Paragraph::new(lines).block(block(app, title, layers_focused)),
         layers_area,
     );
-    super::paint_frame(app, frame, layers_area, focused);
+    super::paint_frame(app, frame, layers_area, layers_focused);
 
     if app.on_raster_layer() {
         render_pixel_info(app, frame, props_area, focused);

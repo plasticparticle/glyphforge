@@ -6,6 +6,7 @@ mod commands;
 mod dispatch;
 mod inspector;
 mod interface;
+mod layers;
 mod menu;
 mod paint;
 mod pixels;
@@ -28,6 +29,7 @@ use crate::terminal::{ColorDepth, TerminalCapabilities};
 pub use brushes::BRUSH_PAGES;
 pub use brushes::{BOX_STYLES, BrushKind, PaletteEntry};
 pub use interface::Drag;
+pub use layers::{LayerAction, ScreenAction};
 pub use menu::{Menu, MenuEntry};
 #[cfg(test)]
 pub use paint::picker_rows;
@@ -41,6 +43,8 @@ pub use viewport::Viewport;
 pub enum Focus {
     Canvas,
     LeftPanel,
+    /// The layer list at the top of the right panel.
+    Layers,
     RightPanel,
 }
 
@@ -49,6 +53,7 @@ impl Focus {
         match self {
             Self::Canvas => "canvas",
             Self::LeftPanel => "left panel",
+            Self::Layers => "layers",
             Self::RightPanel => "right panel",
         }
     }
@@ -109,6 +114,8 @@ pub struct UiState {
     pub help_open: bool,
     pub focus: Focus,
     pub vim_navigation: bool,
+    /// Overview of the whole screen in the canvas corner.
+    pub minimap: bool,
     /// Highlighted inspector row (Interface Mode, right panel).
     pub inspector_row: usize,
 }
@@ -130,6 +137,11 @@ pub struct EditorState {
     pub selection: Option<ObjectId>,
     /// Further selected components (Shift+click); edits apply to all.
     pub also_selected: Vec<ObjectId>,
+    /// Size the screen is previewed at (responsive check); the document
+    /// keeps its own size.
+    pub preview_size: Option<Size>,
+    /// Layer visibility saved by Isolate, restored by the next Isolate.
+    pub isolation: Option<Vec<(ObjectId, bool)>>,
 }
 
 /// Where the UI chrome theme came from.
@@ -184,6 +196,8 @@ pub struct App {
     pub clipboard: Option<selection::Clipboard>,
     /// Text waiting to be sent to the system clipboard.
     system_clipboard: Option<String>,
+    /// What the entries of an open Find prompt point at.
+    find_targets: Vec<(String, layers::FindTarget)>,
     /// Snapping while dragging components.
     pub snap: glyphforge_core::align::Snap,
     /// Guides that explain the current snap (shown while dragging).
@@ -238,6 +252,8 @@ impl App {
                 },
                 selection: None,
                 also_selected: Vec::new(),
+                preview_size: None,
+                isolation: None,
             },
             session: init.session,
             ui: UiState {
@@ -246,6 +262,7 @@ impl App {
                 help_open: false,
                 focus: Focus::Canvas,
                 vim_navigation: vim,
+                minimap: false,
                 inspector_row: 0,
             },
             ui_theme: Theme::terminal(),
@@ -268,6 +285,7 @@ impl App {
             drag: None,
             clipboard: None,
             system_clipboard: None,
+            find_targets: Vec::new(),
             snap: glyphforge_core::align::Snap::default(),
             guides: Vec::new(),
             paint: PaintState::default(),
@@ -392,8 +410,12 @@ impl App {
         self.screen().layer(&self.editor.layer)
     }
 
+    /// The size the screen is shown and laid out at: the preview size
+    /// when one is chosen, otherwise the screen's own.
     pub fn doc_size(&self) -> Size {
-        self.screen().size()
+        self.editor
+            .preview_size
+            .unwrap_or_else(|| self.screen().size())
     }
 
     /// Cell under a position on the active layer, if it is an artwork layer.
@@ -406,7 +428,10 @@ impl App {
     /// The rendered active screen, recomputed only after edits.
     pub fn composite(&mut self) -> &Canvas {
         if self.composite_cache.is_none() {
-            let rendered = match self.session.render(&self.editor.screen, None) {
+            let rendered = match self
+                .session
+                .render(&self.editor.screen, self.editor.preview_size)
+            {
                 Ok(c) => c,
                 Err(e) => {
                     self.report_error(&e);
@@ -501,6 +526,8 @@ impl App {
         self.editor.viewport.offset = Position::ORIGIN;
         self.editor.selection = None;
         self.editor.also_selected.clear();
+        self.editor.preview_size = None;
+        self.editor.isolation = None;
         self.paint.anchor = None;
         self.paint.stroke = None;
         self.paint.pixel_anchor = None;

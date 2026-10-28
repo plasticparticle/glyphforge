@@ -194,6 +194,18 @@ impl App {
                 action: Action::ActivateLayer(layer.id.clone()),
             });
         }
+        for screen in self.doc().screens() {
+            if screen.id == self.editor.screen {
+                continue;
+            }
+            out.push(Command {
+                title: format!("Go To Screen {}", screen.name),
+                group: "Screen".to_owned(),
+                key: String::new(),
+                words: format!("screen switch page {}", screen.id),
+                action: Action::Screen(super::ScreenAction::Switch(screen.id.clone())),
+            });
+        }
         for theme in Theme::builtin() {
             out.push(Command {
                 title: format!("Editor Theme {}", theme.name),

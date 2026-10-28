@@ -56,7 +56,11 @@ impl App {
         if self.layout_cache.is_none() {
             let result = self
                 .session
-                .layout(&self.editor.screen, &self.editor.layer, None)
+                .layout(
+                    &self.editor.screen,
+                    &self.editor.layer,
+                    self.editor.preview_size,
+                )
                 .unwrap_or_default();
             self.layout_cache = Some(result);
         }
@@ -515,15 +519,6 @@ impl App {
 
     // --- prompts ------------------------------------------------------------
 
-    pub fn open_select_by_id(&mut self) {
-        let ids: Vec<String> = self.doc().components().map(|c| c.id.to_string()).collect();
-        if ids.is_empty() {
-            self.set_status(StatusKind::Info, "The document has no components yet");
-            return;
-        }
-        self.prompt = Some(Prompt::new(PromptKind::SelectById, "Select component", ids));
-    }
-
     pub fn open_add_component(&mut self) {
         if self.design_mode() != DesignMode::Interface {
             self.set_status(
@@ -589,12 +584,6 @@ impl App {
         };
         let value = prompt.value();
         match prompt.kind {
-            PromptKind::SelectById => match ObjectId::new(&value) {
-                Ok(id) if self.doc().component(&id).is_some() => {
-                    self.jump_to_component(&id);
-                }
-                _ => self.set_status(StatusKind::Warning, format!("No component {value:?}")),
-            },
             PromptKind::AddComponent => self.add_component_from(&value),
             PromptKind::EditProperty => self.edit_property_from(&value),
             PromptKind::Color(target) => self.submit_color_prompt(target, &value),
@@ -604,6 +593,12 @@ impl App {
             PromptKind::PixelSettings => self.submit_pixel_settings(&prompt.input),
             PromptKind::Gradient => self.submit_gradient(&prompt.input),
             PromptKind::Reparent => self.reparent_into(&value),
+            PromptKind::NewLayer => self.submit_new_layer(&prompt.input),
+            PromptKind::RenameLayer => self.submit_rename_layer(&prompt.input),
+            PromptKind::NewScreen => self.submit_new_screen(&prompt.input),
+            PromptKind::RenameScreen => self.submit_rename_screen(&prompt.input),
+            PromptKind::ResizeScreen => self.submit_resize_screen(&value),
+            PromptKind::Find => self.submit_find(&prompt),
             PromptKind::Inspector(key) => self.submit_inspector(&key, &prompt.input),
             PromptKind::SaveAs => {
                 if value.is_empty() {
@@ -621,7 +616,7 @@ impl App {
     }
 
     /// Selects a component wherever it is: switches screen and layer.
-    fn jump_to_component(&mut self, id: &ObjectId) {
+    pub(super) fn jump_to_component(&mut self, id: &ObjectId) {
         let Some(layer) = self.doc().layer_of_component(id).map(|l| l.id.clone()) else {
             return;
         };

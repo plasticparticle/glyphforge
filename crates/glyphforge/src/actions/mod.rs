@@ -8,7 +8,7 @@ use glyphforge_core::boxdraw::BorderFamily;
 use glyphforge_core::raster::{Dither, GradientShape, GradientStyle, PaletteLimit, RasterMode};
 use glyphforge_core::{Color, ObjectId, Position};
 
-use crate::app::{BrushKind, ColorTarget, Tool};
+use crate::app::{BrushKind, ColorTarget, LayerAction, ScreenAction, Tool};
 
 /// Direction for cursor and viewport movement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -247,6 +247,12 @@ pub enum Action {
     TogglePanels,
     /// Steps the canvas through lower colour depths.
     CyclePreviewDepth,
+    /// Steps the screen through responsive preview sizes.
+    CyclePreviewSize,
+    ToggleMinimap,
+    FocusLayers,
+    Layer(LayerAction),
+    Screen(ScreenAction),
     FocusNext,
     FocusPrev,
     ScrollView(Direction),
@@ -368,7 +374,7 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("delete-selection", "Delete Selection", Edit, Action::DeleteSelection, keys: ["ctrl+delete"], kw: ["clear", "remove"], aliases: [], implemented: true),
             desc!("select-next", "Select Next Component", Interface, Interface, Action::SelectNext, keys: ["]"], kw: ["component", "cycle"], aliases: [], implemented: true),
             desc!("select-prev", "Select Previous Component", Interface, Interface, Action::SelectPrev, keys: ["["], kw: ["component", "cycle"], aliases: [], implemented: true),
-            desc!("select-by-id", "Select Component By Id", Interface, Global, Action::SelectById, keys: ["ctrl+f"], kw: ["find", "jump", "goto"], aliases: ["find"], implemented: true),
+            desc!("select-by-id", "Find", Interface, Global, Action::SelectById, keys: ["ctrl+f"], kw: ["search", "jump", "goto", "component", "screen", "layer", "text"], aliases: ["find"], implemented: true),
             desc!("add-component", "Add Component", Interface, Interface, Action::AddComponent, keys: ["a"], kw: ["create", "insert", "panel", "label", "button"], aliases: ["new component"], implemented: true),
             desc!("edit-property", "Edit Property", Interface, Interface, Action::EditProperty, keys: ["enter"], kw: ["set", "title", "text", "inspector"], aliases: [], implemented: true),
             desc!("select-all", "Select All", Interface, Interface, Action::SelectAll, keys: ["ctrl+a", "paint:ctrl+a", "global:ctrl+a"], kw: ["multi", "selection", "everything"], aliases: [], implemented: true),
@@ -444,6 +450,26 @@ pub fn descriptors() -> &'static [ActionDescriptor] {
             desc!("toggle-right-panel", "Toggle Right Panel", View, Action::ToggleRightPanel, keys: ["f3"], kw: ["layers", "properties", "sidebar", "hide", "show"], aliases: [], implemented: true),
             desc!("toggle-panels", "Toggle All Panels", View, Action::TogglePanels, keys: ["f4"], kw: ["zen", "focus", "fullscreen", "hide", "show"], aliases: ["zen mode"], implemented: true),
             desc!("preview-depth", "Preview Colour Depth", View, Action::CyclePreviewDepth, keys: ["f6"], kw: ["256", "16", "ansi", "colours", "degrade", "truecolor"], aliases: [], implemented: true),
+            desc!("preview-size", "Preview Screen Size", View, Action::CyclePreviewSize, keys: ["f7"], kw: ["responsive", "resize", "width", "80x24", "breakpoint"], aliases: [], implemented: true),
+            desc!("toggle-minimap", "Toggle Minimap", View, Action::ToggleMinimap, keys: ["f8"], kw: ["overview", "navigator", "map"], aliases: ["minimap"], implemented: true),
+            desc!("focus-layers", "Focus Layer List", View, Action::FocusLayers, keys: ["alt+y"], kw: ["layers", "panel", "list"], aliases: ["layers"], implemented: true),
+            desc!("layer-new", "New Layer", View, Action::Layer(LayerAction::New), keys: ["ctrl+shift+n"], kw: ["layers", "add", "create", "artwork", "interface"], aliases: [], implemented: true),
+            desc!("layer-rename", "Rename Layer", View, Action::Layer(LayerAction::Rename), keys: [], kw: ["layers", "name"], aliases: [], implemented: true),
+            desc!("layer-duplicate", "Duplicate Layer", View, Action::Layer(LayerAction::Duplicate), keys: [], kw: ["layers", "copy", "clone"], aliases: [], implemented: true),
+            desc!("layer-delete", "Delete Layer", View, Action::Layer(LayerAction::Delete), keys: [], kw: ["layers", "remove"], aliases: [], implemented: true),
+            desc!("layer-merge-down", "Merge Layer Down", View, Action::Layer(LayerAction::MergeDown), keys: [], kw: ["layers", "flatten", "combine"], aliases: ["merge"], implemented: true),
+            desc!("layer-visible", "Show Or Hide Layer", View, Action::Layer(LayerAction::ToggleVisible(None)), keys: ["ctrl+shift+h"], kw: ["layers", "visibility", "hide", "show", "eye"], aliases: [], implemented: true),
+            desc!("layer-lock", "Lock Or Unlock Layer", View, Action::Layer(LayerAction::ToggleLock(None)), keys: [], kw: ["layers", "protect", "freeze"], aliases: [], implemented: true),
+            desc!("layer-isolate", "Isolate Layer", View, Action::Layer(LayerAction::Isolate), keys: [], kw: ["layers", "solo", "only", "focus"], aliases: ["solo"], implemented: true),
+            desc!("layer-raise", "Raise Layer", View, Action::Layer(LayerAction::Raise(true)), keys: [], kw: ["layers", "reorder", "up", "front"], aliases: [], implemented: true),
+            desc!("layer-lower", "Lower Layer", View, Action::Layer(LayerAction::Raise(false)), keys: [], kw: ["layers", "reorder", "down", "back"], aliases: [], implemented: true),
+            desc!("screen-next", "Next Screen", View, Action::Screen(ScreenAction::Step(true)), keys: ["alt+pagedown"], kw: ["screens", "switch", "page"], aliases: [], implemented: true),
+            desc!("screen-prev", "Previous Screen", View, Action::Screen(ScreenAction::Step(false)), keys: ["alt+pageup"], kw: ["screens", "switch", "page"], aliases: [], implemented: true),
+            desc!("screen-new", "New Screen", View, Action::Screen(ScreenAction::New), keys: [], kw: ["screens", "add", "page", "view"], aliases: [], implemented: true),
+            desc!("screen-rename", "Rename Screen", View, Action::Screen(ScreenAction::Rename), keys: [], kw: ["screens", "name"], aliases: [], implemented: true),
+            desc!("screen-resize", "Resize Screen", View, Action::Screen(ScreenAction::Resize), keys: [], kw: ["screens", "size", "dimensions", "canvas"], aliases: [], implemented: true),
+            desc!("screen-duplicate", "Duplicate Screen", View, Action::Screen(ScreenAction::Duplicate), keys: [], kw: ["screens", "copy", "clone"], aliases: [], implemented: true),
+            desc!("screen-delete", "Delete Screen", View, Action::Screen(ScreenAction::Delete), keys: [], kw: ["screens", "remove"], aliases: [], implemented: true),
             desc!("focus-next", "Focus Next Region", View, Action::FocusNext, keys: ["tab"], kw: ["panel", "cycle"], aliases: [], implemented: true),
             desc!("focus-prev", "Focus Previous Region", View, Action::FocusPrev, keys: ["shift+tab"], kw: ["panel", "cycle"], aliases: [], implemented: true),
             desc!("layer-next", "Next Layer", View, Action::LayerNext, keys: ["ctrl+pageup"], kw: ["layers", "up", "activate"], aliases: [], implemented: true),

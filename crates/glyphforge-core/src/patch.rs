@@ -8,7 +8,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::component::{Component, tree};
-use crate::document::{Cell, CellChange, Document, DocumentError, Layer, LayerKind, Position};
+use crate::document::{
+    Cell, CellChange, Document, DocumentError, Layer, LayerKind, Position, Screen, Size,
+};
 use crate::id::ObjectId;
 use crate::layout::{Dimension, Layout, Placement};
 use crate::raster::draw::PixelWrite;
@@ -174,6 +176,32 @@ pub enum Operation {
     SetTheme {
         theme: Theme,
     },
+    /// Adds a screen (with its layers) at `index` (default: last).
+    CreateScreen {
+        screen: Screen,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        index: Option<usize>,
+    },
+    DeleteScreen {
+        target: ObjectId,
+    },
+    /// Renames and/or resizes a screen. Resizing crops or extends every
+    /// layer; its inverse restores the whole screen, so nothing cropped
+    /// is lost to undo.
+    UpdateScreen {
+        target: ObjectId,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        width: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        height: Option<u16>,
+    },
+    /// Replaces a screen with the same id wholesale (the inverse of a
+    /// resize).
+    ReplaceScreen {
+        screen: Screen,
+    },
 }
 
 impl Operation {
@@ -191,12 +219,15 @@ impl Operation {
             | Self::ReorderLayer { target, .. }
             | Self::UpdateRaster { target, .. }
             | Self::ReplaceRaster { target, .. }
-            | Self::DeleteGradient { target } => Some(target),
+            | Self::DeleteGradient { target }
+            | Self::DeleteScreen { target }
+            | Self::UpdateScreen { target, .. } => Some(target),
             Self::SetGradient { gradient } => Some(&gradient.id),
             Self::CreateComponent { component, .. } => Some(&component.id),
             Self::SetCells { layer, .. } | Self::SetPixels { layer, .. } => Some(layer),
             Self::CreateLayer { layer, .. } => Some(&layer.id),
             Self::SetTheme { .. } => None,
+            Self::CreateScreen { screen, .. } | Self::ReplaceScreen { screen } => Some(&screen.id),
         }
     }
 
@@ -209,6 +240,10 @@ impl Operation {
             Self::CreateComponent { .. } => "create_component",
             Self::DeleteComponent { .. } => "delete_component",
             Self::Reparent { .. } => "reparent",
+            Self::CreateScreen { .. } => "create_screen",
+            Self::DeleteScreen { .. } => "delete_screen",
+            Self::UpdateScreen { .. } => "update_screen",
+            Self::ReplaceScreen { .. } => "replace_screen",
             Self::SetCells { .. } => "set_cells",
             Self::SetPixels { .. } => "set_pixels",
             Self::UpdateRaster { .. } => "update_raster",
@@ -350,6 +385,10 @@ fn apply_one(doc: &mut Document, op: &Operation) -> Result<Operation, OperationE
             let before = std::mem::replace(&mut doc.theme, theme.clone());
             Ok(Operation::SetTheme { theme: before })
         }
+        Operation::CreateScreen { .. }
+        | Operation::DeleteScreen { .. }
+        | Operation::UpdateScreen { .. }
+        | Operation::ReplaceScreen { .. } => apply_screen_op(doc, op),
     }
 }
 
@@ -712,6 +751,81 @@ fn apply_raster_op(doc: &mut Document, op: &Operation) -> Result<Operation, Oper
                 .ok_or_else(|| OperationError::NotAGradient(target.clone()))?;
             let removed = doc.gradients.remove(index);
             Ok(Operation::SetGradient { gradient: removed })
+        }
+        _ => unreachable!("dispatched by apply_one"),
+    }
+}
+
+fn apply_screen_op(doc: &mut Document, op: &Operation) -> Result<Operation, OperationError> {
+    let index_of = |doc: &Document, id: &ObjectId| {
+        doc.screens()
+            .iter()
+            .position(|s| &s.id == id)
+            .ok_or_else(|| OperationError::NotAScreen(id.clone()))
+    };
+    match op {
+        Operation::CreateScreen { screen, index } => {
+            let mut probe = doc.clone();
+            probe.add_screen(screen.clone())?;
+            if let Some(dup) = probe.duplicate_ids().into_iter().next() {
+                return Err(DocumentError::DuplicateId(dup).into());
+            }
+            let max = doc.screens().len();
+            let idx = index.unwrap_or(max);
+            if idx > max {
+                return Err(OperationError::IndexOutOfRange { index: idx, max });
+            }
+            doc.screens_mut().insert(idx, screen.clone());
+            Ok(Operation::DeleteScreen {
+                target: screen.id.clone(),
+            })
+        }
+        Operation::DeleteScreen { target } => {
+            let i = index_of(doc, target)?;
+            if doc.screens().len() == 1 {
+                return Err(DocumentError::LastScreen.into());
+            }
+            let removed = doc.screens_mut().remove(i);
+            Ok(Operation::CreateScreen {
+                screen: removed,
+                index: Some(i),
+            })
+        }
+        Operation::UpdateScreen {
+            target,
+            name,
+            width,
+            height,
+        } => {
+            let i = index_of(doc, target)?;
+            let before = doc.screens()[i].clone();
+            let screen = &mut doc.screens_mut()[i];
+            if let Some(n) = name {
+                screen.name.clone_from(n);
+            }
+            if width.is_some() || height.is_some() {
+                let size = Size::new(
+                    width.unwrap_or(before.size().width),
+                    height.unwrap_or(before.size().height),
+                );
+                screen.resize(size).map_err(DocumentError::from)?;
+                return Ok(Operation::ReplaceScreen { screen: before });
+            }
+            Ok(Operation::UpdateScreen {
+                target: target.clone(),
+                name: name.as_ref().map(|_| before.name.clone()),
+                width: None,
+                height: None,
+            })
+        }
+        Operation::ReplaceScreen { screen } => {
+            let i = index_of(doc, &screen.id)?;
+            let before = std::mem::replace(&mut doc.screens_mut()[i], screen.clone());
+            if let Some(dup) = doc.duplicate_ids().into_iter().next() {
+                doc.screens_mut()[i] = before;
+                return Err(DocumentError::DuplicateId(dup).into());
+            }
+            Ok(Operation::ReplaceScreen { screen: before })
         }
         _ => unreachable!("dispatched by apply_one"),
     }
@@ -1277,5 +1391,70 @@ mod tests {
         .unwrap_err();
         assert!(err.to_string().contains("inside"), "{err}");
         assert_eq!(doc, before);
+    }
+
+    #[test]
+    fn screens_create_rename_resize_delete_and_invert() {
+        let mut doc = Document::new(Size::new(10, 4)).unwrap();
+        let original = doc.clone();
+        let screen = Screen::new(id!("settings"), "Settings", Size::new(10, 4)).unwrap();
+        let undo_create = Patch::single(Operation::CreateScreen {
+            screen,
+            index: None,
+        })
+        .apply(&mut doc)
+        .unwrap();
+        assert_eq!(doc.screens().len(), 2);
+        // Paint a cell that a resize will crop away.
+        Patch::single(Operation::SetCells {
+            layer: id!("settings-artwork"),
+            cells: vec![CellWrite {
+                x: 9,
+                y: 3,
+                cell: Cell::glyph(Grapheme::new("x").unwrap(), CellStyle::DEFAULT),
+            }],
+        })
+        .apply(&mut doc)
+        .unwrap();
+        let before_resize = doc.clone();
+        let undo_resize = Patch::single(Operation::UpdateScreen {
+            target: id!("settings"),
+            name: Some("Prefs".into()),
+            width: Some(5),
+            height: None,
+        })
+        .apply(&mut doc)
+        .unwrap();
+        let s = doc.screen(&id!("settings")).unwrap();
+        assert_eq!((s.name.as_str(), s.size()), ("Prefs", Size::new(5, 4)));
+        undo_resize.apply(&mut doc).unwrap();
+        assert_eq!(doc, before_resize, "undo restores the cropped cell");
+        // A duplicate id inside a new screen is refused.
+        let clash = Screen::new(id!("other"), "Other", Size::new(4, 4)).unwrap();
+        let mut clash = clash;
+        clash.layers_mut()[0].id = id!("settings-ui");
+        assert!(
+            Patch::single(Operation::CreateScreen {
+                screen: clash,
+                index: None
+            })
+            .apply(&mut doc)
+            .is_err()
+        );
+        let _ = undo_create;
+        Patch::single(Operation::DeleteScreen {
+            target: id!("settings"),
+        })
+        .apply(&mut doc)
+        .unwrap();
+        assert_eq!(doc, original);
+        assert!(
+            Patch::single(Operation::DeleteScreen {
+                target: original.first_screen().id.clone()
+            })
+            .apply(&mut doc)
+            .is_err(),
+            "the last screen stays"
+        );
     }
 }
